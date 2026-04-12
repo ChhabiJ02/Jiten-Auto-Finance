@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "288025797078",
+    "project_id": "jiten-auto-and-finance",
+    "storage_bucket": "jiten-auto-and-finance.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:288025797078:android:46251e509f8e78e299c477",
+        "android_client_info": {
+          "package_name": "com.example.showroom_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBYW3qAITpaF_Ae_ox1_aP_k1OVY4I8rJc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
