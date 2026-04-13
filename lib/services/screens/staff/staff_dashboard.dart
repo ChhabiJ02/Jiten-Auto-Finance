@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_inquiry_screen.dart';
 
 class StaffDashboard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Staff Dashboard"),
@@ -16,12 +19,47 @@ class StaffDashboard extends StatelessWidget {
         ],
       ),
 
-      // 👇 KEEP BODY SIMPLE FOR NOW
-      body: const Center(
-        child: Text("Click + to add inquiry"),
+      body: StreamBuilder(
+        stream: FirebaseFirestore.instance
+            .collection('inquiries')
+            .where('createdBy', isEqualTo: user!.uid)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final data = snapshot.data!.docs;
+
+          if (data.isEmpty) {
+            return const Center(child: Text("No inquiries yet"));
+          }
+
+          return ListView.builder(
+            itemCount: data.length,
+            itemBuilder: (context, index) {
+              final item = data[index];
+
+              return Card(
+                margin: const EdgeInsets.all(10),
+                child: ListTile(
+                  title: Text(item['name']),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("📞 ${item['phone']}"),
+                      Text("🚗 ${item['brand']} ${item['model']}"),
+                      Text("💰 ₹${item['price']}"),
+                      Text("📅 Follow up: ${item['nextFollowUp'].toDate().toString().split(' ')[0]}"),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
       ),
 
-      // 🔥 THIS IS THE BUTTON YOU ASKED "WHERE"
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(

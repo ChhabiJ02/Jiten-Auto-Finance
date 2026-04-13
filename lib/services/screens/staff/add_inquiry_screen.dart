@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AddInquiryScreen extends StatefulWidget {
   @override
@@ -10,96 +11,93 @@ class AddInquiryScreen extends StatefulWidget {
 class _AddInquiryScreenState extends State<AddInquiryScreen> {
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
-  final referenceController = TextEditingController();
-  final vehicleController = TextEditingController();
+  final brandController = TextEditingController();
   final modelController = TextEditingController();
-  final notesController = TextEditingController();
+  final priceController = TextEditingController();
+  final referenceController = TextEditingController();
+
+  DateTime selectedDate = DateTime.now();
 
   bool loading = false;
 
-  Future<void> saveInquiry() async {
-    if (nameController.text.isEmpty ||
-        phoneController.text.isEmpty ||
-        vehicleController.text.isEmpty) {
+  // 🔥 WHATSAPP FUNCTION
+  Future<void> sendWhatsAppAndSave() async {
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+    final brand = brandController.text.trim();
+    final model = modelController.text.trim();
+    final price = priceController.text.trim();
+
+    if (name.isEmpty || phone.isEmpty || brand.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill required fields")),
+        const SnackBar(content: Text("Fill required fields")),
       );
       return;
     }
 
+    final message = "Thank you $name 🙏\n"
+        "For your inquiry at Jiten Auto.\n"
+        "Vehicle: $brand $model\n"
+        "Price: ₹$price\n"
+        "Date: ${selectedDate.toString().split(' ')[0]}";
+
+    final url = Uri.parse("https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
+
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+      await saveInquiry(); // 🔥 SAVE AFTER WHATSAPP
+    }
+  }
+
+  Future<void> saveInquiry() async {
     setState(() => loading = true);
 
-    try {
-      final user = FirebaseAuth.instance.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
-      await FirebaseFirestore.instance.collection('inquiries').add({
-        "name": nameController.text.trim(),
-        "phone": phoneController.text.trim(),
-        "reference": referenceController.text.trim(),
-        "vehicle": vehicleController.text.trim(),
-        "model": modelController.text.trim(),
-        "notes": notesController.text.trim(),
-        "createdBy": user!.uid,
-        "createdAt": Timestamp.now(),
-        "source": "offline"
-      });
+    await FirebaseFirestore.instance.collection('inquiries').add({
+      "name": nameController.text.trim(),
+      "phone": phoneController.text.trim(),
+      "brand": brandController.text.trim(),
+      "model": modelController.text.trim(),
+      "price": priceController.text.trim(),
+      "reference": referenceController.text.trim(),
+      "date": selectedDate,
+      "createdBy": user!.uid,
+      "createdAt": Timestamp.now(),
+      "nextFollowUp": Timestamp.fromDate(
+        DateTime.now().add(const Duration(days: 2)),
+      )
+    });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Inquiry Added Successfully")),
-      );
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text("Lead Saved")),
+    );
 
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Error saving inquiry")),
-      );
-    }
-
-    setState(() => loading = false);
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Add Inquiry")),
+      appBar: AppBar(title: const Text("New Inquiry")),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Customer Name"),
-            ),
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(labelText: "Phone Number"),
-            ),
-            TextField(
-              controller: referenceController,
-              decoration: const InputDecoration(labelText: "Reference"),
-            ),
-            TextField(
-              controller: vehicleController,
-              decoration: const InputDecoration(labelText: "Vehicle"),
-            ),
-            TextField(
-              controller: modelController,
-              decoration: const InputDecoration(labelText: "Model"),
-            ),
-            TextField(
-              controller: notesController,
-              decoration: const InputDecoration(labelText: "Notes"),
-            ),
+            TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
+            TextField(controller: phoneController, decoration: const InputDecoration(labelText: "Phone")),
+            TextField(controller: brandController, decoration: const InputDecoration(labelText: "Vehicle Brand")),
+            TextField(controller: modelController, decoration: const InputDecoration(labelText: "Model")),
+            TextField(controller: priceController, decoration: const InputDecoration(labelText: "Price")),
+            TextField(controller: referenceController, decoration: const InputDecoration(labelText: "Reference")),
 
             const SizedBox(height: 20),
 
-            ElevatedButton(
-              onPressed: loading ? null : saveInquiry,
-              child: loading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Save Inquiry"),
-            ),
+            ElevatedButton.icon(
+              onPressed: sendWhatsAppAndSave,
+              icon: const Icon(Icons.message),
+              label: const Text("Send WhatsApp & Save"),
+            )
           ],
         ),
       ),
