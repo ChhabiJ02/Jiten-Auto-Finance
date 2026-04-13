@@ -13,9 +13,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF2A3F66);
-    const accentColor = Color(0xFFC39C6B);
-    const backgroundColor = Color(0xFFF6F1E7);
+    const primaryColor = Color(0xFF7B1F3F);
+    const accentColor = Color(0xFFF4DBE1);
+    const backgroundColor = Color(0xFFF9EEF2);
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -67,7 +67,7 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: accentColor),
+            borderSide: BorderSide(color: primaryColor),
           ),
           labelStyle: TextStyle(color: primaryColor.withAlpha(204)),
         ),
