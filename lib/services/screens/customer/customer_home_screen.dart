@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   final List<Map<String, String>> activa6g = [
@@ -17,7 +18,8 @@ class CustomerHomeScreen extends StatelessWidget {
     {"name": "Silver", "price": "₹99,000", "img": "https://via.placeholder.com/150"},
   ];
 
-  Widget buildSection(String title, List<Map<String, String>> items) {
+  Widget buildSection(BuildContext context, String title, List<Map<String, String>> items) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -25,7 +27,7 @@ class CustomerHomeScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Text(
             title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: theme.textTheme.titleLarge,
           ),
         ),
         const SizedBox(height: 10),
@@ -58,7 +60,13 @@ class CustomerHomeScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(item["name"]!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      Text(item["price"]!, style: const TextStyle(color: Colors.green)),
+                      Text(
+                        item["price"]!,
+                        style: TextStyle(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -85,7 +93,7 @@ class CustomerHomeScreen extends StatelessWidget {
           PopupMenuButton<String>(
             onSelected: (value) {
               if (value == "logout") {
-                Navigator.pop(context);
+                FirebaseAuth.instance.signOut();
               }
             },
             itemBuilder: (context) => [
@@ -101,9 +109,9 @@ class CustomerHomeScreen extends StatelessWidget {
         child: Column(
           children: [
             const SizedBox(height: 10),
-            buildSection("Activa 6G", activa6g),
-            buildSection("Activa 5G", activa5g),
-            buildSection("Jupiter", jupiter),
+            buildSection(context, "Activa 6G", activa6g),
+            buildSection(context, "Activa 5G", activa5g),
+            buildSection(context, "Jupiter", jupiter),
           ],
         ),
       ),

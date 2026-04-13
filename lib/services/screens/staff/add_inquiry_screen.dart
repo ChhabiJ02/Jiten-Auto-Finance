@@ -20,7 +20,12 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   bool loading = false;
 
-  // 🔥 WHATSAPP FUNCTION
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Future<void> sendWhatsAppAndSave() async {
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
@@ -28,10 +33,28 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     final model = modelController.text.trim();
     final price = priceController.text.trim();
 
-    if (name.isEmpty || phone.isEmpty || brand.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Fill required fields")),
-      );
+    if (name.isEmpty) {
+      showMessage("Please enter the customer name.");
+      return;
+    }
+    if (phone.isEmpty) {
+      showMessage("Please enter the customer phone number.");
+      return;
+    }
+    if (brand.isEmpty) {
+      showMessage("Please enter the vehicle brand.");
+      return;
+    }
+
+    final sanitizedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    final whatsappNumber = sanitizedPhone.startsWith('91')
+        ? sanitizedPhone
+        : sanitizedPhone.length == 10
+            ? '91$sanitizedPhone'
+            : sanitizedPhone;
+
+    if (whatsappNumber.length < 10) {
+      showMessage("Please enter a valid phone number for WhatsApp.");
       return;
     }
 
@@ -41,39 +64,83 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "Price: ₹$price\n"
         "Date: ${selectedDate.toString().split(' ')[0]}";
 
-    final url = Uri.parse("https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
-
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-      await saveInquiry(); // 🔥 SAVE AFTER WHATSAPP
-    }
-  }
-
-  Future<void> saveInquiry() async {
-    setState(() => loading = true);
-
-    final user = FirebaseAuth.instance.currentUser;
-
-    await FirebaseFirestore.instance.collection('inquiries').add({
-      "name": nameController.text.trim(),
-      "phone": phoneController.text.trim(),
-      "brand": brandController.text.trim(),
-      "model": modelController.text.trim(),
-      "price": priceController.text.trim(),
-      "reference": referenceController.text.trim(),
-      "date": selectedDate,
-      "createdBy": user!.uid,
-      "createdAt": Timestamp.now(),
-      "nextFollowUp": Timestamp.fromDate(
-        DateTime.now().add(const Duration(days: 2)),
-      )
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Lead Saved")),
+    final whatsappUri = Uri.parse(
+      "whatsapp://send?phone=$whatsappNumber&text=${Uri.encodeComponent(message)}",
+    );
+    final webUri = Uri.parse(
+      "https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}",
     );
 
-    Navigator.pop(context);
+    var launched = false;
+
+    try {
+      launched = await launchUrl(
+        whatsappUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {
+      launched = false;
+    }
+
+    if (!launched) {
+      try {
+        launched = await launchUrl(
+          webUri,
+          mode: LaunchMode.externalApplication,
+        );
+      } catch (_) {
+        launched = false;
+      }
+    }
+
+    if (!launched) {
+      showMessage("WhatsApp is not available on this device.");
+      return;
+    }
+
+    await saveInquiry();
+  }
+
+  Future<bool> saveInquiry() async {
+    setState(() => loading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        showMessage("Unable to save inquiry: user not signed in.");
+        return false;
+      }
+
+      await FirebaseFirestore.instance.collection('inquiries').add({
+        "name": nameController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "brand": brandController.text.trim(),
+        "model": modelController.text.trim(),
+        "price": priceController.text.trim(),
+        "reference": referenceController.text.trim(),
+        "date": selectedDate,
+        "createdBy": user.uid,
+        "createdAt": Timestamp.now(),
+        "nextFollowUp": Timestamp.fromDate(
+          DateTime.now().add(const Duration(days: 2)),
+        )
+      });
+
+      if (mounted) {
+        showMessage("WhatsApp launched and inquiry saved.");
+        Navigator.pop(context);
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        showMessage("Failed to save inquiry. Please try again.");
+      }
+      return false;
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
   }
 
   @override
