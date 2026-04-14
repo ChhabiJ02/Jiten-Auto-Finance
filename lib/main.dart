@@ -18,6 +18,7 @@ class MyApp extends StatelessWidget {
     const backgroundColor = Color(0xFFF9EEF2);
 
     return MaterialApp(
+      title: 'JitenAuto',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: false,

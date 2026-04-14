@@ -59,7 +59,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
 
     final message = "Thank you $name 🙏\n"
-        "For your inquiry at Jiten Auto.\n"
+        "For your inquiry at JitenAuto.\n"
         "Vehicle: $brand $model\n"
         "Price: ₹$price\n"
         "Date: ${selectedDate.toString().split(' ')[0]}";
@@ -145,27 +145,161 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(title: const Text("New Inquiry")),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            TextField(controller: nameController, decoration: const InputDecoration(labelText: "Name")),
-            TextField(controller: phoneController, decoration: const InputDecoration(labelText: "Phone")),
-            TextField(controller: brandController, decoration: const InputDecoration(labelText: "Vehicle Brand")),
-            TextField(controller: modelController, decoration: const InputDecoration(labelText: "Model")),
-            TextField(controller: priceController, decoration: const InputDecoration(labelText: "Price")),
-            TextField(controller: referenceController, decoration: const InputDecoration(labelText: "Reference")),
-
-            const SizedBox(height: 20),
-
-            ElevatedButton.icon(
-              onPressed: sendWhatsAppAndSave,
-              icon: const Icon(Icons.message),
-              label: const Text("Send WhatsApp & Save"),
-            )
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF7B1F3F), Color(0xFFF4DBE1)],
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Card(
+                elevation: 16,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                color: Colors.white,
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        height: 80,
+                        width: 80,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.message_outlined,
+                          color: theme.colorScheme.primary,
+                          size: 40,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        "New Inquiry",
+                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Capture the lead details and send a WhatsApp confirmation.",
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
+                      ),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          labelText: "Customer Name",
+                          prefixIcon: const Icon(Icons.person_outline),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: InputDecoration(
+                          labelText: "Phone Number",
+                          prefixIcon: const Icon(Icons.phone_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: brandController,
+                        decoration: InputDecoration(
+                          labelText: "Vehicle Brand",
+                          prefixIcon: const Icon(Icons.directions_car_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: modelController,
+                        decoration: InputDecoration(
+                          labelText: "Model",
+                          prefixIcon: const Icon(Icons.precision_manufacturing),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: priceController,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: "Price",
+                          prefixIcon: const Icon(Icons.currency_rupee),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: referenceController,
+                        decoration: InputDecoration(
+                          labelText: "Reference",
+                          prefixIcon: const Icon(Icons.note_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.message),
+                          label: const Text("Send WhatsApp & Save"),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          onPressed: sendWhatsAppAndSave,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );

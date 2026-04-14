@@ -27,21 +27,31 @@ class InquiryListScreen extends StatelessWidget {
           return ListView.builder(
             itemCount: inquiries.length,
             itemBuilder: (context, index) {
-              final data = inquiries[index];
+              final doc = inquiries[index];
+
+              // ✅ IMPORTANT FIX HERE
+              final data = doc.data() as Map<String, dynamic>;
 
               return Card(
                 margin: const EdgeInsets.all(10),
                 child: ListTile(
                   title: Text(data['name'] ?? ''),
+
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text("Phone: ${data['phone']}"),
-                      Text("Vehicle: ${data['vehicle']}"),
-                      Text("Model: ${data['model']}"),
-                      Text("Ref: ${data['reference']}"),
+                      Text("Phone: ${data['phone'] ?? ''}"),
+
+                      // ✅ HANDLE BOTH brand & vehicle
+                      Text(
+                        "Vehicle: ${data['brand'] ?? data['vehicle'] ?? 'N/A'}",
+                      ),
+
+                      Text("Model: ${data['model'] ?? ''}"),
+                      Text("Ref: ${data['reference'] ?? ''}"),
                     ],
                   ),
+
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                 ),
               );

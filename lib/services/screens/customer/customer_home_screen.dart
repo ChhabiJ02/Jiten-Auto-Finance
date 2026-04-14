@@ -84,26 +84,20 @@ class CustomerHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Jiten Auto"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) {
-              if (value == "logout") {
-                FirebaseAuth.instance.signOut();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: "profile", child: Text("Profile")),
-              const PopupMenuItem(value: "service", child: Text("Service")),
-              const PopupMenuItem(value: "logout", child: Text("Logout")),
-            ],
-          )
-        ],
-      ),
+  title: const Text("JitenAuto"),
+  actions: [
+    IconButton(
+      icon: const Icon(Icons.search),
+      onPressed: () {},
+    ),
+    IconButton(
+      icon: const Icon(Icons.logout),
+      onPressed: () {
+        FirebaseAuth.instance.signOut();
+      },
+    ),
+  ],
+),
 
       body: SingleChildScrollView(
         child: Column(
