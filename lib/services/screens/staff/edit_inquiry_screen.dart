@@ -16,8 +16,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController phoneController;
   late final TextEditingController brandController;
   late final TextEditingController modelController;
+  late final TextEditingController variantController;
   late final TextEditingController priceController;
+  late final TextEditingController descriptionController;
   late final TextEditingController referenceController;
+  late final TextEditingController otherController;
+  late String paymentType;
+  late String status;
   late DateTime selectedDate;
   bool loading = false;
 
@@ -35,8 +40,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     phoneController = TextEditingController(text: data['phone'] ?? '');
     brandController = TextEditingController(text: data['brand'] ?? '');
     modelController = TextEditingController(text: data['model'] ?? '');
+    variantController = TextEditingController(text: data['variant'] ?? '');
     priceController = TextEditingController(text: data['price'] ?? '');
+    descriptionController = TextEditingController(text: data['description'] ?? '');
     referenceController = TextEditingController(text: data['reference'] ?? '');
+    otherController = TextEditingController(text: data['otherDescription'] ?? '');
+    paymentType = data['paymentType'] ?? 'Loan';
+    status = data['status'] ?? 'New Inquiry';
     final nextFollowUp = data['nextFollowUp'];
     selectedDate = nextFollowUp is Timestamp
         ? nextFollowUp.toDate()
@@ -49,8 +59,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     phoneController.dispose();
     brandController.dispose();
     modelController.dispose();
+    variantController.dispose();
     priceController.dispose();
+    descriptionController.dispose();
     referenceController.dispose();
+    otherController.dispose();
     super.dispose();
   }
 
@@ -59,8 +72,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final phone = phoneController.text.trim();
     final brand = brandController.text.trim();
     final model = modelController.text.trim();
+    final variant = variantController.text.trim();
     final price = priceController.text.trim();
+    final description = descriptionController.text.trim();
     final reference = referenceController.text.trim();
+    final otherDescription = otherController.text.trim();
 
     if (name.isEmpty) {
       showMessage('Please enter the customer name.');
@@ -92,8 +108,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         'phone': phone,
         'brand': brand,
         'model': model,
+        'variant': variant,
         'price': price,
+        'description': description,
+        'paymentType': paymentType,
+        'otherDescription': otherDescription,
         'reference': reference,
+        'status': status,
         'nextFollowUp': Timestamp.fromDate(selectedDate),
       });
 
@@ -153,14 +174,61 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: variantController,
+              decoration: const InputDecoration(labelText: 'Variant'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: priceController,
               decoration: const InputDecoration(labelText: 'Price'),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
             TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(labelText: 'Vehicle Description'),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: paymentType,
+              items: const [
+                DropdownMenuItem(value: 'Loan', child: Text('Loan')),
+                DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => paymentType = value);
+                }
+              },
+              decoration: const InputDecoration(labelText: 'Payment Option'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: otherController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Other Description'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
               controller: referenceController,
               decoration: const InputDecoration(labelText: 'Reference'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: status,
+              items: const [
+                DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
+                DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
+                DropdownMenuItem(value: 'Finance', child: Text('Finance')),
+                DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => status = value);
+                }
+              },
+              decoration: const InputDecoration(labelText: 'Inquiry Status'),
             ),
             const SizedBox(height: 16),
             Row(

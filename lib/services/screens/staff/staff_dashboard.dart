@@ -3,8 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'add_inquiry_screen.dart';
 import 'edit_inquiry_screen.dart';
+import 'service_requests_screen.dart';
 
-class StaffDashboard extends StatelessWidget {
+class StaffDashboard extends StatefulWidget {
+  @override
+  State<StaffDashboard> createState() => _StaffDashboardState();
+}
+
+class _StaffDashboardState extends State<StaffDashboard> {
+  String selectedFilter = 'All';
+  final filters = ['All', 'New Inquiry', 'Follow Ups', 'Finance', 'Booked'];
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -31,6 +40,12 @@ class StaffDashboard extends StatelessWidget {
           }
 
           final data = snapshot.data!.docs;
+          final filteredData = selectedFilter == 'All'
+              ? data
+              : data.where((item) {
+                  final itemData = item.data() as Map<String, dynamic>;
+                  return (itemData['status'] as String? ?? 'New Inquiry') == selectedFilter;
+                }).toList();
 
           if (data.isEmpty) {
             return Column(
@@ -59,50 +74,112 @@ class StaffDashboard extends StatelessWidget {
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
                 ),
               ),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: data.length,
-                  itemBuilder: (context, index) {
-                    final item = data[index];
-
-                    return Card(
-                      margin: const EdgeInsets.all(10),
-                      child: ListTile(
-                        title: Text(item['name']),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              "📞 ${item['phone']}",
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              "🚗 ${item['brand']} ${item['model']}",
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              "💰 ₹${item['price']}",
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              "📅 Follow up: ${item['nextFollowUp'].toDate().toString().split(' ')[0]}",
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                        trailing: const Icon(Icons.edit),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => EditInquiryScreen(inquiry: item),
-                            ),
-                          );
-                        },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.miscellaneous_services_outlined),
+                  label: const Text('Service Requests'),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ServiceRequestsScreen(),
                       ),
                     );
                   },
                 ),
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Row(
+                  children: filters.map((filter) {
+                    final isSelected = filter == selectedFilter;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ChoiceChip(
+                        label: Text(filter),
+                        selected: isSelected,
+                        onSelected: (_) {
+                          setState(() => selectedFilter = filter);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: filteredData.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No $selectedFilter leads found.',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      )
+                    : ListView.builder(
+                        itemCount: filteredData.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredData[index];
+                          final itemData = item.data() as Map<String, dynamic>;
+                          final statusLabel = itemData['status'] as String? ?? 'New Inquiry';
+                          final nextFollowUp = itemData['nextFollowUp'];
+                          final followUpText = nextFollowUp is Timestamp
+                              ? nextFollowUp.toDate().toString().split(' ')[0]
+                              : 'N/A';
+
+                          return Card(
+                            margin: const EdgeInsets.all(10),
+                            child: ListTile(
+                              title: Text(item['name']),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    "📞 ${item['phone']}",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    "🚗 ${itemData['brand'] ?? ''} ${itemData['model'] ?? ''} ${itemData['variant'] ?? ''}".trim(),
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    "💰 ₹${itemData['price'] ?? ''}",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  if ((itemData['description'] as String?)?.isNotEmpty ?? false)
+                                    Text(
+                                      "ℹ️ ${itemData['description']}",
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                  Text(
+                                    "💳 ${itemData['paymentType'] as String? ?? 'Loan'}",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    "📅 Follow up: $followUpText",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  Text(
+                                    "Status: $statusLabel",
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              trailing: const Icon(Icons.edit),
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => EditInquiryScreen(inquiry: item),
+                                  ),
+                                );
+                              },
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           );

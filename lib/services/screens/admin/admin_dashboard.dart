@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'inquiry_list_screen.dart';
+import 'vehicle_catalog_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -387,14 +388,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ),
                 const SizedBox(height: 24),
                 Center(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => InquiryListScreen()),
-                      );
-                    },
-                    child: const Text('View All Inquiries'),
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 12,
+                    children: [
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => InquiryListScreen()),
+                          );
+                        },
+                        child: const Text('View All Inquiries'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const VehicleCatalogScreen()),
+                          );
+                        },
+                        child: const Text('Manage Vehicles'),
+                      ),
+                    ],
                   ),
                 ),
               ],
