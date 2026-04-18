@@ -18,6 +18,8 @@ class CustomerHomeScreen extends StatelessWidget {
     {"name": "Silver", "price": "₹99,000", "img": "https://via.placeholder.com/150"},
   ];
 
+  CustomerHomeScreen({super.key});
+
   Widget buildSection(BuildContext context, String title, List<Map<String, String>> items) {
     final theme = Theme.of(context);
     return Column(

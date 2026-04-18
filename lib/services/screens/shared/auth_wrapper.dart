@@ -34,7 +34,7 @@ class AuthWrapper extends StatelessWidget {
               );
             }
 
-            final role = roleSnap.data;
+            final role = roleSnap.data?.toString().trim().toLowerCase();
 
             // 🔥 DEBUG
             print("🔥 ROLE: $role");
@@ -43,17 +43,19 @@ class AuthWrapper extends StatelessWidget {
               return AdminDashboard();
             } else if (role == 'staff') {
               return StaffDashboard();
-            } else if (role == 'customer') {
+            } else if (role == null || role.isEmpty || role == 'customer') {
               return CustomerHomeScreen();
             } else {
-              // 🔥 FALLBACK SCREEN
+              final roleDisplay = role.isEmpty == true ? 'not assigned' : role;
               return Scaffold(
                 body: Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text("No role assigned ❌"),
-                      const SizedBox(height: 20),
+                      Text("Unknown role: $roleDisplay", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 12),
+                      const Text("Please ensure your Firestore user role is set to 'customer'."),
+                      const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
                           FirebaseAuth.instance.signOut();

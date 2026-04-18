@@ -13,17 +13,60 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   final phoneController = TextEditingController();
   final brandController = TextEditingController();
   final modelController = TextEditingController();
+  final variantController = TextEditingController();
   final priceController = TextEditingController();
+  final descriptionController = TextEditingController();
   final referenceController = TextEditingController();
+  final otherController = TextEditingController();
 
+  String? selectedVehicleId;
+  String paymentType = 'Loan';
+  String status = 'New Inquiry';
   DateTime selectedDate = DateTime.now();
 
   bool loading = false;
+  bool lookupLoading = false;
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _lookupVehicle() async {
+    final brand = brandController.text.trim();
+    final model = modelController.text.trim();
+    final variant = variantController.text.trim();
+
+    if (brand.isEmpty || model.isEmpty || variant.isEmpty) {
+      showMessage('Enter brand, model and variant to fetch vehicle details.');
+      return;
+    }
+
+    setState(() => lookupLoading = true);
+    try {
+      final query = await FirebaseFirestore.instance
+          .collection('vehicles')
+          .where('brand', isEqualTo: brand)
+          .where('model', isEqualTo: model)
+          .where('variant', isEqualTo: variant)
+          .limit(1)
+          .get();
+      if (query.docs.isNotEmpty) {
+        final vehicle = query.docs.first;
+        final data = vehicle.data() as Map<String, dynamic>;
+        selectedVehicleId = vehicle.id;
+        priceController.text = data['price']?.toString() ?? priceController.text;
+        descriptionController.text = data['description'] ?? descriptionController.text;
+        showMessage('Vehicle details loaded from catalog.');
+      } else {
+        showMessage('No matching vehicle found in catalog.');
+      }
+    } catch (_) {
+      showMessage('Failed to fetch vehicle details.');
+    } finally {
+      if (mounted) setState(() => lookupLoading = false);
+    }
   }
 
   Future<void> sendWhatsAppAndSave() async {
@@ -60,8 +103,10 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
     final message = "Thank you $name 🙏\n"
         "For your inquiry at JitenAuto.\n"
-        "Vehicle: $brand $model\n"
+        "Vehicle: $brand ${model.isNotEmpty ? model : ''} ${variantController.text.trim().isNotEmpty ? '(${variantController.text.trim()})' : ''}\n"
         "Price: ₹$price\n"
+        "Description: ${descriptionController.text.trim()}\n"
+        "Payment: $paymentType\n"
         "Date: ${selectedDate.toString().split(' ')[0]}";
 
     final whatsappUri = Uri.parse(
@@ -116,8 +161,14 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "phone": phoneController.text.trim(),
         "brand": brandController.text.trim(),
         "model": modelController.text.trim(),
+        "variant": variantController.text.trim(),
+        "vehicleId": selectedVehicleId,
         "price": priceController.text.trim(),
+        "description": descriptionController.text.trim(),
+        "paymentType": paymentType,
+        "otherDescription": otherController.text.trim(),
         "reference": referenceController.text.trim(),
+        "status": status,
         "date": selectedDate,
         "createdBy": user.uid,
         "createdAt": Timestamp.now(),
@@ -141,6 +192,20 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         setState(() => loading = false);
       }
     }
+  }
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    phoneController.dispose();
+    brandController.dispose();
+    modelController.dispose();
+    variantController.dispose();
+    priceController.dispose();
+    descriptionController.dispose();
+    referenceController.dispose();
+    otherController.dispose();
+    super.dispose();
   }
 
   @override
@@ -254,11 +319,119 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        controller: variantController,
+                        decoration: InputDecoration(
+                          labelText: "Variant",
+                          prefixIcon: const Icon(Icons.widgets_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          icon: lookupLoading
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.search),
+                          label: const Text('Fetch price & description'),
+                          onPressed: lookupLoading ? null : _lookupVehicle,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
                         decoration: InputDecoration(
                           labelText: "Price",
                           prefixIcon: const Icon(Icons.currency_rupee),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: descriptionController,
+                        maxLines: 3,
+                        readOnly: true,
+                        decoration: InputDecoration(
+                          labelText: "Vehicle Description",
+                          prefixIcon: const Icon(Icons.info_outline),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: paymentType,
+                        items: const [
+                          DropdownMenuItem(value: 'Loan', child: Text('Loan')),
+                          DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => paymentType = value);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Payment Option',
+                          prefixIcon: const Icon(Icons.payment_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: otherController,
+                        maxLines: 3,
+                        decoration: InputDecoration(
+                          labelText: "Other Description",
+                          prefixIcon: const Icon(Icons.description_outlined),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: status,
+                        items: const [
+                          DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
+                          DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
+                          DropdownMenuItem(value: 'Finance', child: Text('Finance')),
+                          DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => status = value);
+                          }
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Inquiry Status',
+                          prefixIcon: const Icon(Icons.filter_list_outlined),
                           filled: true,
                           fillColor: Colors.grey.shade100,
                           border: OutlineInputBorder(
