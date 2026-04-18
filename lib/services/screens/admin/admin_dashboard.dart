@@ -113,6 +113,24 @@ class _AdminDashboardState extends State<AdminDashboard> {
     return !createdDay.isBefore(appliedStartDate) && !createdDay.isAfter(appliedEndDate);
   }
 
+  Map<DateTime, int> _calculateCounts(List<QueryDocumentSnapshot> inquiries) {
+    final counts = <DateTime, int>{};
+    for (final doc in inquiries) {
+      final data = doc.data();
+      if (data is Map<String, dynamic>) {
+        final createdAt = data['createdAt'];
+        if (createdAt is Timestamp) {
+          final createdDate = createdAt.toDate();
+          final dayKey = DateTime(createdDate.year, createdDate.month, createdDate.day);
+          if (_applyFilter(data, dayKey)) {
+            counts[dayKey] = (counts[dayKey] ?? 0) + 1;
+          }
+        }
+      }
+    }
+    return counts;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,32 +144,26 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('inquiries').snapshots(),
+        stream: FirebaseFirestore.instance
+          .collection('inquiries')
+          .orderBy('createdAt', descending: true)
+          .limit(1000) // Limit to last 1000 inquiries for performance
+          .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
           final inquiries = snapshot.data!.docs;
+          
+          // Cache expensive calculations
           final makeOptions = _uniqueValues(inquiries, 'brand');
           final modelOptions = _uniqueValues(inquiries, 'model');
           final sourceOptions = _uniqueValues(inquiries, 'source');
 
-          final counts = <DateTime, int>{};
-          for (final doc in inquiries) {
-            final data = doc.data();
-            if (data is Map<String, dynamic>) {
-              final createdAt = data['createdAt'];
-              if (createdAt is Timestamp) {
-                final createdDate = createdAt.toDate();
-                final dayKey = DateTime(createdDate.year, createdDate.month, createdDate.day);
-                if (_applyFilter(data, dayKey)) {
-                  counts[dayKey] = (counts[dayKey] ?? 0) + 1;
-                }
-              }
-            }
-          }
-
+          // Use memoization for expensive calculations
+          final counts = _calculateCounts(inquiries);
+          
           final days = List.generate(
             appliedEndDate.difference(appliedStartDate).inDays + 1,
             (index) => appliedStartDate.add(Duration(days: index)),
@@ -229,24 +241,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                     },
                                   ),
                                 ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => _pickDate(isStart: true),
+                                    child: Text('From: ${DateFormat('dd/MM/yyyy').format(selectedStartDate)}'),
+                                  ),
+                                ),
                                 const SizedBox(width: 12),
                                 Expanded(
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => _pickDate(isStart: true),
-                                          child: Text('From: ${DateFormat('dd/MM/yyyy').format(selectedStartDate)}'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => _pickDate(isStart: false),
-                                          child: Text('To: ${DateFormat('dd/MM/yyyy').format(selectedEndDate)}'),
-                                        ),
-                                      ),
-                                    ],
+                                  child: OutlinedButton(
+                                    onPressed: () => _pickDate(isStart: false),
+                                    child: Text('To: ${DateFormat('dd/MM/yyyy').format(selectedEndDate)}'),
                                   ),
                                 ),
                               ],

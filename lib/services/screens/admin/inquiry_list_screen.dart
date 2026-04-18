@@ -69,69 +69,133 @@ class InquiryListScreen extends StatelessWidget {
               }
 
               final doc = inquiries[index - 1];
-
-              // ✅ IMPORTANT FIX HERE
               final data = doc.data() as Map<String, dynamic>;
+
+              // Check if follow-up is pending
+              bool hasPendingFollowUp = false;
+              String followUpText = '';
+              
+              final nextFollowUp = data['nextFollowUp'];
+              if (nextFollowUp is Timestamp) {
+                final followUpDate = nextFollowUp.toDate();
+                final today = DateTime.now();
+                // Reset time for comparison
+                final todayWithoutTime = DateTime(today.year, today.month, today.day);
+                final followUpDateWithoutTime = DateTime(followUpDate.year, followUpDate.month, followUpDate.day);
+                
+                if (followUpDateWithoutTime.isBefore(todayWithoutTime)) {
+                  hasPendingFollowUp = true;
+                  followUpText = 'Follow-up pending since ${followUpDateWithoutTime.toString().split(' ')[0]}';
+                } else if (followUpDateWithoutTime.year == todayWithoutTime.year && 
+                           followUpDateWithoutTime.month == todayWithoutTime.month && 
+                           followUpDateWithoutTime.day == todayWithoutTime.day) {
+                  hasPendingFollowUp = true;
+                  followUpText = 'Follow-up due today';
+                }
+              }
+
+              // Check if lead is closed or booked
+              final isClosed = data['isClosed'] == true;
+              final isBooked = data['isBooked'] == true;
+              final isCompleted = isClosed || isBooked;
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: ListTile(
-                  title: Text(data['name'] ?? ''),
-
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          children: [
-                            const TextSpan(text: 'Phone: '),
-                            TextSpan(text: data['phone'] ?? ''),
-                          ],
-                        ),
+                color: hasPendingFollowUp && !isCompleted ? Colors.red.shade50 : null,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      title: Text(data['name'] ?? ''),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              children: [
+                                const TextSpan(text: 'Phone: '),
+                                TextSpan(text: data['phone'] ?? ''),
+                              ],
+                            ),
+                          ),
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              children: [
+                                const TextSpan(text: 'Vehicle: '),
+                                TextSpan(text: data['brand'] ?? data['vehicle'] ?? 'N/A'),
+                              ],
+                            ),
+                          ),
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              children: [
+                                const TextSpan(text: 'Model: '),
+                                TextSpan(text: data['model'] ?? ''),
+                              ],
+                            ),
+                          ),
+                          Text.rich(
+                            TextSpan(
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                              children: [
+                                const TextSpan(text: 'Ref: '),
+                                TextSpan(text: data['reference'] ?? ''),
+                              ],
+                            ),
+                          ),
+                          if (hasPendingFollowUp && !isCompleted)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                color: Colors.red.shade100,
+                                child: Text(
+                                  followUpText,
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (isClosed)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Status: CLOSED',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          if (isBooked)
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'Status: BOOKED',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-
-                      // ✅ HANDLE BOTH brand & vehicle
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          children: [
-                            const TextSpan(text: 'Vehicle: '),
-                            TextSpan(text: data['brand'] ?? data['vehicle'] ?? 'N/A'),
-                          ],
-                        ),
-                      ),
-
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          children: [
-                            const TextSpan(text: 'Model: '),
-                            TextSpan(text: data['model'] ?? ''),
-                          ],
-                        ),
-                      ),
-                      Text.rich(
-                        TextSpan(
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                          children: [
-                            const TextSpan(text: 'Ref: '),
-                            TextSpan(text: data['reference'] ?? ''),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => EditInquiryScreen(inquiry: doc),
-                      ),
-                    );
-                  },
+                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => EditInquiryScreen(inquiry: doc),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               );
             },

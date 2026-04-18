@@ -18,8 +18,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController modelController;
   late final TextEditingController priceController;
   late final TextEditingController referenceController;
+  late final TextEditingController followUpCommentController;
+  
   late DateTime selectedDate;
+  late DateTime newFollowUpDate;
   bool loading = false;
+  bool isClosed = false;
+  bool isBooked = false;
+  List<Map<String, dynamic>> followUpHistory = [];
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -37,10 +43,24 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     modelController = TextEditingController(text: data['model'] ?? '');
     priceController = TextEditingController(text: data['price'] ?? '');
     referenceController = TextEditingController(text: data['reference'] ?? '');
+    followUpCommentController = TextEditingController();
+    
     final nextFollowUp = data['nextFollowUp'];
     selectedDate = nextFollowUp is Timestamp
         ? nextFollowUp.toDate()
         : DateTime.now();
+    
+    newFollowUpDate = DateTime.now();
+    
+    // Load follow-up history
+    final history = data['followUpHistory'];
+    if (history is List) {
+      followUpHistory = List<Map<String, dynamic>>.from(history);
+    }
+    
+    // Load status
+    isClosed = data['isClosed'] == true;
+    isBooked = data['isBooked'] == true;
   }
 
   @override
@@ -51,7 +71,29 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     modelController.dispose();
     priceController.dispose();
     referenceController.dispose();
+    followUpCommentController.dispose();
     super.dispose();
+  }
+
+  Future<void> _addFollowUp() async {
+    final comment = followUpCommentController.text.trim();
+    
+    if (comment.isEmpty) {
+      showMessage('Please enter a follow-up comment.');
+      return;
+    }
+
+    final newFollowUp = {
+      'date': Timestamp.fromDate(newFollowUpDate),
+      'comment': comment,
+      'createdAt': Timestamp.now(),
+    };
+
+    setState(() {
+      followUpHistory.add(newFollowUp);
+      followUpCommentController.clear();
+      newFollowUpDate = DateTime.now();
+    });
   }
 
   Future<void> _saveChanges() async {
@@ -95,6 +137,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         'price': price,
         'reference': reference,
         'nextFollowUp': Timestamp.fromDate(selectedDate),
+        'followUpHistory': followUpHistory,
+        'isClosed': isClosed,
+        'isBooked': isBooked,
       });
 
       if (mounted) {
@@ -124,6 +169,18 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     }
   }
 
+  Future<void> _pickNewFollowUpDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: newFollowUpDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() => newFollowUpDate = picked);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -132,52 +189,210 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
+            // Basic Information Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Basic Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: nameController,
+                      decoration: const InputDecoration(labelText: 'Name'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: phoneController,
+                      decoration: const InputDecoration(labelText: 'Phone'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: brandController,
+                      decoration: const InputDecoration(labelText: 'Vehicle Brand'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: modelController,
+                      decoration: const InputDecoration(labelText: 'Model'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: priceController,
+                      decoration: const InputDecoration(labelText: 'Price'),
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: referenceController,
+                      decoration: const InputDecoration(labelText: 'Reference'),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Next Follow up: ${selectedDate.toString().split(' ')[0]}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _pickFollowUpDate,
+                          child: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              decoration: const InputDecoration(labelText: 'Phone'),
+            
+            const SizedBox(height: 20),
+
+            // Status Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isClosed,
+                          onChanged: (value) {
+                            setState(() {
+                              isClosed = value ?? false;
+                              if (isClosed) isBooked = false; // Can't be both closed and booked
+                            });
+                          },
+                        ),
+                        const Text('Closed'),
+                        const SizedBox(width: 30),
+                        Checkbox(
+                          value: isBooked,
+                          onChanged: (value) {
+                            setState(() {
+                              isBooked = value ?? false;
+                              if (isBooked) isClosed = false; // Can't be both booked and closed
+                            });
+                          },
+                        ),
+                        const Text('Booked'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: brandController,
-              decoration: const InputDecoration(labelText: 'Vehicle Brand'),
+
+            const SizedBox(height: 20),
+
+            // Add New Follow-up Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Add New Follow-up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Follow-up Date: ${newFollowUpDate.toString().split(' ')[0]}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _pickNewFollowUpDate,
+                          child: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: followUpCommentController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Follow-up Comment',
+                        hintText: 'Enter details about this follow-up...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _addFollowUp,
+                        child: const Text('Add Follow-up'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: modelController,
-              decoration: const InputDecoration(labelText: 'Model'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              decoration: const InputDecoration(labelText: 'Price'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: referenceController,
-              decoration: const InputDecoration(labelText: 'Reference'),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Follow up: ${selectedDate.toString().split(' ')[0]}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+
+            const SizedBox(height: 20),
+
+            // Follow-up History Section
+            if (followUpHistory.isNotEmpty) ...[
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Follow-up History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                      const SizedBox(height: 16),
+                      ...followUpHistory.map((followUp) {
+                        final date = followUp['date'] is Timestamp 
+                            ? (followUp['date'] as Timestamp).toDate()
+                            : DateTime.now();
+                        
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Date: ${date.toString().split(' ')[0]}',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      'Added: ${followUp['createdAt'] is Timestamp ? (followUp['createdAt'] as Timestamp).toDate().toString().split(' ')[0] : ''}',
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(followUp['comment'] ?? ''),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
-                TextButton(
-                  onPressed: _pickFollowUpDate,
-                  child: const Text('Change'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // Save Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
