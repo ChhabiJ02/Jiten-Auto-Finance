@@ -21,8 +21,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   String? selectedVehicleId;
   String paymentType = 'Loan';
-  String status = 'New Inquiry';
   DateTime selectedDate = DateTime.now();
+  DateTime? followUpDate;
 
   bool loading = false;
   bool lookupLoading = false;
@@ -168,13 +168,11 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "paymentType": paymentType,
         "otherDescription": otherController.text.trim(),
         "reference": referenceController.text.trim(),
-        "status": status,
         "date": selectedDate,
         "createdBy": user.uid,
         "createdAt": Timestamp.now(),
-        "nextFollowUp": Timestamp.fromDate(
-          DateTime.now().add(const Duration(days: 2)),
-        )
+        "status": "New Inquiry",
+        if (followUpDate != null) "nextFollowUp": Timestamp.fromDate(followUpDate!),
       });
 
       if (mounted) {
@@ -416,31 +414,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: status,
-                        items: const [
-                          DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
-                          DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
-                          DropdownMenuItem(value: 'Finance', child: Text('Finance')),
-                          DropdownMenuItem(value: 'Booked', child: Text('Booked')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => status = value);
-                          }
-                        },
-                        decoration: InputDecoration(
-                          labelText: 'Inquiry Status',
-                          prefixIcon: const Icon(Icons.filter_list_outlined),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
                       TextField(
                         controller: referenceController,
                         decoration: InputDecoration(
@@ -451,6 +424,48 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      InkWell(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: followUpDate ?? DateTime.now().add(const Duration(days: 1)),
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (picked != null) {
+                            setState(() => followUpDate = picked);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.calendar_today_outlined),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  followUpDate != null
+                                      ? 'Follow-up: ${followUpDate!.toString().split(' ')[0]}'
+                                      : 'Set follow-up date (optional)',
+                                  style: TextStyle(
+                                    color: followUpDate != null ? Colors.black : Colors.black54,
+                                  ),
+                                ),
+                              ),
+                              if (followUpDate != null)
+                                IconButton(
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () => setState(() => followUpDate = null),
+                                ),
+                            ],
                           ),
                         ),
                       ),

@@ -95,13 +95,13 @@ class InquiryListScreen extends StatelessWidget {
               }
 
               // Check if lead is closed or booked
+              final status = data['status'] as String? ?? 'New Inquiry';
               final isClosed = data['isClosed'] == true;
               final isBooked = data['isBooked'] == true;
-              final isCompleted = isClosed || isBooked;
+              final isCompleted = isClosed || isBooked || status.toLowerCase() == 'booked' || status.toLowerCase() == 'closed';
 
               return Card(
                 margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                color: hasPendingFollowUp && !isCompleted ? Colors.red.shade50 : null,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -149,15 +149,11 @@ class InquiryListScreen extends StatelessWidget {
                           if (hasPendingFollowUp && !isCompleted)
                             Padding(
                               padding: const EdgeInsets.only(top: 8.0),
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                color: Colors.red.shade100,
-                                child: Text(
-                                  followUpText,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              child: Text(
+                                followUpText,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
                             ),

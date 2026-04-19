@@ -105,7 +105,7 @@ class VehicleCatalogScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Vehicle Catalog')),
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('vehicles').orderBy('brand').orderBy('model').snapshots(),
+        stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -127,42 +127,41 @@ class VehicleCatalogScreen extends StatelessWidget {
               final displayName = data['displayName'] as String? ?? '';
               final title = displayName.isNotEmpty ? displayName : '${data['brand'] ?? ''} ${data['model'] ?? ''} ${data['variant'] ?? ''}'.trim();
 
-              return Card(
-                margin: const EdgeInsets.only(bottom: 14),
-                child: ListTile(
-                  leading: imageUrl != null
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Image.network(imageUrl, width: 64, height: 64, fit: BoxFit.cover),
-                        )
-                      : Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(8)),
-                          child: const Icon(Icons.directions_bike, color: Colors.grey),
+              return Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: Card(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 4,
+                  child: InkWell(
+                    onTap: () => _showVehicleDialog(context, doc),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                          child: imageUrl != null
+                              ? Image.network(imageUrl, height: 150, width: double.infinity, fit: BoxFit.cover)
+                              : Container(height: 150, color: Colors.grey.shade200, child: const Icon(Icons.directions_bike, size: 48, color: Colors.grey)),
                         ),
-                  title: Text(title),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text('Price: ₹${data['price'] ?? 'N/A'}'),
-                      if ((data['description'] as String?)?.isNotEmpty ?? false) Text(data['description'] as String),
-                    ],
-                  ),
-                  isThreeLine: true,
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        await _showVehicleDialog(context, doc);
-                      } else if (value == 'delete') {
-                        await FirebaseFirestore.instance.collection('vehicles').doc(doc.id).delete();
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 6),
+                              Text('₹${data['price'] ?? 'N/A'}', style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold)),
+                              if ((data['description'] as String?)?.isNotEmpty ?? false) ...[
+                                const SizedBox(height: 6),
+                                Text(data['description'] as String, maxLines: 2, overflow: TextOverflow.ellipsis),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

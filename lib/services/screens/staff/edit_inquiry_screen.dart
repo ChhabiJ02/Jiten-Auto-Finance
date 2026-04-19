@@ -23,12 +23,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController otherController;
   late final TextEditingController followUpCommentController;
   late String paymentType;
-  late String status;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
   bool loading = false;
   bool isClosed = false;
   bool isBooked = false;
+  String status = 'New Inquiry';
   List<Map<String, dynamic>> followUpHistory = [];
 
   void showMessage(String message) {
@@ -56,7 +56,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     );
     followUpCommentController = TextEditingController();
     paymentType = data['paymentType'] ?? 'Loan';
-    status = data['status'] ?? 'New Inquiry';
     final nextFollowUp = data['nextFollowUp'];
     selectedDate = nextFollowUp is Timestamp
         ? nextFollowUp.toDate()
@@ -73,6 +72,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     // Load status
     isClosed = data['isClosed'] == true;
     isBooked = data['isBooked'] == true;
+    status = data['status'] as String? ?? 'New Inquiry';
   }
 
   @override
@@ -158,11 +158,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             'paymentType': paymentType,
             'otherDescription': otherDescription,
             'reference': reference,
-            'status': status,
             'nextFollowUp': Timestamp.fromDate(selectedDate),
             'followUpHistory': followUpHistory,
             'isClosed': isClosed,
             'isBooked': isBooked,
+            'status': status,
           });
 
       if (mounted) {
@@ -298,6 +298,25 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
+                    DropdownButtonFormField<String>(
+                      value: status,
+                      items: const [
+                        DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
+                        DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
+                        DropdownMenuItem(value: 'Finance', child: Text('Finance')),
+                        DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => status = value);
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Current Status',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Checkbox(
@@ -305,9 +324,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           onChanged: (value) {
                             setState(() {
                               isClosed = value ?? false;
-                              if (isClosed)
-                                isBooked =
-                                    false; // Can't be both closed and booked
+                              if (isClosed) {
+                                isBooked = false;
+                                status = 'Booked'; // Auto-set status when closed
+                              }
                             });
                           },
                         ),
@@ -318,9 +338,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           onChanged: (value) {
                             setState(() {
                               isBooked = value ?? false;
-                              if (isBooked)
-                                isClosed =
-                                    false; // Can't be both booked and closed
+                              if (isBooked) {
+                                isClosed = false;
+                                status = 'Booked'; // Auto-set status when booked
+                              }
                             });
                           },
                         ),
@@ -435,28 +456,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
               controller: referenceController,
               decoration: const InputDecoration(labelText: 'Reference'),
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: status,
-              items: const [
-                DropdownMenuItem(
-                  value: 'New Inquiry',
-                  child: Text('New Inquiry'),
-                ),
-                DropdownMenuItem(
-                  value: 'Follow Ups',
-                  child: Text('Follow Ups'),
-                ),
-                DropdownMenuItem(value: 'Finance', child: Text('Finance')),
-                DropdownMenuItem(value: 'Booked', child: Text('Booked')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => status = value);
-                }
-              },
-              decoration: const InputDecoration(labelText: 'Inquiry Status'),
-            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -465,6 +464,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     'Follow up: ${selectedDate.toString().split(' ')[0]}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
+                ),
+                TextButton(
+                  onPressed: _pickFollowUpDate,
+                  child: const Text('Change'),
                 ),
               ],
             ),

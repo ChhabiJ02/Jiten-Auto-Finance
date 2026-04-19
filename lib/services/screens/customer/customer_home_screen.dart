@@ -1,100 +1,329 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'new_vehicle_booking_screen.dart';
 import 'book_service_screen.dart';
 import 'my_appointments_screen.dart';
 import 'my_service_plan_screen.dart';
+import '../shared/user_settings_screen.dart';
 
-class CustomerHomeScreen extends StatelessWidget {
+class CustomerHomeScreen extends StatefulWidget {
+  const CustomerHomeScreen({super.key});
+
+  @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   final List<Map<String, String>> fallbackVehicles = [
     {"name": "Activa 6G Black", "price": "₹1,05,000", "img": "https://via.placeholder.com/150"},
     {"name": "Activa 5G Grey", "price": "₹95,000", "img": "https://via.placeholder.com/150"},
     {"name": "Jupiter Matte Black", "price": "₹1,00,000", "img": "https://via.placeholder.com/150"},
   ];
 
+  final searchController = TextEditingController();
+  bool searching = false;
+  String searchQuery = '';
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  void toggleSearch() {
+    setState(() {
+      searching = !searching;
+      if (!searching) {
+        searchQuery = '';
+        searchController.clear();
+      }
+    });
+  }
+
+  Widget buildSearchField() {
+    return TextField(
+      controller: searchController,
+      autofocus: true,
+      decoration: InputDecoration(
+        hintText: 'Search vehicles, brands or models',
+        border: InputBorder.none,
+        hintStyle: TextStyle(color: Theme.of(context).colorScheme.onPrimary.withOpacity(0.8)),
+      ),
+      style: TextStyle(color: Theme.of(context).colorScheme.onPrimary, fontSize: 16),
+      onChanged: (value) => setState(() {
+        searchQuery = value.trim().toLowerCase();
+      }),
+    );
+  }
+
+  bool _matchesSearch(Map<String, dynamic> item) {
+    if (searchQuery.isEmpty) return true;
+    final candidate = '${item['displayName'] ?? ''} ${item['brand'] ?? ''} ${item['model'] ?? ''} ${item['variant'] ?? ''} ${item['description'] ?? ''}'.toString().toLowerCase();
+    return candidate.contains(searchQuery);
+  }
+
   Widget buildVehicleSection(BuildContext context, String title, List<Map<String, dynamic>> items) {
     final theme = Theme.of(context);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(title, style: theme.textTheme.titleLarge),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 60,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 220,
+          height: 280,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
               final photoUrls = (item['photos'] as List<dynamic>?)?.whereType<String>().toList() ?? [];
-              final imageUrl = photoUrls.isNotEmpty ? photoUrls.first : item['img'] as String?;
-              final titleText = (item['displayName'] as String?)?.isNotEmpty == true
-                  ? item['displayName'] as String
-                  : '${item['brand'] ?? ''} ${item['model'] ?? ''} ${item['variant'] ?? ''}'.trim();
+              final imageUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
+              final displayName = item['displayName'] as String?;
+              final brand = item['brand'] as String? ?? 'Vehicle';
+              final model = item['model'] as String? ?? '';
+              final variant = item['variant'] as String? ?? '';
+              final price = item['price'] as String? ?? 'N/A';
+              
+              final titleText = displayName?.isNotEmpty == true
+                  ? displayName!
+                  : [brand, model, variant].where((s) => s.isNotEmpty).join(' ').trim();
 
               return Container(
-                width: 170,
-                margin: const EdgeInsets.only(left: 12),
+                width: 200,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
                 child: Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 4,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                        child: imageUrl != null
-                            ? Image.network(imageUrl, height: 110, width: double.infinity, fit: BoxFit.cover)
-                            : Container(height: 110, color: Colors.grey.shade200, child: const Icon(Icons.directions_bike, size: 48, color: Colors.grey)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 8,
+                  shadowColor: theme.colorScheme.primary.withOpacity(0.3),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          theme.colorScheme.surface,
+                          theme.colorScheme.surface.withOpacity(0.95),
+                        ],
                       ),
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Image with Badge
+                        Stack(
                           children: [
-                            Text(titleText, style: const TextStyle(fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 6),
-                            Text('₹${item['price'] ?? 'N/A'}', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
+                            ClipRRect(
+                              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                              child: imageUrl != null && imageUrl.isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: imageUrl,
+                                      height: 140,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      placeholder: (context, url) => Container(
+                                        height: 140,
+                                        color: theme.colorScheme.surfaceVariant,
+                                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      ),
+                                      errorWidget: (context, url, error) => Container(
+                                        height: 140,
+                                        color: theme.colorScheme.surfaceVariant,
+                                        child: Icon(
+                                          Icons.directions_bike,
+                                          size: 56,
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      height: 140,
+                                      color: theme.colorScheme.surfaceVariant,
+                                      child: Center(
+                                        child: Icon(
+                                          Icons.directions_bike,
+                                          size: 56,
+                                          color: theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            // Brand Badge
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.primary,
+                                  borderRadius: BorderRadius.circular(12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: theme.colorScheme.primary.withOpacity(0.4),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  brand,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onPrimary,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
-                      ),
-                    ],
+                        // Content
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Title
+                                Text(
+                                  titleText,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    height: 1.2,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 6),
+                                // Variant Info
+                                if (variant.isNotEmpty)
+                                  Text(
+                                    variant,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurface.withOpacity(0.6),
+                                      fontSize: 12,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                const Spacer(),
+                                // Price
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '₹$price',
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: theme.colorScheme.primary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );
             },
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 28),
       ],
     );
   }
 
-  Widget buildOptionCard(BuildContext context, String title, String subtitle, IconData icon, VoidCallback onTap) {
-    return SizedBox(
-      width: 170,
-      child: Card(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        elevation: 4,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(icon, size: 28, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(height: 16),
-                Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 8),
-                Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.black54)),
-              ],
-            ),
+  Widget buildActionCard(BuildContext context, String title, String subtitle, IconData icon, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: theme.colorScheme.primary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Flexible(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Flexible(
+                child: Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.75),
+                    fontSize: 13,
+                  ),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -105,118 +334,296 @@ class CustomerHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final name = user?.displayName ?? user?.email?.split('@').first ?? 'Customer';
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Customer Dashboard"),
+        title: searching ? buildSearchField() : const Text("JitenAuto Dashboard"),
+        backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {},
+            icon: Icon(searching ? Icons.close : Icons.search),
+            onPressed: toggleSearch,
           ),
           IconButton(
-            icon: const Icon(Icons.logout),
+            icon: const Icon(Icons.settings),
             onPressed: () {
-              FirebaseAuth.instance.signOut();
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSettingsScreen()));
             },
           ),
         ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('vehicles').snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data!.docs;
-          final grouped = <String, List<Map<String, dynamic>>>{};
-          for (final doc in docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final brand = (data['brand'] as String?)?.trim() ?? 'Others';
-            grouped.putIfAbsent(brand, () => []).add(data);
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Card(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Welcome back, $name!', style: Theme.of(context).textTheme.headlineSmall),
-                          const SizedBox(height: 8),
-                          Text('Customer Dashboard — new vehicle booking and service appointment flows.', style: Theme.of(context).textTheme.bodyMedium),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.primary.withOpacity(0.05),
+              theme.colorScheme.surface,
+            ],
+          ),
+        ),
+        child: StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('vehicles')
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            // Handle errors
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      buildOptionCard(
-                        context,
-                        'New Vehicle Booking',
-                        'Request a new vehicle purchase',
-                        Icons.directions_bike,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewVehicleBookingScreen())),
+                      Icon(
+                        Icons.error_outline,
+                        size: 56,
+                        color: theme.colorScheme.error,
                       ),
-                      buildOptionCard(
-                        context,
-                        'Book Service',
-                        'Schedule service for any 2-wheeler',
-                        Icons.miscellaneous_services,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookServiceScreen())),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Unable to load vehicles',
+                        style: theme.textTheme.titleMedium,
                       ),
-                      buildOptionCard(
-                        context,
-                        'My Appointments',
-                        'Track service requests and approvals',
-                        Icons.calendar_month,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAppointmentsScreen())),
-                      ),
-                      buildOptionCard(
-                        context,
-                        'My Service Plan',
-                        'View left services and renew plans',
-                        Icons.assignment_turned_in,
-                        () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyServicePlanScreen())),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Please check your connection and try again.',
+                        style: theme.textTheme.bodyMedium,
+                        textAlign: TextAlign.center,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                if (docs.isEmpty) ...[
+              );
+            }
+
+            // Loading state
+            if (!snapshot.hasData) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Loading vehicles...',
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+
+            final docs = snapshot.data!.docs;
+            
+            // Group vehicles by brand
+            final grouped = <String, List<Map<String, dynamic>>>{};
+            for (final doc in docs) {
+              try {
+                final data = doc.data() as Map<String, dynamic>;
+                if (!_matchesSearch(data)) continue;
+                final brand = (data['brand'] as String?)?.trim() ?? 'Other Brands';
+                grouped.putIfAbsent(brand, () => []).add(data);
+              } catch (e) {
+                // Skip malformed documents
+                continue;
+              }
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Welcome Section
+                  Container(
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          theme.colorScheme.primary,
+                          theme.colorScheme.primary.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: theme.colorScheme.primary.withOpacity(0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: theme.colorScheme.onPrimary.withOpacity(0.2),
+                          child: Icon(
+                            Icons.person,
+                            size: 30,
+                            color: theme.colorScheme.onPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Welcome back, $name!',
+                                style: theme.textTheme.headlineSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Explore our latest vehicles and manage your services.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onPrimary.withOpacity(0.9),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Quick Actions
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Text(
-                      'No vehicle catalog available yet. Please check back later.',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      'Quick Actions',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  buildVehicleSection(context, 'Featured Vehicles', fallbackVehicles.map((item) => item.cast<String, dynamic>()).toList()),
-                ] else ...[
-                  for (final entry in grouped.entries)
-                    buildVehicleSection(context, entry.key, entry.value),
+                  const SizedBox(height: 12),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.1,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        buildActionCard(
+                          context,
+                          'New Vehicle Booking',
+                          'Request a new vehicle purchase',
+                          Icons.directions_bike,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NewVehicleBookingScreen())),
+                        ),
+                        buildActionCard(
+                          context,
+                          'Book Service',
+                          'Schedule service for any 2-wheeler',
+                          Icons.miscellaneous_services,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BookServiceScreen())),
+                        ),
+                        buildActionCard(
+                          context,
+                          'My Appointments',
+                          'Track service requests and approvals',
+                          Icons.calendar_month,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyAppointmentsScreen())),
+                        ),
+                        buildActionCard(
+                          context,
+                          'My Service Plan',
+                          'View left services and renew plans',
+                          Icons.assignment_turned_in,
+                          () => Navigator.push(context, MaterialPageRoute(builder: (_) => const MyServicePlanScreen())),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // Vehicles Section
+                  if (docs.isEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.directions_bike,
+                            size: 56,
+                            color: theme.colorScheme.onSurface.withOpacity(0.3),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No Vehicles Available',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Our vehicle catalog is being updated. Please check back soon!',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ] else if (grouped.isEmpty && searchQuery.isNotEmpty) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 56,
+                            color: theme.colorScheme.onSurface.withOpacity(0.3),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No Results Found',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Try searching with different keywords.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ] else ...[
+                    for (final entry in grouped.entries)
+                      buildVehicleSection(context, entry.key, entry.value),
+                  ],
                 ],
-              ],
-            ),
-          );
-        },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
