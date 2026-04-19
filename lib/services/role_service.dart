@@ -8,7 +8,11 @@ class RoleService {
       final doc = await _firestore.collection('users').doc(uid).get();
 
       if (doc.exists) {
-        return doc['role'];
+        final rawRole = (doc.data() as Map<String, dynamic>?)?['role'];
+        if (rawRole is String) {
+          return rawRole.trim().toLowerCase();
+        }
+        return rawRole?.toString().trim().toLowerCase();
       }
       return null;
     } catch (e) {

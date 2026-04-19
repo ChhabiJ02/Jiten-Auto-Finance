@@ -16,10 +16,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController phoneController;
   late final TextEditingController brandController;
   late final TextEditingController modelController;
+  late final TextEditingController variantController;
   late final TextEditingController priceController;
+  late final TextEditingController descriptionController;
   late final TextEditingController referenceController;
+  late final TextEditingController otherController;
   late final TextEditingController followUpCommentController;
-  
+  late String paymentType;
+  late String status;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
   bool loading = false;
@@ -28,9 +32,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   List<Map<String, dynamic>> followUpHistory = [];
 
   void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -41,23 +45,31 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     phoneController = TextEditingController(text: data['phone'] ?? '');
     brandController = TextEditingController(text: data['brand'] ?? '');
     modelController = TextEditingController(text: data['model'] ?? '');
+    variantController = TextEditingController(text: data['variant'] ?? '');
     priceController = TextEditingController(text: data['price'] ?? '');
+    descriptionController = TextEditingController(
+      text: data['description'] ?? '',
+    );
     referenceController = TextEditingController(text: data['reference'] ?? '');
+    otherController = TextEditingController(
+      text: data['otherDescription'] ?? '',
+    );
     followUpCommentController = TextEditingController();
-    
+    paymentType = data['paymentType'] ?? 'Loan';
+    status = data['status'] ?? 'New Inquiry';
     final nextFollowUp = data['nextFollowUp'];
     selectedDate = nextFollowUp is Timestamp
         ? nextFollowUp.toDate()
         : DateTime.now();
-    
+
     newFollowUpDate = DateTime.now();
-    
+
     // Load follow-up history
     final history = data['followUpHistory'];
     if (history is List) {
       followUpHistory = List<Map<String, dynamic>>.from(history);
     }
-    
+
     // Load status
     isClosed = data['isClosed'] == true;
     isBooked = data['isBooked'] == true;
@@ -69,15 +81,18 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     phoneController.dispose();
     brandController.dispose();
     modelController.dispose();
+    variantController.dispose();
     priceController.dispose();
+    descriptionController.dispose();
     referenceController.dispose();
+    otherController.dispose();
     followUpCommentController.dispose();
     super.dispose();
   }
 
   Future<void> _addFollowUp() async {
     final comment = followUpCommentController.text.trim();
-    
+
     if (comment.isEmpty) {
       showMessage('Please enter a follow-up comment.');
       return;
@@ -101,8 +116,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final phone = phoneController.text.trim();
     final brand = brandController.text.trim();
     final model = modelController.text.trim();
+    final variant = variantController.text.trim();
     final price = priceController.text.trim();
+    final description = descriptionController.text.trim();
     final reference = referenceController.text.trim();
+    final otherDescription = otherController.text.trim();
 
     if (name.isEmpty) {
       showMessage('Please enter the customer name.');
@@ -130,17 +148,22 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
           .collection('inquiries')
           .doc(widget.inquiry.id)
           .update({
-        'name': name,
-        'phone': phone,
-        'brand': brand,
-        'model': model,
-        'price': price,
-        'reference': reference,
-        'nextFollowUp': Timestamp.fromDate(selectedDate),
-        'followUpHistory': followUpHistory,
-        'isClosed': isClosed,
-        'isBooked': isBooked,
-      });
+            'name': name,
+            'phone': phone,
+            'brand': brand,
+            'model': model,
+            'variant': variant,
+            'price': price,
+            'description': description,
+            'paymentType': paymentType,
+            'otherDescription': otherDescription,
+            'reference': reference,
+            'status': status,
+            'nextFollowUp': Timestamp.fromDate(selectedDate),
+            'followUpHistory': followUpHistory,
+            'isClosed': isClosed,
+            'isBooked': isBooked,
+          });
 
       if (mounted) {
         showMessage('Inquiry updated successfully.');
@@ -197,7 +220,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Basic Information', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text(
+                      'Basic Information',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: nameController,
@@ -211,7 +240,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     const SizedBox(height: 12),
                     TextField(
                       controller: brandController,
-                      decoration: const InputDecoration(labelText: 'Vehicle Brand'),
+                      decoration: const InputDecoration(
+                        labelText: 'Vehicle Brand',
+                      ),
                     ),
                     const SizedBox(height: 12),
                     TextField(
@@ -248,7 +279,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
 
             // Status Section
@@ -259,7 +290,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Status', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text(
+                      'Status',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -268,7 +305,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           onChanged: (value) {
                             setState(() {
                               isClosed = value ?? false;
-                              if (isClosed) isBooked = false; // Can't be both closed and booked
+                              if (isClosed)
+                                isBooked =
+                                    false; // Can't be both closed and booked
                             });
                           },
                         ),
@@ -279,7 +318,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           onChanged: (value) {
                             setState(() {
                               isBooked = value ?? false;
-                              if (isBooked) isClosed = false; // Can't be both booked and closed
+                              if (isBooked)
+                                isClosed =
+                                    false; // Can't be both booked and closed
                             });
                           },
                         ),
@@ -301,7 +342,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Add New Follow-up', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    const Text(
+                      'Add New Follow-up',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
@@ -339,58 +386,89 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 ),
               ),
             ),
-
-            const SizedBox(height: 20),
-
-            // Follow-up History Section
-            if (followUpHistory.isNotEmpty) ...[
-              Card(
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Follow-up History', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                      const SizedBox(height: 16),
-                      ...followUpHistory.map((followUp) {
-                        final date = followUp['date'] is Timestamp 
-                            ? (followUp['date'] as Timestamp).toDate()
-                            : DateTime.now();
-                        
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Date: ${date.toString().split(' ')[0]}',
-                                      style: const TextStyle(fontWeight: FontWeight.bold),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      'Added: ${followUp['createdAt'] is Timestamp ? (followUp['createdAt'] as Timestamp).toDate().toString().split(' ')[0] : ''}',
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(followUp['comment'] ?? ''),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
+            const SizedBox(height: 12),
+            TextField(
+              controller: modelController,
+              decoration: const InputDecoration(labelText: 'Model'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: variantController,
+              decoration: const InputDecoration(labelText: 'Variant'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: priceController,
+              decoration: const InputDecoration(labelText: 'Price'),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Vehicle Description',
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: paymentType,
+              items: const [
+                DropdownMenuItem(value: 'Loan', child: Text('Loan')),
+                DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => paymentType = value);
+                }
+              },
+              decoration: const InputDecoration(labelText: 'Payment Option'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: otherController,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Other Description'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: referenceController,
+              decoration: const InputDecoration(labelText: 'Reference'),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: status,
+              items: const [
+                DropdownMenuItem(
+                  value: 'New Inquiry',
+                  child: Text('New Inquiry'),
+                ),
+                DropdownMenuItem(
+                  value: 'Follow Ups',
+                  child: Text('Follow Ups'),
+                ),
+                DropdownMenuItem(value: 'Finance', child: Text('Finance')),
+                DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => status = value);
+                }
+              },
+              decoration: const InputDecoration(labelText: 'Inquiry Status'),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Follow up: ${selectedDate.toString().split(' ')[0]}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
-            ],
+              ],
+            ),
+            const SizedBox(height: 20),
 
             // Save Button
             SizedBox(
