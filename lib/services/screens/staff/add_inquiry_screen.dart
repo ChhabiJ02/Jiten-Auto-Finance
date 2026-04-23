@@ -169,6 +169,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "otherDescription": otherController.text.trim(),
         "reference": referenceController.text.trim(),
         "date": selectedDate,
+        "staffId": user.uid,
         "createdBy": user.uid,
         "createdAt": Timestamp.now(),
         "status": "New Inquiry",

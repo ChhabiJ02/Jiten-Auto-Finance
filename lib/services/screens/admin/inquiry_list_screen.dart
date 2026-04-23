@@ -1,203 +1,526 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../staff/edit_inquiry_screen.dart';
 
-class InquiryListScreen extends StatelessWidget {
+class InquiryListScreen extends StatefulWidget {
   const InquiryListScreen({super.key});
+
+  @override
+  State<InquiryListScreen> createState() => _InquiryListScreenState();
+}
+
+class _InquiryListScreenState extends State<InquiryListScreen> {
+  String? selectedStaffId;
+  List<Map<String, dynamic>> staffList = [];
+  Set<String> selectedInquiries = {};
+  bool isSelectionMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStaffList();
+    _assignUnassignedInquiries();
+  }
+
+  Future<void> _assignUnassignedInquiries() async {
+    try {
+      // Wait for staff list to load
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (staffList.isEmpty) {
+        return;
+      }
+
+      // Don't automatically assign - each inquiry should keep its original staffId
+      // This function is now just for validation/cleanup if needed
+    } catch (e) {
+      print('Error in inquiry assignment validation: $e');
+    }
+  }
+
+  Future<void> _loadStaffList() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .get();
+
+      final uniqueStaff = <String, Map<String, dynamic>>{};
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final role = data['role']?.toString().toLowerCase();
+        if (role == 'staff') {
+          final name = data['name'] ?? 'Unknown Staff';
+          // Use name as key to avoid duplicates
+          uniqueStaff[name] = {
+            'id': doc.id,
+            'name': name,
+          };
+        }
+      }
+
+      setState(() {
+        staffList = uniqueStaff.values.toList();
+      });
+    } catch (e) {
+      print('Error loading staff list: $e');
+    }
+  }
+
+
+  void _toggleSelection(String inquiryId) {
+    setState(() {
+      if (selectedInquiries.contains(inquiryId)) {
+        selectedInquiries.remove(inquiryId);
+      } else {
+        selectedInquiries.add(inquiryId);
+      }
+    });
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      isSelectionMode = !isSelectionMode;
+      if (!isSelectionMode) {
+        selectedInquiries.clear();
+      }
+    });
+  }
+
+  Future<void> _makeCall(String phoneNumber) async {
+    final url = Uri.parse('tel:$phoneNumber');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
+  }
+
+  Future<void> _sendBulkWhatsApp() async {
+    if (selectedInquiries.isEmpty) return;
+
+    try {
+      final inquiries = await FirebaseFirestore.instance
+          .collection('inquiries')
+          .where(FieldPath.documentId, whereIn: selectedInquiries.toList())
+          .get();
+
+      String message = 'Hello! We have some updates regarding your vehicle inquiry.';
+      List<String> phoneNumbers = [];
+
+      for (var doc in inquiries.docs) {
+        final data = doc.data();
+        final phone = data['phone']?.toString().trim() ?? '';
+        if (phone.isNotEmpty) {
+          // Clean phone number
+          String cleanPhone = phone.replaceAll(RegExp(r'[^\d]'), '');
+          if (cleanPhone.length == 10) {
+            cleanPhone = '91$cleanPhone';
+          }
+          if (cleanPhone.length >= 10) {
+            phoneNumbers.add(cleanPhone);
+          }
+        }
+      }
+
+      if (phoneNumbers.isNotEmpty) {
+        // For bulk messaging, we'll send individual messages
+        for (String phone in phoneNumbers) {
+          final url = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+          if (await canLaunchUrl(url)) {
+            await launchUrl(url);
+            // Small delay between launches
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('WhatsApp opened for ${phoneNumbers.length} contacts')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No valid phone numbers found')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sending WhatsApp: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("All Inquiries"),
+        actions: [
+          if (isSelectionMode)
+            IconButton(
+              icon: const Icon(Icons.send),
+              onPressed: selectedInquiries.isNotEmpty ? _sendBulkWhatsApp : null,
+              tooltip: 'Send WhatsApp to selected',
+            ),
+          IconButton(
+            icon: Icon(isSelectionMode ? Icons.cancel : Icons.checklist),
+            onPressed: _toggleSelectionMode,
+            tooltip: isSelectionMode ? 'Cancel selection' : 'Select multiple',
+          ),
+        ],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('inquiries')
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      body: Column(
+        children: [
+          // Staff Filter Dropdown
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            child: DropdownButtonFormField<String?>(
+              initialValue: selectedStaffId,
+              decoration: const InputDecoration(
+                labelText: 'Filter by Staff',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All Staff'),
+                ),
+                ...staffList.map((staff) => DropdownMenuItem<String?>(
+                  value: staff['id'],
+                  child: Text(staff['name']),
+                )),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  selectedStaffId = value;
+                });
+              },
+            ),
+          ),
+          // Staff Lead Counts
+          if (staffList.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: staffList.map((staff) {
+                  return FutureBuilder<int>(
+                    future: _getStaffLeadCount(staff['id']),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+                      return Chip(
+                        label: Text('${staff['name']}: $count leads'),
+                        backgroundColor: selectedStaffId == staff['id']
+                            ? Colors.blue.withValues(alpha: 0.2)
+                            : null,
+                      );
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('inquiries')
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-          final inquiries = snapshot.data!.docs;
+                final allInquiries = snapshot.data!.docs;
 
-          if (inquiries.isEmpty) {
-            return const Center(child: Text("No inquiries yet"));
-          }
+                // Filter by selected staff
+                final inquiries = selectedStaffId == null
+                    ? allInquiries
+                    : allInquiries.where((doc) {
+                        final data = doc.data() as Map<String, dynamic>;
+                        return data['staffId'] == selectedStaffId;
+                      }).toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            itemCount: inquiries.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
-                  child: Card(
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                if (inquiries.isEmpty) {
+                  return const Center(child: Text("No inquiries yet"));
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  itemCount: inquiries.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12),
+                        child: Card(
+                          elevation: 2,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Total Inquiries',
+                                      style: Theme.of(context).textTheme.bodyLarge,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      inquiries.length.toString(),
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const Icon(Icons.list_alt, size: 32, color: Colors.blueAccent),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    final doc = inquiries[index - 1];
+                    final data = doc.data() as Map<String, dynamic>;
+
+                    // Check if follow-up is pending
+                    bool hasPendingFollowUp = false;
+                    String followUpText = '';
+
+                    final nextFollowUp = data['nextFollowUp'];
+                    if (nextFollowUp is Timestamp) {
+                      final followUpDate = nextFollowUp.toDate();
+                      final today = DateTime.now();
+                      // Reset time for comparison
+                      final todayWithoutTime = DateTime(today.year, today.month, today.day);
+                      final followUpDateWithoutTime = DateTime(followUpDate.year, followUpDate.month, followUpDate.day);
+
+                      if (followUpDateWithoutTime.isBefore(todayWithoutTime)) {
+                        hasPendingFollowUp = true;
+                        followUpText = 'Follow-up pending since ${followUpDateWithoutTime.toString().split(' ')[0]}';
+                      } else if (followUpDateWithoutTime.year == todayWithoutTime.year &&
+                                 followUpDateWithoutTime.month == todayWithoutTime.month &&
+                                 followUpDateWithoutTime.day == todayWithoutTime.day) {
+                        hasPendingFollowUp = true;
+                        followUpText = 'Follow-up due today';
+                      }
+                    }
+
+                    // Check if lead is closed or booked
+                    final status = data['status'] as String? ?? 'New Inquiry';
+                    final isClosed = data['isClosed'] == true;
+                    final isBooked = data['isBooked'] == true;
+                    final isCompleted = isClosed || isBooked || status.toLowerCase() == 'booked' || status.toLowerCase() == 'closed';
+
+                    // Get staff name from loaded staffList
+                    String staffName = 'Unassigned';
+                    if (data['staffId'] != null) {
+                      final staffMember = staffList.firstWhere(
+                        (staff) => staff['id'] == data['staffId'],
+                        orElse: () => {'id': data['staffId'], 'name': 'Unknown Staff'},
+                      );
+                      staffName = staffMember['name'] ?? 'Unknown Staff';
+                    }
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Total Inquiries',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                inquiries.length.toString(),
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          ListTile(
+                            leading: isSelectionMode
+                                ? Checkbox(
+                                    value: selectedInquiries.contains(doc.id),
+                                    onChanged: (value) => _toggleSelection(doc.id),
+                                  )
+                                : null,
+                            title: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(data['name'] ?? ''),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: _getStatusColor(status, isClosed, isBooked),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    _getStatusText(status, isClosed, isBooked),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
                                       fontWeight: FontWeight.bold,
                                     ),
-                              ),
-                            ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    children: [
+                                      const TextSpan(text: 'Phone: '),
+                                      TextSpan(text: data['phone'] ?? ''),
+                                    ],
+                                  ),
+                                ),
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    children: [
+                                      const TextSpan(text: 'Vehicle: '),
+                                      TextSpan(text: data['brand'] ?? data['vehicle'] ?? 'N/A'),
+                                    ],
+                                  ),
+                                ),
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    children: [
+                                      const TextSpan(text: 'Model: '),
+                                      TextSpan(text: data['model'] ?? ''),
+                                    ],
+                                  ),
+                                ),
+                                Text.rich(
+                                  TextSpan(
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                    children: [
+                                      const TextSpan(text: 'Staff: '),
+                                      TextSpan(text: staffName),
+                                    ],
+                                  ),
+                                ),
+                                FutureBuilder<List<Map<String, dynamic>>>(
+                                  future: _getCallHistory(doc.id),
+                                  builder: (context, callSnapshot) {
+                                    final calls = callSnapshot.data ?? [];
+                                    if (calls.isNotEmpty) {
+                                      final lastCall = calls.last;
+                                      final duration = lastCall['duration'] ?? 'N/A';
+                                      return Padding(
+                                        padding: const EdgeInsets.only(top: 4.0),
+                                        child: Text.rich(
+                                          TextSpan(
+                                            style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                            children: [
+                                              const TextSpan(text: 'Last call: '),
+                                              TextSpan(text: duration),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const SizedBox.shrink();
+                                  },
+                                ),
+                                if (hasPendingFollowUp && !isCompleted)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 8.0),
+                                    child: Text(
+                                      followUpText,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.call, color: Colors.green),
+                                  onPressed: () => _makeCall(data['phone'] ?? ''),
+                                  tooltip: 'Call customer',
+                                ),
+                                const Icon(Icons.arrow_forward_ios, size: 16),
+                              ],
+                            ),
+                            onTap: isSelectionMode
+                                ? () => _toggleSelection(doc.id)
+                                : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => EditInquiryScreen(inquiry: doc),
+                                      ),
+                                    );
+                                  },
                           ),
-                          const Icon(Icons.list_alt, size: 32, color: Colors.blueAccent),
                         ],
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 );
-              }
-
-              final doc = inquiries[index - 1];
-              final data = doc.data() as Map<String, dynamic>;
-
-              // Check if follow-up is pending
-              bool hasPendingFollowUp = false;
-              String followUpText = '';
-              
-              final nextFollowUp = data['nextFollowUp'];
-              if (nextFollowUp is Timestamp) {
-                final followUpDate = nextFollowUp.toDate();
-                final today = DateTime.now();
-                // Reset time for comparison
-                final todayWithoutTime = DateTime(today.year, today.month, today.day);
-                final followUpDateWithoutTime = DateTime(followUpDate.year, followUpDate.month, followUpDate.day);
-                
-                if (followUpDateWithoutTime.isBefore(todayWithoutTime)) {
-                  hasPendingFollowUp = true;
-                  followUpText = 'Follow-up pending since ${followUpDateWithoutTime.toString().split(' ')[0]}';
-                } else if (followUpDateWithoutTime.year == todayWithoutTime.year && 
-                           followUpDateWithoutTime.month == todayWithoutTime.month && 
-                           followUpDateWithoutTime.day == todayWithoutTime.day) {
-                  hasPendingFollowUp = true;
-                  followUpText = 'Follow-up due today';
-                }
-              }
-
-              // Check if lead is closed or booked
-              final status = data['status'] as String? ?? 'New Inquiry';
-              final isClosed = data['isClosed'] == true;
-              final isBooked = data['isBooked'] == true;
-              final isCompleted = isClosed || isBooked || status.toLowerCase() == 'booked' || status.toLowerCase() == 'closed';
-
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ListTile(
-                      title: Text(data['name'] ?? ''),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text.rich(
-                            TextSpan(
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              children: [
-                                const TextSpan(text: 'Phone: '),
-                                TextSpan(text: data['phone'] ?? ''),
-                              ],
-                            ),
-                          ),
-                          Text.rich(
-                            TextSpan(
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              children: [
-                                const TextSpan(text: 'Vehicle: '),
-                                TextSpan(text: data['brand'] ?? data['vehicle'] ?? 'N/A'),
-                              ],
-                            ),
-                          ),
-                          Text.rich(
-                            TextSpan(
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              children: [
-                                const TextSpan(text: 'Model: '),
-                                TextSpan(text: data['model'] ?? ''),
-                              ],
-                            ),
-                          ),
-                          Text.rich(
-                            TextSpan(
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                              children: [
-                                const TextSpan(text: 'Ref: '),
-                                TextSpan(text: data['reference'] ?? ''),
-                              ],
-                            ),
-                          ),
-                          if (hasPendingFollowUp && !isCompleted)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                followUpText,
-                                style: const TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (isClosed)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                'Status: CLOSED',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          if (isBooked)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8.0),
-                              child: Text(
-                                'Status: BOOKED',
-                                style: TextStyle(
-                                  color: Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => EditInquiryScreen(inquiry: doc),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
+              },
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  Future<int> _getStaffLeadCount(String staffId) async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('inquiries')
+          .where('staffId', isEqualTo: staffId)
+          .get();
+      return snapshot.docs.length;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _getCallHistory(String inquiryId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('inquiries')
+          .doc(inquiryId)
+          .get();
+
+      if (doc.exists) {
+        final data = doc.data();
+        final calls = data?['callHistory'];
+        if (calls is List) {
+          return List<Map<String, dynamic>>.from(calls);
+        }
+      }
+    } catch (e) {
+      print('Error getting call history: $e');
+    }
+    return [];
+  }
+
+  Color _getStatusColor(String status, bool isClosed, bool isBooked) {
+    if (isBooked) return Colors.green;
+    if (isClosed) return Colors.red;
+    switch (status.toLowerCase()) {
+      case 'new inquiry':
+        return Colors.blue;
+      case 'follow ups':
+        return Colors.orange;
+      case 'finance':
+        return Colors.purple;
+      case 'booked':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status, bool isClosed, bool isBooked) {
+    if (isBooked) return 'BOOKED';
+    if (isClosed) return 'CLOSED';
+    return status.toUpperCase();
   }
 }

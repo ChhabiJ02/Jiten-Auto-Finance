@@ -22,14 +22,18 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController referenceController;
   late final TextEditingController otherController;
   late final TextEditingController followUpCommentController;
+  late final TextEditingController callDurationController;
+  late final TextEditingController callNotesController;
   late String paymentType;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
+  late DateTime callDateTime;
   bool loading = false;
   bool isClosed = false;
   bool isBooked = false;
   String status = 'New Inquiry';
   List<Map<String, dynamic>> followUpHistory = [];
+  List<Map<String, dynamic>> callHistory = [];
 
   void showMessage(String message) {
     ScaffoldMessenger.of(
@@ -55,6 +59,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       text: data['otherDescription'] ?? '',
     );
     followUpCommentController = TextEditingController();
+    callDurationController = TextEditingController();
+    callNotesController = TextEditingController();
     paymentType = data['paymentType'] ?? 'Loan';
     final nextFollowUp = data['nextFollowUp'];
     selectedDate = nextFollowUp is Timestamp
@@ -62,11 +68,18 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         : DateTime.now();
 
     newFollowUpDate = DateTime.now();
+    callDateTime = DateTime.now();
 
     // Load follow-up history
     final history = data['followUpHistory'];
     if (history is List) {
       followUpHistory = List<Map<String, dynamic>>.from(history);
+    }
+
+    // Load call history
+    final calls = data['callHistory'];
+    if (calls is List) {
+      callHistory = List<Map<String, dynamic>>.from(calls);
     }
 
     // Load status
@@ -87,6 +100,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     referenceController.dispose();
     otherController.dispose();
     followUpCommentController.dispose();
+    callDurationController.dispose();
+    callNotesController.dispose();
     super.dispose();
   }
 
@@ -108,6 +123,30 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       followUpHistory.add(newFollowUp);
       followUpCommentController.clear();
       newFollowUpDate = DateTime.now();
+    });
+  }
+
+  Future<void> _addCall() async {
+    final duration = callDurationController.text.trim();
+    final notes = callNotesController.text.trim();
+
+    if (duration.isEmpty) {
+      showMessage('Please enter call duration.');
+      return;
+    }
+
+    final newCall = {
+      'dateTime': Timestamp.fromDate(callDateTime),
+      'duration': duration,
+      'notes': notes,
+      'createdAt': Timestamp.now(),
+    };
+
+    setState(() {
+      callHistory.add(newCall);
+      callDurationController.clear();
+      callNotesController.clear();
+      callDateTime = DateTime.now();
     });
   }
 
@@ -160,6 +199,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             'reference': reference,
             'nextFollowUp': Timestamp.fromDate(selectedDate),
             'followUpHistory': followUpHistory,
+            'callHistory': callHistory,
             'isClosed': isClosed,
             'isBooked': isBooked,
             'status': status,
@@ -471,6 +511,94 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+
+            // Add Call Log Section
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Log Call',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Call Date & Time: ${callDateTime.toString()}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: callDateTime,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now(),
+                            );
+                            if (picked != null) {
+                              final timePicked = await showTimePicker(
+                                context: context,
+                                initialTime: TimeOfDay.fromDateTime(callDateTime),
+                              );
+                              if (timePicked != null) {
+                                setState(() {
+                                  callDateTime = DateTime(
+                                    picked.year,
+                                    picked.month,
+                                    picked.day,
+                                    timePicked.hour,
+                                    timePicked.minute,
+                                  );
+                                });
+                              }
+                            }
+                          },
+                          child: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: callDurationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Call Duration (e.g., 5 min 30 sec)',
+                        hintText: 'Enter call duration...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: callNotesController,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Call Notes',
+                        hintText: 'Enter notes about the call...',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _addCall,
+                        child: const Text('Log Call'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
             const SizedBox(height: 20),
 
             // Save Button

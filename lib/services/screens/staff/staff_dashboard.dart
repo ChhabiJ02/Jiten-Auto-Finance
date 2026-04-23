@@ -15,6 +15,18 @@ class _StaffDashboardState extends State<StaffDashboard> {
   String selectedFilter = 'All';
   final filters = ['All', 'New Inquiry', 'Follow Ups', 'Finance', 'Booked'];
 
+  bool _isCreatedToday(Map<String, dynamic> itemData) {
+    final createdAt = itemData['createdAt'];
+    if (createdAt is! Timestamp) return false;
+    
+    final createdDate = createdAt.toDate();
+    final today = DateTime.now();
+    final createdDay = DateTime(createdDate.year, createdDate.month, createdDate.day);
+    final todayDay = DateTime(today.year, today.month, today.day);
+    
+    return createdDay == todayDay;
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -46,7 +58,14 @@ class _StaffDashboardState extends State<StaffDashboard> {
               ? data
               : data.where((item) {
                   final itemData = item.data() as Map<String, dynamic>;
-                  return (itemData['status'] as String? ?? 'New Inquiry') == selectedFilter;
+                  final status = itemData['status'] as String? ?? 'New Inquiry';
+                  
+                  // For New Inquiry filter, only show inquiries created today
+                  if (selectedFilter == 'New Inquiry') {
+                    return status == selectedFilter && _isCreatedToday(itemData);
+                  }
+                  
+                  return status == selectedFilter;
                 }).toList();
 
           if (data.isEmpty) {

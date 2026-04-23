@@ -58,6 +58,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     setState(() => loading = true);
 
     try {
+      // Save to serviceRequests collection for service tracking
       await FirebaseFirestore.instance.collection('serviceRequests').add({
         'userId': user.uid,
         'customerEmail': user.email,
@@ -73,6 +74,25 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
         'notes': notesController.text.trim(),
         'status': 'Pending',
         'createdAt': Timestamp.now(),
+      });
+
+      // Also create an inquiry entry so it shows up in staff dashboard
+      final userName = user.displayName ?? user.email?.split('@').first ?? 'Customer';
+      final userPhone = user.phoneNumber ?? '';
+      
+      await FirebaseFirestore.instance.collection('inquiries').add({
+        'name': userName,
+        'phone': userPhone,
+        'brand': brand,
+        'model': model,
+        'variant': variantController.text.trim(),
+        'price': 'Service Request',
+        'description': 'Service Type: $serviceType\n${notesController.text.trim()}',
+        'status': 'New Inquiry',
+        'createdBy': user.uid,
+        'createdAt': Timestamp.now(),
+        'isServiceRequest': true,
+        'serviceRequestType': serviceType,
       });
 
       if (mounted) {

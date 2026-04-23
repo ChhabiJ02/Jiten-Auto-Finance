@@ -15,7 +15,7 @@ class CustomerHomeScreen extends StatefulWidget {
   State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
 }
 
-class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBindingObserver {
   final List<Map<String, String>> fallbackVehicles = [
     {"name": "Activa 6G Black", "price": "₹1,05,000", "img": "https://via.placeholder.com/150"},
     {"name": "Activa 5G Grey", "price": "₹95,000", "img": "https://via.placeholder.com/150"},
@@ -27,7 +27,23 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   String searchQuery = '';
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Reload Firebase user when app resumes to get updated displayName
+      FirebaseAuth.instance.currentUser?.reload();
+      setState(() {});
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     searchController.dispose();
     super.dispose();
   }
