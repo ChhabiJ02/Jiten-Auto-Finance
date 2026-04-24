@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class AddInquiryScreen extends StatefulWidget {
   @override
   State<AddInquiryScreen> createState() => _AddInquiryScreenState();
-}
+} 
 
 class _AddInquiryScreenState extends State<AddInquiryScreen> {
   final nameController = TextEditingController();
@@ -27,10 +29,61 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   bool loading = false;
   bool lookupLoading = false;
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+  String? selectedBrand;
+  String? selectedModel;
+  String? selectedVariant;
+
+  List<String> brands = [];
+  List<String> models = [];
+  List<Map<String, dynamic>> variants = [];
+
+  @override
+  void initState() {
+    super.initState();
+    fetchBrands();
+  }
+
+  // 🔥 FETCH BRAND
+  Future<void> fetchBrands() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('Brand').get();
+
+    setState(() {
+      brands = snapshot.docs.map((e) => e['Name'].toString()).toList();
+    });
+  }
+
+  // 🔥 FETCH MODEL
+  Future<void> fetchModels(String brand) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Model')
+        .where('ParentBrand', isEqualTo: brand)
+        .get();
+
+    setState(() {
+      models = snapshot.docs.map((e) => e['Name'].toString()).toList();
+      selectedModel = null;
+      selectedVariant = null;
+      variants = [];
+    });
+  }
+
+  // 🔥 FETCH VARIANT
+  Future<void> fetchVariants(String model) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Variant')
+        .where('ParentModel', isEqualTo: model)
+        .get();
+
+    setState(() {
+      variants = snapshot.docs.map((e) => e.data()).toList();
+      selectedVariant = null;
+    });
+  }
+
+  void showMessage(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<void> _lookupVehicle() async {
@@ -70,81 +123,25 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   Future<void> sendWhatsAppAndSave() async {
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
-    final brand = brandController.text.trim();
-    final model = modelController.text.trim();
-    final price = priceController.text.trim();
+  final name = nameController.text.trim();
+  final phone = phoneController.text.trim();
 
-    if (name.isEmpty) {
-      showMessage("Please enter the customer name.");
-      return;
-    }
-    if (phone.isEmpty) {
-      showMessage("Please enter the customer phone number.");
-      return;
-    }
-    if (brand.isEmpty) {
-      showMessage("Please enter the vehicle brand.");
-      return;
-    }
+  final message =
+      "Hello $name 🙏\n\n"
+      "Thank you for visiting Jiten Auto.\n"
+      "Your quotation is attached.\n\n"
+      "Regards,\nJiten Auto Team";
 
-    final sanitizedPhone = phone.replaceAll(RegExp(r'[^0-9]'), '');
-    final whatsappNumber = sanitizedPhone.startsWith('91')
-        ? sanitizedPhone
-        : sanitizedPhone.length == 10
-            ? '91$sanitizedPhone'
-            : sanitizedPhone;
+  final url = Uri.parse(
+      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
 
-    if (whatsappNumber.length < 10) {
-      showMessage("Please enter a valid phone number for WhatsApp.");
-      return;
-    }
+  await launchUrl(url, mode: LaunchMode.externalApplication);
 
-    final message = "Thank you $name 🙏\n"
-        "For your inquiry at JitenAuto.\n"
-        "Vehicle: $brand ${model.isNotEmpty ? model : ''} ${variantController.text.trim().isNotEmpty ? '(${variantController.text.trim()})' : ''}\n"
-        "Price: ₹$price\n"
-        "Description: ${descriptionController.text.trim()}\n"
-        "Payment: $paymentType\n"
-        "Date: ${selectedDate.toString().split(' ')[0]}";
+  // 🔥 GENERATE PDF AFTER MESSAGE
+  await generateQuotationPDF();
 
-    final whatsappUri = Uri.parse(
-      "whatsapp://send?phone=$whatsappNumber&text=${Uri.encodeComponent(message)}",
-    );
-    final webUri = Uri.parse(
-      "https://wa.me/$whatsappNumber?text=${Uri.encodeComponent(message)}",
-    );
-
-    var launched = false;
-
-    try {
-      launched = await launchUrl(
-        whatsappUri,
-        mode: LaunchMode.externalApplication,
-      );
-    } catch (_) {
-      launched = false;
-    }
-
-    if (!launched) {
-      try {
-        launched = await launchUrl(
-          webUri,
-          mode: LaunchMode.externalApplication,
-        );
-      } catch (_) {
-        launched = false;
-      }
-    }
-
-    if (!launched) {
-      showMessage("WhatsApp is not available on this device.");
-      return;
-    }
-
-    await saveInquiry();
-  }
+  await saveInquiry();
+}
 
   Future<bool> saveInquiry() async {
     setState(() => loading = true);
@@ -191,6 +188,127 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         setState(() => loading = false);
       }
     }
+  }
+
+  Future<void> generateQuotationPDF() async {
+    final pdf = pw.Document();
+
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+    final reference = referenceController.text.trim();
+    final brand = brandController.text.trim();
+    final model = modelController.text.trim();
+    final variant = variantController.text.trim();
+    final price = priceController.text.trim();
+    final date = DateTime.now().toString().split(' ')[0];
+
+    pdf.addPage(
+      pw.Page(
+        build: (context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+
+              // 🔴 HEADER
+              pw.Text(
+                "JITEN AUTO",
+                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+              ),
+              pw.SizedBox(height: 5),
+              pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
+
+              pw.Divider(),
+
+              // 🔵 CUSTOMER DETAILS
+              pw.Text("Customer Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+
+              pw.SizedBox(height: 8),
+              pw.Text("Name: $name"),
+              pw.Text("Mobile: $phone"),
+              pw.Text("Reference: $reference"),
+              pw.Text("Date: $date"),
+
+              pw.SizedBox(height: 20),
+
+              // 🔵 VEHICLE DETAILS
+              pw.Text("Vehicle Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+
+              pw.SizedBox(height: 8),
+              pw.Text("Brand: $brand"),
+              pw.Text("Model: $model"),
+              pw.Text("Variant: $variant"),
+
+              pw.SizedBox(height: 10),
+
+              pw.Text(
+                "Price: ₹$price",
+                style: pw.TextStyle(
+                    fontSize: 16, fontWeight: pw.FontWeight.bold),
+              ),
+
+              pw.SizedBox(height: 30),
+
+              // 🔵 FOOTER
+              pw.Text("Thank you for your inquiry.",
+                  style: pw.TextStyle(fontSize: 12)),
+
+              pw.SizedBox(height: 10),
+              pw.Text("Regards,\nJiten Auto",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await Printing.layoutPdf(
+      onLayout: (format) async => pdf.save(),
+    );
+  }
+
+  Future<void> sendThankYou() async {
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+
+    final message = 
+        "Thank you $name 🙏\n"
+        "For visiting Jiten Auto.\n"
+        "We appreciate your inquiry.\n\n"
+        "Our team will get back to you shortly.\n\n"
+        "Regards,\nJiten Auto Team";
+
+    final url = Uri.parse(
+        "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
+
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> sendQuotation() async {
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+
+    final brand = brandController.text;
+    final model = modelController.text;
+    final variant = variantController.text;
+    final price = priceController.text;
+
+    final message =
+        "Hello $name 👋\n\n"
+        "Thank you for your interest.\n\n"
+        "📄 *Quotation Details*\n"
+        "Vehicle: $brand $model $variant\n"
+        "Price: ₹$price\n"
+        "Payment: $paymentType\n\n"
+        "Please let us know if you have any questions.\n\n"
+        "Regards,\nJiten Auto Team";
+
+    final url = Uri.parse(
+        "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
+
+    await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
   @override
@@ -289,8 +407,19 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: brandController,
+                      
+                      // 🔵 BRAND DROPDOWN
+                      DropdownButtonFormField<String>(
+                        value: selectedBrand,
+                        isExpanded: true,
+                        hint: const Text("Select Brand"),
+                        items: brands.map<DropdownMenuItem<String>>((b) {
+                          return DropdownMenuItem(value: b, child: Text(b));
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() => selectedBrand = val);
+                          fetchModels(val!);
+                        },
                         decoration: InputDecoration(
                           labelText: "Vehicle Brand",
                           prefixIcon: const Icon(Icons.directions_car_outlined),
@@ -302,9 +431,21 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: modelController,
+
+                      // 🔵 MODEL DROPDOWN
+                      DropdownButtonFormField<String>(
+                        value: selectedModel,
+                        isExpanded: true,
+                        hint: const Text("Select Model"),
+                        items: models.map<DropdownMenuItem<String>>((m) {
+                          return DropdownMenuItem(value: m, child: Text(m));
+                        }).toList(),
+                        onChanged: (val) {
+                          setState(() => selectedModel = val);
+                          fetchVariants(val!);
+                        },
                         decoration: InputDecoration(
                           labelText: "Model",
                           prefixIcon: const Icon(Icons.precision_manufacturing),
@@ -316,9 +457,36 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: variantController,
+
+                      // 🔵 VARIANT DROPDOWN
+                      DropdownButtonFormField<String>(
+                        value: selectedVariant,
+                        isExpanded: true, // ✅ FIX OVERFLOW
+                        hint: const Text("Select Variant"),
+                        items: variants.map<DropdownMenuItem<String>>((v) {
+                          return DropdownMenuItem<String>(
+                            value: v['Name'],
+                            child: Text(
+                              v['Name'] ?? '',
+                              overflow: TextOverflow.ellipsis, // ✅ CLEAN UI
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          final selected =
+                              variants.firstWhere((e) => e['Name'] == val);
+
+                          setState(() {
+                            selectedVariant = val;
+
+                            brandController.text = selectedBrand!;
+                            modelController.text = selectedModel!;
+                            variantController.text = val!;
+                            priceController.text = selected['Price'].toString(); // ✅ ONLY HERE
+                          });
+                        },
                         decoration: InputDecoration(
                           labelText: "Variant",
                           prefixIcon: const Icon(Icons.widgets_outlined),
@@ -330,22 +498,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          icon: lookupLoading
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.search),
-                          label: const Text('Fetch price & description'),
-                          onPressed: lookupLoading ? null : _lookupVehicle,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
+                      
+                      const SizedBox(height: 16),
+                      
                       TextField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
@@ -361,6 +516,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                     
                       TextField(
                         controller: descriptionController,
                         maxLines: 3,
@@ -377,6 +533,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                     
                       DropdownButtonFormField<String>(
                         value: paymentType,
                         items: const [
@@ -400,6 +557,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                     
                       TextField(
                         controller: otherController,
                         maxLines: 3,
@@ -415,6 +573,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                     
                       TextField(
                         controller: referenceController,
                         decoration: InputDecoration(
@@ -429,6 +588,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
                       InkWell(
                         onTap: () async {
                           final picked = await showDatePicker(
@@ -470,19 +630,34 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.message),
-                          label: const Text("Send WhatsApp & Save"),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                          onPressed: sendWhatsAppAndSave,
+                      const SizedBox(height: 20),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: sendThankYou,
+                                child: const Text("Send Thank You"),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: sendQuotation,
+                                child: const Text("Send Quotation"),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
+
+                        const SizedBox(height: 10),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: saveInquiry,
+                            child: const Text("Save Inquiry"),
+                          ),
+                        ),
                     ],
                   ),
                 ),
