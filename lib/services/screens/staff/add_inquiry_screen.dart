@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class AddInquiryScreen extends StatefulWidget {
+  const AddInquiryScreen({super.key});
+
   @override
   State<AddInquiryScreen> createState() => _AddInquiryScreenState();
 }
@@ -54,7 +56,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           .get();
       if (query.docs.isNotEmpty) {
         final vehicle = query.docs.first;
-        final data = vehicle.data() as Map<String, dynamic>;
+        final data = vehicle.data();
         selectedVehicleId = vehicle.id;
         priceController.text = data['price']?.toString() ?? priceController.text;
         descriptionController.text = data['description'] ?? descriptionController.text;
@@ -379,7 +381,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: paymentType,
+                        initialValue: paymentType,
                         items: const [
                           DropdownMenuItem(value: 'Loan', child: Text('Loan')),
                           DropdownMenuItem(value: 'Cash', child: Text('Cash')),
@@ -417,7 +419,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: status,
+                        initialValue: status,
                         items: const [
                           DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
                           DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),

@@ -19,7 +19,6 @@ class MyServicePlanScreen extends StatelessWidget {
                   .collection('serviceRequests')
                   .where('userId', isEqualTo: user.uid)
                   .where('boughtFromUs', isEqualTo: true)
-                  .orderBy('createdAt', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {

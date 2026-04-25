@@ -1,38 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'model_screen.dart';
+import 'variant_screen.dart';
 
-class VehicleCatalogScreen extends StatelessWidget {
-  const VehicleCatalogScreen({super.key});
+class ModelScreen extends StatelessWidget {
+  final String brand;
+
+  const ModelScreen({super.key, required this.brand});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Vehicle Brands")),
+      appBar: AppBar(title: Text(brand)),
 
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('Brand').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('Model')
+            .where('ParentBrand', isEqualTo: brand)
+            .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final brands = snapshot.data!.docs;
+          final models = snapshot.data!.docs;
 
           return ListView.builder(
-            itemCount: brands.length,
+            itemCount: models.length,
             itemBuilder: (context, index) {
-              final data = brands[index].data() as Map<String, dynamic>;
-              final brandName = data['Name'];
+              final data = models[index].data() as Map<String, dynamic>;
+              final modelName = data['Name'];
 
               return ListTile(
-                title: Text(brandName),
+                title: Text(modelName),
                 trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => ModelScreen(brand: brandName),
+                      builder: (_) => VariantScreen(
+                        brand: brand,
+                        model: modelName,
+                      ),
                     ),
                   );
                 },

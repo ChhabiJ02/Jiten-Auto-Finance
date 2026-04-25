@@ -122,7 +122,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: serviceType,
+              initialValue: serviceType,
               items: const [
                 DropdownMenuItem(value: 'Regular Service', child: Text('Regular Service')),
                 DropdownMenuItem(value: 'Repair', child: Text('Repair')),

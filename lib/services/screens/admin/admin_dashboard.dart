@@ -1,12 +1,10 @@
-﻿import 'dart:math' as math;
-
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'inquiry_list_screen.dart';
 import 'vehicle_catalog_screen.dart';
+import '../shared/user_settings_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -16,8 +14,6 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  static const int daysToShow = 16;
-
   late DateTime selectedStartDate;
   late DateTime selectedEndDate;
   late DateTime appliedStartDate;
@@ -33,8 +29,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
   void initState() {
     super.initState();
     final today = DateTime.now();
+    // Show from day 1 to current day of the month
+    selectedStartDate = DateTime(today.year, today.month, 1);
     selectedEndDate = DateTime(today.year, today.month, today.day);
-    selectedStartDate = selectedEndDate.subtract(const Duration(days: daysToShow - 1));
     appliedStartDate = selectedStartDate;
     appliedEndDate = selectedEndDate;
   }
@@ -139,9 +136,9 @@ class _AdminDashboardState extends State<AdminDashboard> {
         title: const Text('Admin Dashboard'),
         actions: [
           IconButton(
-            onPressed: () => FirebaseAuth.instance.signOut(),
-            icon: const Icon(Icons.logout),
-          )
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSettingsScreen())),
+            icon: const Icon(Icons.settings),
+          ),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
@@ -316,53 +313,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Text(
-                              'Lead Trend',
-                              style: Theme.of(context).textTheme.titleLarge,
-                            ),
-                            const Spacer(),
-                            Text(
-                              '$totalLeads total',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        SizedBox(
-                          height: 220,
-                          child: CustomPaint(
-                            painter: _LineChartPainter(
-                              points: dailyCounts,
-                              lineColor: Theme.of(context).colorScheme.primary,
-                              dotColor: Theme.of(context).colorScheme.secondary,
-                              gridColor: Theme.of(context).dividerColor,
-                            ),
-                            child: Container(),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text('From ${DateFormat('dd MMM').format(appliedStartDate)}', style: Theme.of(context).textTheme.bodyMedium),
-                            Text('To ${DateFormat('dd MMM').format(appliedEndDate)}', style: Theme.of(context).textTheme.bodyMedium),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
                         Text(
                           DateFormat('MMMM').format(appliedStartDate),
                           style: Theme.of(context).textTheme.titleLarge,
@@ -397,28 +347,32 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                Center(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 12,
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                  child: Row(
                     children: [
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => InquiryListScreen()),
-                          );
-                        },
-                        child: const Text('View All Inquiries'),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => InquiryListScreen()),
+                            );
+                          },
+                          child: const Text('View All Inquiries'),
+                        ),
                       ),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const VehicleCatalogScreen()),
-                          );
-                        },
-                        child: const Text('Manage Vehicles'),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const VehicleCatalogScreen()),
+                            );
+                          },
+                          child: const Text('Manage Vehicles'),
+                        ),
                       ),
                     ],
                   ),
@@ -483,57 +437,4 @@ class _TableCell extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LineChartPainter extends CustomPainter {
-  _LineChartPainter({required this.points, required this.lineColor, required this.dotColor, required this.gridColor});
-
-  final List<int> points;
-  final Color lineColor;
-  final Color dotColor;
-  final Color gridColor;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = gridColor
-      ..strokeWidth = 1;
-
-    for (var i = 0; i <= 4; i++) {
-      final y = size.height - i * size.height / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-
-    final maxValue = points.isEmpty ? 1 : points.reduce(math.max);
-    final path = Path();
-    final linePaint = Paint()
-      ..color = lineColor
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    for (var index = 0; index < points.length; index++) {
-      final dx = points.length == 1 ? 0.0 : index * (size.width / (points.length - 1));
-      final normalized = maxValue == 0 ? 0.5 : points[index] / maxValue;
-      final dy = size.height - normalized * size.height;
-      final current = Offset(dx, dy);
-      if (index == 0) {
-        path.moveTo(current.dx, current.dy);
-      } else {
-        path.lineTo(current.dx, current.dy);
-      }
-    }
-
-    canvas.drawPath(path, linePaint);
-
-    final dotPaint = Paint()..color = dotColor;
-    for (var index = 0; index < points.length; index++) {
-      final dx = points.length == 1 ? 0.0 : index * (size.width / (points.length - 1));
-      final normalized = maxValue == 0 ? 0.5 : points[index] / maxValue;
-      final dy = size.height - normalized * size.height;
-      canvas.drawCircle(Offset(dx, dy), 4, dotPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
