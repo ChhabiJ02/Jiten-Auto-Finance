@@ -1,10 +1,10 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-
 import 'inquiry_list_screen.dart';
 import 'vehicle_catalog_screen.dart';
 import '../shared/user_settings_screen.dart';
+import 'user_management_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -135,8 +135,25 @@ class _AdminDashboardState extends State<AdminDashboard> {
       appBar: AppBar(
         title: const Text('Admin Dashboard'),
         actions: [
+          // 🔵 USER MANAGEMENT FIRST
           IconButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSettingsScreen())),
+            icon: const Icon(Icons.people),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const UserManagementScreen(),
+                ),
+              );
+            },
+          ),
+
+          // ⚙️ SETTINGS AFTER
+          IconButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const UserSettingsScreen()),
+            ),
             icon: const Icon(Icons.settings),
           ),
         ],

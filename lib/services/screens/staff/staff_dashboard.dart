@@ -45,7 +45,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('inquiries')
-            .where('createdBy', isEqualTo: user!.uid)
+            .where('staffId', isEqualTo: user!.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
