@@ -300,26 +300,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       controller: referenceController,
                       decoration: const InputDecoration(labelText: 'Reference'),
                     ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Next Follow up: ${selectedDate.toString().split(' ')[0]}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _pickFollowUpDate,
-                          child: const Text('Change'),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
 
             // Status Section
@@ -344,7 +328,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
                         DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
                         DropdownMenuItem(value: 'Finance', child: Text('Finance')),
-                        DropdownMenuItem(value: 'Booked', child: Text('Booked')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -447,70 +430,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: modelController,
-              decoration: const InputDecoration(labelText: 'Model'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: variantController,
-              decoration: const InputDecoration(labelText: 'Variant'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: priceController,
-              decoration: const InputDecoration(labelText: 'Price'),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Vehicle Description',
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              value: paymentType,
-              items: const [
-                DropdownMenuItem(value: 'Loan', child: Text('Loan')),
-                DropdownMenuItem(value: 'Cash', child: Text('Cash')),
-              ],
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => paymentType = value);
-                }
-              },
-              decoration: const InputDecoration(labelText: 'Payment Option'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: otherController,
-              maxLines: 3,
-              decoration: const InputDecoration(labelText: 'Other Description'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: referenceController,
-              decoration: const InputDecoration(labelText: 'Reference'),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Follow up: ${selectedDate.toString().split(' ')[0]}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                TextButton(
-                  onPressed: _pickFollowUpDate,
-                  child: const Text('Change'),
-                ),
-              ],
-            ),
+            
             const SizedBox(height: 20),
 
             // Add Call Log Section
