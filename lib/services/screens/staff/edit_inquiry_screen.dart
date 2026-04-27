@@ -323,7 +323,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: status,
+                      initialValue: status,
                       items: const [
                         DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
                         DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),

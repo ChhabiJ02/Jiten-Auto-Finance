@@ -207,20 +207,20 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    "≡ƒô₧ ${itemData['phone'] ?? ''}",
+                                    "📞 ${itemData['phone'] ?? ''}",
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
-                                    "≡ƒÜù ${itemData['brand'] ?? ''} ${itemData['model'] ?? ''}",
+                                    "🚗 ${itemData['brand'] ?? ''} ${itemData['model'] ?? ''}",
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   Text(
-                                    "≡ƒÆ░ Γé╣${itemData['price'] ?? ''}",
+                                    "💰 ₹${itemData['price'] ?? ''}",
                                     style: const TextStyle(fontWeight: FontWeight.bold),
                                   ),
                                   if (nextFollowUp is Timestamp)
                                     Text(
-                                      "≡ƒôà Follow up: ${nextFollowUp.toDate().toString().split(' ')[0]}",
+                                      "📅 Follow up: ${nextFollowUp.toDate().toString().split(' ')[0]}",
                                       style: const TextStyle(fontWeight: FontWeight.bold),
                                     ),
                                   if (hasOverdueReminder)
@@ -272,4 +272,3 @@ class _StaffDashboardState extends State<StaffDashboard> {
     );
   }
 }
-
