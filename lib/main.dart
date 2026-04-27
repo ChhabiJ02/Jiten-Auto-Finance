@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'services/screens/shared/auth_wrapper.dart'; 
+import 'services/screens/shared/auth_wrapper.dart';
+import 'services/cloudinary_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Initialize Cloudinary with your credentials
+  CloudinaryService.initialize(
+    cloudName: 'YOUR_CLOUD_NAME', // Replace with your Cloudinary cloud name
+    uploadPreset: 'YOUR_UPLOAD_PRESET', // Replace with your upload preset
+    apiKey: 'YOUR_API_KEY', // Optional: for deletions
+    apiSecret: 'YOUR_API_SECRET', // Optional: for deletions
+  );
+  
   runApp(const MyApp());
 }
 

@@ -30,7 +30,7 @@ environment:
 dependencies:
   pdf: ^3.10.7
   printing: ^5.12.0
-  
+
   flutter:
     sdk: flutter
 
@@ -46,6 +46,9 @@ dependencies:
   uuid: ^4.5.3
   url_launcher: ^6.2.5
   cached_network_image: ^3.3.1
+  image_picker: ^1.0.7
+  http: ^1.1.0
+  dio: ^5.3.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class AddInquiryScreen extends StatefulWidget {
   @override
@@ -25,6 +26,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   String paymentType = 'Loan';
   DateTime selectedDate = DateTime.now();
   DateTime? followUpDate;
+  String? selectedVariantPhotoUrl; // Store variant photo URL
 
   bool loading = false;
   bool lookupLoading = false;
@@ -160,6 +162,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "model": modelController.text.trim(),
         "variant": variantController.text.trim(),
         "vehicleId": selectedVehicleId,
+        "vehiclePhotoUrl": selectedVariantPhotoUrl, // Save vehicle photo URL
         "price": priceController.text.trim(),
         "description": descriptionController.text.trim(),
         "paymentType": paymentType,
@@ -480,11 +483,12 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
                           setState(() {
                             selectedVariant = val;
+                            selectedVariantPhotoUrl = selected['photoUrl']; // Capture photo URL
 
                             brandController.text = selectedBrand!;
                             modelController.text = selectedModel!;
                             variantController.text = val!;
-                            priceController.text = selected['Price'].toString(); // ✅ ONLY HERE
+                            priceController.text = selected['Price'].toString();
                           });
                         },
                         decoration: InputDecoration(
@@ -498,6 +502,64 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           ),
                         ),
                       ),
+                      
+                      const SizedBox(height: 16),
+                      
+                      // 🎨 VEHICLE PHOTO DISPLAY
+                      if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
+                        Container(
+                          width: double.infinity,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Theme.of(context).colorScheme.primary,
+                              width: 2,
+                            ),
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: CachedNetworkImage(
+                              imageUrl: selectedVariantPhotoUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => const Center(
+                                child: CircularProgressIndicator(),
+                              ),
+                              errorWidget: (context, url, error) => const Center(
+                                child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
+                              ),
+                            ),
+                          ),
+                        )
+                      else if (selectedVariant != null)
+                        Container(
+                          width: double.infinity,
+                          height: 220,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            color: Colors.grey[200],
+                            border: Border.all(color: Colors.grey[400]!, width: 1),
+                          ),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.image_not_supported, 
+                                  size: 60, 
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No photo available',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       
                       const SizedBox(height: 16),
                       
