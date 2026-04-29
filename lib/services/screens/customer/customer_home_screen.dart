@@ -12,10 +12,12 @@ class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
   @override
-  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState(
+  );
 }
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBindingObserver {
+  String selectedBrand = 'All';
   final List<Map<String, String>> fallbackVehicles = [
     {"name": "Activa 6G Black", "price": "₹1,05,000", "img": "https://via.placeholder.com/150"},
     {"name": "Activa 5G Grey", "price": "₹95,000", "img": "https://via.placeholder.com/150"},
@@ -128,9 +130,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
               final variant = item['variant'] as String? ?? '';
               final price = item['price'] as String? ?? 'N/A';
               
-              final titleText = displayName?.isNotEmpty == true
-                  ? displayName!
-                  : [brand, model, variant].where((s) => s.isNotEmpty).join(' ').trim();
+              final titleText = model;
 
               return Container(
                 width: 200,
@@ -191,7 +191,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                                         ),
                                       ),
                                     ),
-                            ),
+                                  ),
                             // Brand Badge
                             Positioned(
                               top: 12,
@@ -346,6 +346,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     );
   }
 
+  // functions
+  Widget buildBrandChip(String brand) {
+    final isSelected = selectedBrand == brand;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(brand),
+        selected: isSelected,
+        onSelected: (_) {
+          setState(() {
+            selectedBrand = brand;
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -384,9 +402,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         ),
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('vehicles')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+            .collection('Variant')
+            .snapshots(),
           builder: (context, snapshot) {
             // Handle errors
             if (snapshot.hasError) {
@@ -441,17 +458,44 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
             }
 
             final docs = snapshot.data!.docs;
+
+            final brands = <String>{};
+            for (final doc in docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final brand = (data['ParentBrand'] ?? 'Other').toString();
+              
+              brands.add(brand);
+            }
             
             // Group vehicles by brand
             final grouped = <String, List<Map<String, dynamic>>>{};
+
             for (final doc in docs) {
               try {
                 final data = doc.data() as Map<String, dynamic>;
-                if (!_matchesSearch(data)) continue;
-                final brand = (data['brand'] as String?)?.trim() ?? 'Other Brands';
-                grouped.putIfAbsent(brand, () => []).add(data);
+
+                final brandRaw = data['ParentBrand'];
+                final brand = (brandRaw != null && brandRaw.toString().trim().isNotEmpty)
+                    ? brandRaw.toString().trim()
+                    : 'Unknown';
+
+                // ✅ APPLY FILTER HERE (CORRECT PLACE)
+                if (selectedBrand != 'All' && brand != selectedBrand) continue;
+
+                final model = (data['ParentModel'] ?? '').toString();
+                final variant = (data['Name'] ?? '').toString();
+                final price = (data['Price'] ?? '').toString();
+
+                grouped.putIfAbsent(brand, () => []).add({
+                  'brand': brand,
+                  'model': model,
+                  'variant': variant,
+                  'price': price,
+                  'displayName': model,
+                  'photos': data['photos'] ?? [],
+                });
+
               } catch (e) {
-                // Skip malformed documents
                 continue;
               }
             }
@@ -460,63 +504,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome Section
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.primary,
-                          theme.colorScheme.primary.withOpacity(0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: theme.colorScheme.onPrimary.withOpacity(0.2),
-                          child: Icon(
-                            Icons.person,
-                            size: 30,
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Welcome back, $name!',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Explore our latest vehicles and manage your services.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary.withOpacity(0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  
                   // Quick Actions
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -571,6 +559,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                   ),
 
                   const SizedBox(height: 28),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          buildBrandChip('All'),
+                          ...brands.map((b) => buildBrandChip(b)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
 
                   // Vehicles Section
                   if (docs.isEmpty) ...[

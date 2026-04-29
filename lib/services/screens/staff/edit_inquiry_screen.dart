@@ -32,6 +32,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   bool isClosed = false;
   bool isBooked = false;
   String status = 'New Inquiry';
+  static const List<String> _statusOptions = [
+    'New Inquiry',
+    'Follow Ups',
+    'Finance',
+    'Booked',
+    'Closed',
+  ];
   List<Map<String, dynamic>> followUpHistory = [];
   List<Map<String, dynamic>> callHistory = [];
 
@@ -85,7 +92,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     // Load status
     isClosed = data['isClosed'] == true;
     isBooked = data['isBooked'] == true;
-    status = data['status'] as String? ?? 'New Inquiry';
+    final savedStatus = data['status'] as String? ?? 'New Inquiry';
+    if (isClosed) {
+      status = 'Closed';
+    } else if (isBooked) {
+      status = 'Booked';
+    } else {
+      status = _statusOptions.contains(savedStatus) ? savedStatus : 'New Inquiry';
+    }
   }
 
   @override
@@ -220,18 +234,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     }
   }
 
-  Future<void> _pickFollowUpDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime(2100),
-    );
-    if (picked != null) {
-      setState(() => selectedDate = picked);
-    }
-  }
-
   Future<void> _pickNewFollowUpDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -323,15 +325,23 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: status,
-                      items: const [
-                        DropdownMenuItem(value: 'New Inquiry', child: Text('New Inquiry')),
-                        DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
-                        DropdownMenuItem(value: 'Finance', child: Text('Finance')),
-                      ],
+                      key: ValueKey(status),
+                      initialValue: status,
+                      items: _statusOptions
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option,
+                              child: Text(option),
+                            ),
+                          )
+                          .toList(),
                       onChanged: (value) {
                         if (value != null) {
-                          setState(() => status = value);
+                          setState(() {
+                            status = value;
+                            isBooked = value == 'Booked';
+                            isClosed = value == 'Closed';
+                          });
                         }
                       },
                       decoration: const InputDecoration(
@@ -349,7 +359,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               isClosed = value ?? false;
                               if (isClosed) {
                                 isBooked = false;
-                                status = 'Booked'; // Auto-set status when closed
+                                status = 'Closed'; // Auto-set status when closed
+                              } else if (status == 'Closed') {
+                                status = 'New Inquiry';
                               }
                             });
                           },
@@ -364,6 +376,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               if (isBooked) {
                                 isClosed = false;
                                 status = 'Booked'; // Auto-set status when booked
+                              } else if (status == 'Booked') {
+                                status = 'New Inquiry';
                               }
                             });
                           },
@@ -466,6 +480,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               lastDate: DateTime.now(),
                             );
                             if (picked != null) {
+                              if (!context.mounted) return;
                               final timePicked = await showTimePicker(
                                 context: context,
                                 initialTime: TimeOfDay.fromDateTime(callDateTime),
