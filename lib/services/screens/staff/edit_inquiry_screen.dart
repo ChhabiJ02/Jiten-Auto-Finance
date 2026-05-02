@@ -408,7 +408,7 @@ void initState() {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: brands.contains(selectedBrand)
+                      initialValue: brands.contains(selectedBrand)
                         ? selectedBrand
                         : null,
                       isExpanded: true,
@@ -440,7 +440,7 @@ void initState() {
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
-                      value: models.contains(selectedModel)
+                      initialValue: models.contains(selectedModel)
                         ? selectedModel
                         : null,
                       isExpanded: true,
@@ -469,7 +469,7 @@ void initState() {
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
-                      value: variants.any(
+                      initialValue: variants.any(
                               (v) => v['Name'] == selectedVariant,
                             )
                           ? selectedVariant
