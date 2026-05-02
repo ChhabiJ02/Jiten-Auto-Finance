@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:whatsapp_share2/whatsapp_share2.dart';
+//import 'package:whatsapp_share2/whatsapp_share2.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:cached_network_image/cached_network_image.dart';
+// import 'package:cached_network_image/cached_network_image.dart';
 
 class AddInquiryScreen extends StatefulWidget {
   const AddInquiryScreen({super.key});
@@ -130,34 +130,46 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
   }
 
-  Future<void> sendWhatsAppAndSave() async {
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
+  Future<void> sendPdfToWhatsApp() async {
 
-    if (phone.isEmpty) {
-      showMessage('Please enter a phone number.');
-      return;
-    }
+  final phone = phoneController.text.trim();
 
-    final filePath = await saveQuotationPdfToLocalStorage();
-    if (filePath == null) {
-      showMessage('Unable to save quotation PDF.');
-      return;
-    }
+  if (phone.isEmpty) {
+    showMessage('Please enter a phone number before sending.');
+    return;
+  }
 
-    final message =
-        "Hello $name 🙏\n\n"
-        "Thank you for visiting Jiten Auto.\n"
-        "Your quotation voucher is saved locally.\n\n"
-        "Regards,\nJiten Auto Team";
+  final path = await saveQuotationPdfToLocalStorage();
 
-    final url = Uri.parse(
-      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
+  if (path == null) {
+    showMessage('Unable to save quotation PDF.');
+    return;
+  }
+
+  final message =
+      "Hello 👋\n\n"
+      "Your quotation PDF has been generated successfully.\n\n"
+      "Please check the attached file stored locally on the device.\n\n"
+      "Regards,\nJiten Auto Team";
+
+  final url = Uri.parse(
+    "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
+  );
+
+  if (await canLaunchUrl(url)) {
+
+    await launchUrl(
+      url,
+      mode: LaunchMode.externalApplication,
     );
 
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-    await saveInquiry();
+    showMessage("WhatsApp opened successfully.");
+
+  } else {
+
+    showMessage("Could not open WhatsApp.");
   }
+}
 
   Future<bool> saveInquiry() async {
     setState(() => loading = true);
@@ -191,7 +203,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       });
 
       if (mounted) {
-        showMessage("WhatsApp launched and inquiry saved.");
+        showMessage("Lead generated successfully.");
         Navigator.pop(context);
       }
       return true;
@@ -270,36 +282,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     final file = File('${directory.path}/quotation_${DateTime.now().millisecondsSinceEpoch}.pdf');
     await file.writeAsBytes(bytes, flush: true);
     return file.path;
-  }
-
-  Future<void> sendPdfToWhatsApp() async {
-    final phone = phoneController.text.trim();
-    if (phone.isEmpty) {
-      showMessage('Please enter a phone number before sending the PDF.');
-      return;
-    }
-
-    final path = await saveQuotationPdfToLocalStorage();
-    if (path == null) {
-      showMessage('Unable to save quotation PDF.');
-      return;
-    }
-
-    final message =
-        "Hello!\n\nPlease find the attached quotation document.\n\nRegards,\nJiten Auto Team";
-
-    final installed = await WhatsappShare.isInstalled();
-    if (installed != true) {
-      showMessage('WhatsApp is not installed on this device.');
-      return;
-    }
-
-    await WhatsappShare.shareFile(
-      filePath: [path],
-      phone: '91$phone',
-      text: message,
-      package: Package.whatsapp,
-    );
   }
 
   Future<void> sendThankYou() async {
@@ -535,61 +517,61 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       
                       const SizedBox(height: 16),
                       
-                      // 🎨 VEHICLE PHOTO DISPLAY
-                      if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: CachedNetworkImage(
-                              imageUrl: selectedVariantPhotoUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => const Center(
-                                child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
-                              ),
-                            ),
-                          ),
-                        )
-                      else if (selectedVariant != null)
-                        Container(
-                          width: double.infinity,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.grey[200],
-                            border: Border.all(color: Colors.grey[400]!, width: 1),
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_not_supported, 
-                                  size: 60, 
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'No photo available',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      // // 🎨 VEHICLE PHOTO DISPLAY
+                      // if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
+                      //   Container(
+                      //     width: double.infinity,
+                      //     height: 220,
+                      //     decoration: BoxDecoration(
+                      //       borderRadius: BorderRadius.circular(16),
+                      //       border: Border.all(
+                      //         color: Theme.of(context).colorScheme.primary,
+                      //         width: 2,
+                      //       ),
+                      //     ),
+                        //   child: ClipRRect(
+                        //     borderRadius: BorderRadius.circular(14),
+                        //     child: CachedNetworkImage(
+                        //       imageUrl: selectedVariantPhotoUrl!,
+                        //       fit: BoxFit.cover,
+                        //       placeholder: (context, url) => const Center(
+                        //         child: CircularProgressIndicator(),
+                        //       ),
+                        //       errorWidget: (context, url, error) => const Center(
+                        //         child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
+                        //       ),
+                        //     ),
+                        //   ),
+                        // )
+                      // else if (selectedVariant != null)
+                      //   Container(
+                      //     width: double.infinity,
+                      //     height: 220,
+                      //     decoration: BoxDecoration(
+                      //       borderRadius: BorderRadius.circular(16),
+                      //       color: Colors.grey[200],
+                      //       border: Border.all(color: Colors.grey[400]!, width: 1),
+                      //     ),
+                      //     child: Center(
+                      //       child: Column(
+                      //         mainAxisAlignment: MainAxisAlignment.center,
+                      //         children: [
+                      //           Icon(Icons.image_not_supported, 
+                      //             size: 60, 
+                      //             color: Colors.grey[400],
+                      //           ),
+                      //           const SizedBox(height: 8),
+                      //           Text(
+                      //             'No photo available',
+                      //             style: TextStyle(
+                      //               color: Colors.grey[600],
+                      //               fontSize: 14,
+                      //             ),
+                      //           ),
+                      //         ],
+                      //       ),
+                      //     ),
+                      //   ),
                       
                       const SizedBox(height: 16),
                       
@@ -723,44 +705,77 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: sendThankYou,
-                                child: const Text("Send Thank You"),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: sendQuotation,
-                                child: const Text("Send Quotation"),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
+                        
                         SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.picture_as_pdf),
-                            onPressed: sendPdfToWhatsApp,
-                            label: const Text("Send PDF via WhatsApp"),
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+
+                          icon: const Icon(Icons.favorite_outline),
+
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7B1F3F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+
+                          onPressed: () async {
+
+                            final saved = await saveInquiry();
+
+                            if (saved) {
+                              await sendThankYou();
+                            }
+                          },
+
+                          label: const Text(
+                            "Send Thank You & Generate Lead",
+
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+                      ),
 
-                        const SizedBox(height: 10),
+                      const SizedBox(height: 12),
 
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: saveInquiry,
-                            child: const Text("Save Inquiry"),
+                      SizedBox(
+                        width: double.infinity,
+
+                        child: OutlinedButton.icon(
+
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF7B1F3F),
+                            side: const BorderSide(
+                              color: Color(0xFF7B1F3F),
+                            ),
+
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+
+                          onPressed: sendPdfToWhatsApp,
+
+                          label: const Text(
+                            "Send PDF via WhatsApp",
+
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),
