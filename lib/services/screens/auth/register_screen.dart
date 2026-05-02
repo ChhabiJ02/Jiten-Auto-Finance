@@ -14,9 +14,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final phoneController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final otpController = TextEditingController(); // New controller for OTP
 
   bool loading = false;
-  String role = "customer";
+  String _verificationId = ""; // To store Firebase verification ID
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -24,62 +25,101 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Future<void> register() async {
-    final name = nameController.text.trim();
+  // --- STEP 1: SEND OTP ---
+  Future<void> sendOTP() async {
     final phone = phoneController.text.trim();
-    final email = emailController.text.trim();
-    final password = passwordController.text.trim();
-
-    // 🔥 VALIDATION
-    if (name.isEmpty) {
-      showMessage("Please enter your full name.");
-      return;
-    }
-    if (phone.isEmpty) {
-      showMessage("Please enter your phone number.");
-      return;
-    }
-    if (email.isEmpty) {
-      showMessage("Please enter your email address.");
-      return;
-    }
-    if (password.isEmpty) {
-      showMessage("Please enter a password.");
+    
+    // Simple validation for India (+91). Ensure user adds country code.
+    if (!phone.startsWith('+')) {
+      showMessage("Please include country code (e.g. +91)");
       return;
     }
 
     setState(() => loading = true);
 
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phone,
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        // Auto-retrieval (Android only)
+        await registerWithEmailAndPhone(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => loading = false);
+        showMessage(e.message ?? "Verification failed");
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          loading = false;
+        });
+        _showOTPDialog(); // Show the popup to enter OTP
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
+  }
+
+  // --- STEP 2: SHOW OTP POPUP ---
+  void _showOTPDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text("Enter OTP"),
+        content: TextField(
+          controller: otpController,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: "6-digit code"),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              PhoneAuthCredential credential = PhoneAuthProvider.credential(
+                verificationId: _verificationId,
+                smsCode: otpController.text.trim(),
+              );
+              Navigator.pop(context); // Close dialog
+              await registerWithEmailAndPhone(credential);
+            },
+            child: const Text("Verify & Register"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // --- STEP 3: FINAL REGISTRATION ---
+  Future<void> registerWithEmailAndPhone(PhoneAuthCredential phoneCredential) async {
+    setState(() => loading = true);
     try {
-      final userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
+      // 1. Create Email/Password Account
+      final userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
       );
 
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-        "name": name,
-        "phone": phone,
-        "email": email,
-        "role": "customer", // ✅ ONLY CUSTOMER
+      // 2. Link the Phone Number to this account (Optional but recommended)
+      await userCredential.user!.linkWithCredential(phoneCredential);
+
+      // 3. Save to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userCredential.user!.uid).set({
+        "name": nameController.text.trim(),
+        "phone": phoneController.text.trim(),
+        "email": emailController.text.trim(),
+        "role": "customer",
         "createdAt": Timestamp.now(),
       });
 
       if (!mounted) return;
       showMessage("Registered Successfully");
-      await FirebaseAuth.instance.signOut();
       Navigator.pop(context);
-    } on FirebaseAuthException catch (e) {
-      print("🔥 REGISTER ERROR CODE: ${e.code}");
-      print("🔥 REGISTER ERROR MESSAGE: ${e.message}");
-
-      showMessage(e.message ?? "Registration failed");
     } catch (e) {
-      print("🔥 UNKNOWN ERROR: $e");
-      if (mounted) showMessage("Something went wrong. Try again.");
+      showMessage(e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -91,13 +131,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     phoneController.dispose();
     emailController.dispose();
     passwordController.dispose();
+    otpController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       appBar: AppBar(title: const Text("Register")),
       body: Container(
@@ -122,113 +162,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        height: 80,
-                        width: 80,
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primary.withOpacity(0.12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.electric_car_outlined,
-                          color: theme.colorScheme.primary,
-                          size: 40,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Text(
-                        "JitenAuto",
-                        style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        "Create your JitenAuto account and capture more leads.",
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54),
-                      ),
-                      const SizedBox(height: 28),
+                      // ... (Your existing Icon and Header Widgets here) ...
 
+                      const SizedBox(height: 28),
                       TextField(
                         controller: nameController,
-                        decoration: InputDecoration(
-                          labelText: "Full Name",
-                          prefixIcon: const Icon(Icons.person_outline),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
+                        decoration: _inputStyle("Full Name", Icons.person_outline),
                       ),
-
                       const SizedBox(height: 16),
                       TextField(
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: "Phone Number",
-                          prefixIcon: const Icon(Icons.phone_outlined),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
+                        decoration: _inputStyle("Phone (e.g. +91...)", Icons.phone_outlined),
                       ),
-
                       const SizedBox(height: 16),
                       TextField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
-                        decoration: InputDecoration(
-                          labelText: "Email",
-                          prefixIcon: const Icon(Icons.email_outlined),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
+                        decoration: _inputStyle("Email", Icons.email_outlined),
                       ),
-
                       const SizedBox(height: 16),
                       TextField(
                         controller: passwordController,
                         obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: "Password",
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
+                        decoration: _inputStyle("Password", Icons.lock_outline),
                       ),
-
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: loading ? null : register,
+                          onPressed: loading ? null : sendOTP, // Now triggers OTP
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                           ),
                           child: loading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text("Register"),
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text("Send OTP & Register"),
                         ),
                       ),
                     ],
@@ -238,6 +208,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputStyle(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
       ),
     );
   }

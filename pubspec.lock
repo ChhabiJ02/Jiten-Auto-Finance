@@ -604,10 +604,10 @@ packages:
     dependency: transitive
     description:
       name: mime
-      sha256: "41a20518f0cb1256669420fdba0cd90d21561e560ac240f26ef8322e45bb7ed6"
+      sha256: "801fd0b26f14a4a58ccb09d5892c3fbdeff209594300a542492cf13fba9d247a"
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.0"
+    version: "1.0.6"
   native_toolchain_c:
     dependency: transitive
     description:
@@ -665,7 +665,7 @@ packages:
     source: hosted
     version: "1.1.0"
   path_provider:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: path_provider
       sha256: "50c5dd5b6e1aaf6fb3a78b33f6aa3afca52bf903a8a5298f53101fdaee55bbcd"
@@ -1117,6 +1117,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.2.1"
+  whatsapp_share2:
+    dependency: "direct main"
+    description:
+      name: whatsapp_share2
+      sha256: "0ed7a29f55be2230f597d817324c293bb7e99578d0e979edfa0b6c767ba09288"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.1"
   xdg_directories:
     dependency: transitive
     description:

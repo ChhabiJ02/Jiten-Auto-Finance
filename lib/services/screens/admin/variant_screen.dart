@@ -125,7 +125,7 @@ class VariantScreen extends StatelessWidget {
                           .update({
                         "Name": nameController.text,
                         "Price": priceController.text,
-                        if (photoUrl != null) "photoUrl": photoUrl,
+                        "photoUrl": ?photoUrl,
                       });
 
                       Navigator.pop(context);

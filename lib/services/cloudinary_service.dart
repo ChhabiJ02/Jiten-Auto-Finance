@@ -42,7 +42,7 @@ class CloudinaryService {
         'file': await MultipartFile.fromFile(filePath),
         'upload_preset': _uploadPreset,
         'folder': folder,
-        if (publicId != null) 'public_id': publicId,
+        'public_id': ?publicId,
       });
 
       final response = await _dio.post(

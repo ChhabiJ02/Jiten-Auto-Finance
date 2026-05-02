@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:whatsapp_share2/whatsapp_share2.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class AddInquiryScreen extends StatefulWidget {
+  const AddInquiryScreen({super.key});
+
   @override
   State<AddInquiryScreen> createState() => _AddInquiryScreenState();
 } 
@@ -109,7 +115,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           .get();
       if (query.docs.isNotEmpty) {
         final vehicle = query.docs.first;
-        final data = vehicle.data() as Map<String, dynamic>;
+        final data = vehicle.data();
         selectedVehicleId = vehicle.id;
         priceController.text = data['price']?.toString() ?? priceController.text;
         descriptionController.text = data['description'] ?? descriptionController.text;
@@ -125,25 +131,33 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   Future<void> sendWhatsAppAndSave() async {
-  final name = nameController.text.trim();
-  final phone = phoneController.text.trim();
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
 
-  final message =
-      "Hello $name 🙏\n\n"
-      "Thank you for visiting Jiten Auto.\n"
-      "Your quotation is attached.\n\n"
-      "Regards,\nJiten Auto Team";
+    if (phone.isEmpty) {
+      showMessage('Please enter a phone number.');
+      return;
+    }
 
-  final url = Uri.parse(
-      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}");
+    final filePath = await saveQuotationPdfToLocalStorage();
+    if (filePath == null) {
+      showMessage('Unable to save quotation PDF.');
+      return;
+    }
 
-  await launchUrl(url, mode: LaunchMode.externalApplication);
+    final message =
+        "Hello $name 🙏\n\n"
+        "Thank you for visiting Jiten Auto.\n"
+        "Your quotation voucher is saved locally.\n\n"
+        "Regards,\nJiten Auto Team";
 
-  // 🔥 GENERATE PDF AFTER MESSAGE
-  await generateQuotationPDF();
+    final url = Uri.parse(
+      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
+    );
 
-  await saveInquiry();
-}
+    await launchUrl(url, mode: LaunchMode.externalApplication);
+    await saveInquiry();
+  }
 
   Future<bool> saveInquiry() async {
     setState(() => loading = true);
@@ -193,7 +207,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
   }
 
-  Future<void> generateQuotationPDF() async {
+  Future<String?> saveQuotationPdfToLocalStorage() async {
     final pdf = pw.Document();
 
     final name = nameController.text.trim();
@@ -212,52 +226,36 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-
-              // 🔴 HEADER
               pw.Text(
                 "JITEN AUTO",
                 style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
               ),
               pw.SizedBox(height: 5),
               pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
-
               pw.Divider(),
-
-              // 🔵 CUSTOMER DETAILS
               pw.Text("Customer Details",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-
               pw.SizedBox(height: 8),
               pw.Text("Name: $name"),
               pw.Text("Mobile: $phone"),
               pw.Text("Reference: $reference"),
               pw.Text("Date: $date"),
-
               pw.SizedBox(height: 20),
-
-              // 🔵 VEHICLE DETAILS
               pw.Text("Vehicle Details",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-
               pw.SizedBox(height: 8),
               pw.Text("Brand: $brand"),
               pw.Text("Model: $model"),
               pw.Text("Variant: $variant"),
-
               pw.SizedBox(height: 10),
-
               pw.Text(
                 "Price: ₹$price",
                 style: pw.TextStyle(
                     fontSize: 16, fontWeight: pw.FontWeight.bold),
               ),
-
               pw.SizedBox(height: 30),
-
-              // 🔵 FOOTER
               pw.Text("Thank you for your inquiry.",
                   style: pw.TextStyle(fontSize: 12)),
-
               pw.SizedBox(height: 10),
               pw.Text("Regards,\nJiten Auto",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
@@ -267,8 +265,40 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       ),
     );
 
-    await Printing.layoutPdf(
-      onLayout: (format) async => pdf.save(),
+    final bytes = await pdf.save();
+    final directory = await getApplicationDocumentsDirectory();
+    final file = File('${directory.path}/quotation_${DateTime.now().millisecondsSinceEpoch}.pdf');
+    await file.writeAsBytes(bytes, flush: true);
+    return file.path;
+  }
+
+  Future<void> sendPdfToWhatsApp() async {
+    final phone = phoneController.text.trim();
+    if (phone.isEmpty) {
+      showMessage('Please enter a phone number before sending the PDF.');
+      return;
+    }
+
+    final path = await saveQuotationPdfToLocalStorage();
+    if (path == null) {
+      showMessage('Unable to save quotation PDF.');
+      return;
+    }
+
+    final message =
+        "Hello!\n\nPlease find the attached quotation document.\n\nRegards,\nJiten Auto Team";
+
+    final installed = await WhatsappShare.isInstalled();
+    if (installed != true) {
+      showMessage('WhatsApp is not installed on this device.');
+      return;
+    }
+
+    await WhatsappShare.shareFile(
+      filePath: [path],
+      phone: '91$phone',
+      text: message,
+      package: Package.whatsapp,
     );
   }
 
@@ -413,7 +443,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       
                       // 🔵 BRAND DROPDOWN
                       DropdownButtonFormField<String>(
-                        value: selectedBrand,
+                        initialValue: selectedBrand,
                         isExpanded: true,
                         hint: const Text("Select Brand"),
                         items: brands.map<DropdownMenuItem<String>>((b) {
@@ -439,7 +469,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
                       // 🔵 MODEL DROPDOWN
                       DropdownButtonFormField<String>(
-                        value: selectedModel,
+                        initialValue: selectedModel,
                         isExpanded: true,
                         hint: const Text("Select Model"),
                         items: models.map<DropdownMenuItem<String>>((m) {
@@ -465,7 +495,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
                       // 🔵 VARIANT DROPDOWN
                       DropdownButtonFormField<String>(
-                        value: selectedVariant,
+                        initialValue: selectedVariant,
                         isExpanded: true, // ✅ FIX OVERFLOW
                         hint: const Text("Select Variant"),
                         items: variants.map<DropdownMenuItem<String>>((v) {
@@ -597,7 +627,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       const SizedBox(height: 16),
                      
                       DropdownButtonFormField<String>(
-                        value: paymentType,
+                        initialValue: paymentType,
                         items: const [
                           DropdownMenuItem(value: 'Loan', child: Text('Loan')),
                           DropdownMenuItem(value: 'Cash', child: Text('Cash')),
@@ -709,6 +739,17 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                               ),
                             ),
                           ],
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.picture_as_pdf),
+                            onPressed: sendPdfToWhatsApp,
+                            label: const Text("Send PDF via WhatsApp"),
+                          ),
                         ),
 
                         const SizedBox(height: 10),

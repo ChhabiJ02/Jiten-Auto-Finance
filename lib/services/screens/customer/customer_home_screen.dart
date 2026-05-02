@@ -167,12 +167,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                                       fit: BoxFit.cover,
                                       placeholder: (context, url) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceVariant,
+                                        color: theme.colorScheme.surfaceContainerHighest,
                                         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                       ),
                                       errorWidget: (context, url, error) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceVariant,
+                                        color: theme.colorScheme.surfaceContainerHighest,
                                         child: Icon(
                                           Icons.directions_bike,
                                           size: 56,
@@ -182,7 +182,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                                     )
                                   : Container(
                                       height: 140,
-                                      color: theme.colorScheme.surfaceVariant,
+                                      color: theme.colorScheme.surfaceContainerHighest,
                                       child: Center(
                                         child: Icon(
                                           Icons.directions_bike,
