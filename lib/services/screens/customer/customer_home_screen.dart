@@ -76,11 +76,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     );
   }
 
-  bool _matchesSearch(Map<String, dynamic> item) {
-    if (searchQuery.isEmpty) return true;
-    final candidate = '${item['displayName'] ?? ''} ${item['brand'] ?? ''} ${item['model'] ?? ''} ${item['variant'] ?? ''} ${item['description'] ?? ''}'.toString().toLowerCase();
-    return candidate.contains(searchQuery);
-  }
+  // bool _matchesSearch(Map<String, dynamic> item) {
+  //   if (searchQuery.isEmpty) return true;
+  //   final candidate = '${item['displayName'] ?? ''} ${item['brand'] ?? ''} ${item['model'] ?? ''} ${item['variant'] ?? ''} ${item['description'] ?? ''}'.toString().toLowerCase();
+  //   return candidate.contains(searchQuery);
+  // }
 
 Widget buildVehicleSection(
     BuildContext context,
@@ -175,12 +175,12 @@ Widget buildVehicleSection(
                                       fit: BoxFit.cover,
                                       placeholder: (context, url) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceVariant,
+                                        color: theme.colorScheme.surfaceContainerHighest,
                                         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                       ),
                                       errorWidget: (context, url, error) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceVariant,
+                                        color: theme.colorScheme.surfaceContainerHighest,
                                         child: Icon(
                                           Icons.directions_bike,
                                           size: 60,
@@ -189,7 +189,7 @@ Widget buildVehicleSection(
                                     )
                                   : Container(
                                       height: 140,
-                                      color: theme.colorScheme.surfaceVariant,
+                                      color: theme.colorScheme.surfaceContainerHighest,
                                       child: Center(
                                         child: Icon(
                                           Icons.directions_bike,
@@ -439,8 +439,8 @@ Widget buildVehicleSection(
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final name = user?.displayName ?? user?.email?.split('@').first ?? 'Customer';
+    // final user = FirebaseAuth.instance.currentUser;
+    // final name = user?.displayName ?? user?.email?.split('@').first ?? 'Customer';
     final theme = Theme.of(context);
 
     return Scaffold(

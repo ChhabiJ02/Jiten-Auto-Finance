@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:whatsapp_share2/whatsapp_share2.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 class AddInquiryScreen extends StatefulWidget {
@@ -94,6 +93,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         .showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // ignore: unused_element
   Future<void> _lookupVehicle() async {
     final brand = brandController.text.trim();
     final model = modelController.text.trim();
