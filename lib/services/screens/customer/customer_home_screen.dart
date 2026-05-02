@@ -12,10 +12,12 @@ class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
 
   @override
-  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState(
+  );
 }
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBindingObserver {
+  String selectedBrand = 'All';
   final List<Map<String, String>> fallbackVehicles = [
     {"name": "Activa 6G Black", "price": "Γé╣1,05,000", "img": "https://via.placeholder.com/150"},
     {"name": "Activa 5G Grey", "price": "Γé╣95,000", "img": "https://via.placeholder.com/150"},
@@ -80,179 +82,249 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     return candidate.contains(searchQuery);
   }
 
-  Widget buildVehicleSection(BuildContext context, String title, List<Map<String, dynamic>> items) {
+Widget buildVehicleSection(
+    BuildContext context,
+    String title,
+    List<Map<String, dynamic>> items,
+  ) {
     final theme = Theme.of(context);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
             children: [
               Text(
                 title,
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  letterSpacing: 0.5,
+                  fontSize: 22,
                 ),
               ),
-              const SizedBox(height: 4),
-              Container(
-                width: 60,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary,
-                  borderRadius: BorderRadius.circular(2),
+              const Spacer(),
+              Text(
+                "${items.length} Models",
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
+
         SizedBox(
-          height: 280,
+          height: 340,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14),
             itemCount: items.length,
             itemBuilder: (context, index) {
               final item = items[index];
-              final photoUrls = (item['photos'] as List<dynamic>?)?.whereType<String>().toList() ?? [];
-              final imageUrl = photoUrls.isNotEmpty ? photoUrls.first : null;
-              final displayName = item['displayName'] as String?;
-              final brand = item['brand'] as String? ?? 'Vehicle';
-              final model = item['model'] as String? ?? '';
-              final variant = item['variant'] as String? ?? '';
-              final price = item['price'] as String? ?? 'N/A';
-              
-              final titleText = displayName?.isNotEmpty == true
-                  ? displayName!
-                  : [brand, model, variant].where((s) => s.isNotEmpty).join(' ').trim();
+
+              final photos =
+                  (item['photos'] as List<dynamic>?)
+                          ?.whereType<String>()
+                          .toList() ??
+                      [];
+
+              final imageUrl =
+                  photos.isNotEmpty ? photos.first : null;
+
+              final brand = item['brand'] ?? '';
+              final model = item['model'] ?? '';
+              final variant = item['variant'] ?? '';
+              final price = item['price'] ?? '';
+              final colors =
+                  (item['colors'] as List<dynamic>?)
+                          ?.whereType<String>()
+                          .toList() ??
+                      ["Black", "White", "Blue"];
 
               return Container(
-                width: 200,
-                margin: const EdgeInsets.symmetric(horizontal: 6),
-                child: Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                width: 250,
+                margin: const EdgeInsets.only(right: 16, bottom: 8),
+                child: Material(
                   elevation: 8,
-                  shadowColor: theme.colorScheme.primary.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(24),
+                  shadowColor:
+                      theme.colorScheme.primary.withOpacity(0.2),
                   child: Container(
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.colorScheme.surface,
-                          theme.colorScheme.surface.withOpacity(0.95),
-                        ],
-                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      color: theme.colorScheme.surface,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Image with Badge
+
+                        // IMAGE
                         Stack(
                           children: [
                             ClipRRect(
-                              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                              child: imageUrl != null && imageUrl.isNotEmpty
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(24),
+                              ),
+                              child: imageUrl != null
                                   ? CachedNetworkImage(
                                       imageUrl: imageUrl,
-                                      height: 140,
+                                      height: 170,
                                       width: double.infinity,
                                       fit: BoxFit.cover,
                                       placeholder: (context, url) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceContainerHighest,
+                                        color: theme.colorScheme.surfaceVariant,
                                         child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                                       ),
                                       errorWidget: (context, url, error) => Container(
                                         height: 140,
-                                        color: theme.colorScheme.surfaceContainerHighest,
+                                        color: theme.colorScheme.surfaceVariant,
                                         child: Icon(
                                           Icons.directions_bike,
-                                          size: 56,
-                                          color: theme.colorScheme.onSurfaceVariant,
+                                          size: 60,
                                         ),
                                       ),
                                     )
                                   : Container(
                                       height: 140,
-                                      color: theme.colorScheme.surfaceContainerHighest,
+                                      color: theme.colorScheme.surfaceVariant,
                                       child: Center(
                                         child: Icon(
                                           Icons.directions_bike,
-                                          size: 56,
-                                          color: theme.colorScheme.onSurfaceVariant,
+                                          size: 60,
                                         ),
                                       ),
                                     ),
                             ),
-                            // Brand Badge
+
+                            // BRAND CHIP
                             Positioned(
                               top: 12,
-                              right: 12,
+                              left: 12,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: theme.colorScheme.primary.withOpacity(0.4),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
+                                  borderRadius:
+                                      BorderRadius.circular(20),
                                 ),
                                 child: Text(
                                   brand,
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    color: theme.colorScheme.onPrimary,
+                                  style: const TextStyle(
+                                    color: Colors.white,
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 11,
+                                    fontSize: 12,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        // Content
+
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                            padding: const EdgeInsets.all(14),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  CrossAxisAlignment.start,
                               children: [
-                                // Title
+
+                                // MODEL
                                 Text(
-                                  titleText,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    height: 1.2,
-                                  ),
-                                  maxLines: 2,
+                                  model,
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 6),
-                                // Variant Info
-                                if (variant.isNotEmpty)
-                                  Text(
-                                    variant,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.onSurface.withOpacity(0.6),
-                                      fontSize: 12,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.titleLarge
+                                      ?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
                                   ),
+                                ),
+
+                                const SizedBox(height: 4),
+
+                                // VARIANT
+                                Text(
+                                  variant,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // PRICE
+                                Row(
+                                  children: [
+                                    const Icon(
+                                      Icons.currency_rupee,
+                                      size: 18,
+                                      color: Colors.green,
+                                    ),
+                                    Text(
+                                      price.toString(),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 22,
+                                        color: Colors.green,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                // COLORS TITLE
+                                Text(
+                                  "Available Colors",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade800,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                // COLOR OPTIONS
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: colors.map((color) {
+                                    return Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme
+                                            .colorScheme.primary
+                                            .withOpacity(0.08),
+                                        borderRadius:
+                                            BorderRadius.circular(14),
+                                      ),
+                                      child: Text(
+                                        color,
+                                        style: TextStyle(
+                                          color: theme
+                                              .colorScheme.primary,
+                                          fontWeight:
+                                              FontWeight.w600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+
                                 const Spacer(),
                                 // Price
                                 Container(
@@ -262,7 +334,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    'Γé╣$price',
+                                    '₹$price',
                                     style: theme.textTheme.titleSmall?.copyWith(
                                       color: theme.colorScheme.primary,
                                       fontWeight: FontWeight.bold,
@@ -282,7 +354,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
             },
           ),
         ),
-        const SizedBox(height: 28),
+
+        const SizedBox(height: 26),
       ],
     );
   }
@@ -346,6 +419,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     );
   }
 
+  // functions
+  Widget buildBrandChip(String brand) {
+    final isSelected = selectedBrand == brand;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: ChoiceChip(
+        label: Text(brand),
+        selected: isSelected,
+        onSelected: (_) {
+          setState(() {
+            selectedBrand = brand;
+          });
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -384,9 +475,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
         ),
         child: StreamBuilder<QuerySnapshot>(
           stream: FirebaseFirestore.instance
-              .collection('vehicles')
-              .orderBy('createdAt', descending: true)
-              .snapshots(),
+            .collection('Variant')
+            .snapshots(),
           builder: (context, snapshot) {
             // Handle errors
             if (snapshot.hasError) {
@@ -441,17 +531,44 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
             }
 
             final docs = snapshot.data!.docs;
+
+            final brands = <String>{};
+            for (final doc in docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final brand = (data['ParentBrand'] ?? 'Other').toString();
+              
+              brands.add(brand);
+            }
             
             // Group vehicles by brand
             final grouped = <String, List<Map<String, dynamic>>>{};
+
             for (final doc in docs) {
               try {
                 final data = doc.data() as Map<String, dynamic>;
-                if (!_matchesSearch(data)) continue;
-                final brand = (data['brand'] as String?)?.trim() ?? 'Other Brands';
-                grouped.putIfAbsent(brand, () => []).add(data);
+
+                final brandRaw = data['ParentBrand'];
+                final brand = (brandRaw != null && brandRaw.toString().trim().isNotEmpty)
+                    ? brandRaw.toString().trim()
+                    : 'Unknown';
+
+                // ✅ APPLY FILTER HERE (CORRECT PLACE)
+                if (selectedBrand != 'All' && brand != selectedBrand) continue;
+
+                final model = (data['ParentModel'] ?? '').toString();
+                final variant = (data['Name'] ?? '').toString();
+                final price = (data['Price'] ?? '').toString();
+
+                grouped.putIfAbsent(brand, () => []).add({
+                  'brand': brand,
+                  'model': model,
+                  'variant': variant,
+                  'price': price,
+                  'displayName': model,
+                  'photos': data['photos'] ?? [],
+                });
+
               } catch (e) {
-                // Skip malformed documents
                 continue;
               }
             }
@@ -460,63 +577,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome Section
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          theme.colorScheme.primary,
-                          theme.colorScheme.primary.withOpacity(0.8),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: theme.colorScheme.onPrimary.withOpacity(0.2),
-                          child: Icon(
-                            Icons.person,
-                            size: 30,
-                            color: theme.colorScheme.onPrimary,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Welcome back, $name!',
-                                style: theme.textTheme.headlineSmall?.copyWith(
-                                  color: theme.colorScheme.onPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Explore our latest vehicles and manage your services.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.onPrimary.withOpacity(0.9),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
+                  
                   // Quick Actions
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -571,6 +632,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
                   ),
 
                   const SizedBox(height: 28),
+
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          buildBrandChip('All'),
+                          ...brands.map((b) => buildBrandChip(b)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
 
                   // Vehicles Section
                   if (docs.isEmpty) ...[
@@ -644,4 +719,3 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> with WidgetsBin
     );
   }
 }
-
