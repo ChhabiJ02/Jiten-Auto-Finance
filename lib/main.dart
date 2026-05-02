@@ -1,10 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'services/screens/shared/auth_wrapper.dart'; 
+import 'services/screens/shared/auth_wrapper.dart';
+import 'services/cloudinary_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  
+  // Initialize Cloudinary with your credentials
+  CloudinaryService.initialize(
+    cloudName: 'YOUR_CLOUD_NAME', // Replace with your Cloudinary cloud name
+    uploadPreset: 'YOUR_UPLOAD_PRESET', // Replace with your upload preset
+    apiKey: 'YOUR_API_KEY', // Optional: for deletions
+    apiSecret: 'YOUR_API_SECRET', // Optional: for deletions
+  );
+  
   runApp(const MyApp());
 }
 
@@ -13,11 +23,12 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF2A3F66);
-    const accentColor = Color(0xFFC39C6B);
-    const backgroundColor = Color(0xFFF6F1E7);
+    const primaryColor = Color(0xFF7B1F3F);
+    const accentColor = Color(0xFFF4DBE1);
+    const backgroundColor = Color(0xFFF9EEF2);
 
     return MaterialApp(
+      title: 'JitenAuto',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: false,
@@ -67,7 +78,7 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(14),
-            borderSide: BorderSide(color: accentColor),
+            borderSide: BorderSide(color: primaryColor),
           ),
           labelStyle: TextStyle(color: primaryColor.withAlpha(204)),
         ),
