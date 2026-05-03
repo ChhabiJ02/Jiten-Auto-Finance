@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:whatsapp_share2/whatsapp_share2.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter/services.dart';
+// remove share_plus import
 
 class AddInquiryScreen extends StatefulWidget {
   const AddInquiryScreen({super.key});
@@ -17,6 +18,8 @@ class AddInquiryScreen extends StatefulWidget {
 } 
 
 class _AddInquiryScreenState extends State<AddInquiryScreen> {
+static const _platform = MethodChannel('whatsapp_pdf_share');
+
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
   final brandController = TextEditingController();
@@ -207,7 +210,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
   }
 
-  Future<String?> saveQuotationPdfToLocalStorage() async {
+ Future<String?> saveQuotationPdfToLocalStorage() async {
+  try {
     final pdf = pw.Document();
 
     final name = nameController.text.trim();
@@ -226,13 +230,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           child: pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              pw.Text(
-                "JITEN AUTO",
-                style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
-              ),
+              pw.Text("JITEN AUTO",
+                  style: pw.TextStyle(
+                      fontSize: 24, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 5),
               pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
               pw.Divider(),
+              pw.SizedBox(height: 8),
               pw.Text("Customer Details",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 8),
@@ -248,11 +252,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
               pw.Text("Model: $model"),
               pw.Text("Variant: $variant"),
               pw.SizedBox(height: 10),
-              pw.Text(
-                "Price: ₹$price",
-                style: pw.TextStyle(
-                    fontSize: 16, fontWeight: pw.FontWeight.bold),
-              ),
+              pw.Text("Price: ₹$price",
+                  style: pw.TextStyle(
+                      fontSize: 16, fontWeight: pw.FontWeight.bold)),
               pw.SizedBox(height: 30),
               pw.Text("Thank you for your inquiry.",
                   style: pw.TextStyle(fontSize: 12)),
@@ -266,41 +268,136 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     );
 
     final bytes = await pdf.save();
-    final directory = await getApplicationDocumentsDirectory();
-    final file = File('${directory.path}/quotation_${DateTime.now().millisecondsSinceEpoch}.pdf');
-    await file.writeAsBytes(bytes, flush: true);
-    return file.path;
+
+// ✅ Replace with this:
+final cacheDir = await getTemporaryDirectory();
+final filePath = '${cacheDir.path}/quotation.pdf';
+final file = File(filePath);
+await file.writeAsBytes(bytes, flush: true);
+
+    return filePath;
+  } catch (e) {
+    showMessage('Failed to save PDF: ${e.toString()}');
+    return null;
+  }
+}
+
+Future<void> sendPdfToWhatsApp() async {
+  final phone = phoneController.text.trim();
+  final name = nameController.text.trim();
+
+  if (phone.isEmpty) {
+    showMessage('Please enter a phone number.');
+    return;
   }
 
-  Future<void> sendPdfToWhatsApp() async {
-    final phone = phoneController.text.trim();
-    if (phone.isEmpty) {
-      showMessage('Please enter a phone number before sending the PDF.');
-      return;
-    }
+  setState(() => loading = true);
 
-    final path = await saveQuotationPdfToLocalStorage();
-    if (path == null) {
-      showMessage('Unable to save quotation PDF.');
-      return;
-    }
+  try {
+    // 1. Request permissions
+    await Permission.manageExternalStorage.request();
+    await Permission.storage.request();
 
-    final message =
-        "Hello!\n\nPlease find the attached quotation document.\n\nRegards,\nJiten Auto Team";
+    // 2. Generate PDF
+    final pdf = pw.Document();
+    final reference = referenceController.text.trim();
+    final brand = brandController.text.trim();
+    final model = modelController.text.trim();
+    final variant = variantController.text.trim();
+    final price = priceController.text.trim();
+    final date = DateTime.now().toString().split(' ')[0];
 
-    final installed = await WhatsappShare.isInstalled();
-    if (installed != true) {
-      showMessage('WhatsApp is not installed on this device.');
-      return;
-    }
-
-    await WhatsappShare.shareFile(
-      filePath: [path],
-      phone: '91$phone',
-      text: message,
-      package: Package.whatsapp,
+    pdf.addPage(
+      pw.Page(
+        build: (context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("JITEN AUTO",
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 5),
+              pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+              pw.Text("Customer Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text("Name: $name"),
+              pw.Text("Mobile: $phone"),
+              pw.Text("Reference: $reference"),
+              pw.Text("Date: $date"),
+              pw.SizedBox(height: 20),
+              pw.Text("Vehicle Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text("Brand: $brand"),
+              pw.Text("Model: $model"),
+              pw.Text("Variant: $variant"),
+              pw.SizedBox(height: 10),
+              pw.Text("Price: ₹$price",
+                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 30),
+              pw.Text("Thank you for your inquiry.",
+                  style: pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 10),
+              pw.Text("Regards,\nJiten Auto",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
     );
+
+    final bytes = await pdf.save();
+
+    // 3. Save to Downloads/JitenAuto/
+    final downloadsDir = Directory('/storage/emulated/0/Download/JitenAuto');
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
+
+    final nameCleaned = name.replaceAll(' ', '_');
+    final fileName = 'Quotation_$nameCleaned.pdf';
+    final filePath = '${downloadsDir.path}/$fileName';
+
+    final file = File(filePath);
+    await file.writeAsBytes(bytes, flush: true);
+
+    // 4. Verify
+    if (!await file.exists() || await file.length() == 0) {
+      showMessage('Failed to save PDF.');
+      return;
+    }
+
+    // 5. Send via native Android intent
+    final message =
+        "Hello $name 👋\n\n"
+        "Please find the attached quotation.\n\n"
+        "Regards,\nJiten Auto Team";
+
+    await _platform.invokeMethod('shareToWhatsApp', {
+      'filePath': filePath,
+      'phone': phone,
+      'message': message,
+    });
+
+  } catch (e) {
+    showMessage('Error: ${e.toString()}');
+  } finally {
+    if (mounted) setState(() => loading = false);
   }
+}
+
+  // Future<Package?> _resolveWhatsappPackage() async {
+  //   if (await WhatsappShare.isInstalled(package: Package.whatsapp) == true) {
+  //     return Package.whatsapp;
+  //   }
+  //   if (await WhatsappShare.isInstalled(package: Package.businessWhatsapp) == true) {
+  //     return Package.businessWhatsapp;
+  //   }
+  //   return null;
+  // }
 
   Future<void> sendThankYou() async {
     final name = nameController.text.trim();
