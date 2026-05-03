@@ -7,6 +7,7 @@ import 'book_service_screen.dart';
 import 'my_appointments_screen.dart';
 import 'my_service_plan_screen.dart';
 import '../shared/user_settings_screen.dart';
+import 'vehicle_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -161,227 +162,293 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                       .toList() ??
                   ["Black", "White", "Blue"];
 
-              return Container(
-                width: 250,
-                margin: const EdgeInsets.only(right: 16, bottom: 8),
-                child: Material(
-                  elevation: 8,
-                  borderRadius: BorderRadius.circular(24),
-                  shadowColor: theme.colorScheme.primary.withOpacity(0.2),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      color: theme.colorScheme.surface,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // IMAGE
-                        Stack(
-                          children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(24),
-                              ),
-                              child: imageUrl != null
-                                  ? CachedNetworkImage(
-                                      imageUrl: imageUrl,
-                                      height: 170,
-                                      width: double.infinity,
-                                      fit: BoxFit.cover,
-                                      placeholder: (context, url) => Container(
-                                        height: 140,
-                                        color: theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                        child: const Center(
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        ),
-                                      ),
-                                      errorWidget: (context, url, error) =>
-                                          Container(
-                                            height: 140,
-                                            color: theme
-                                                .colorScheme
-                                                .surfaceContainerHighest,
-                                            child: const Icon(
-                                              Icons.directions_bike,
-                                              size: 60,
-                                            ),
-                                          ),
-                                    )
-                                  : Container(
-                                      height: 140,
-                                      color: theme
-                                          .colorScheme
-                                          .surfaceContainerHighest,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.directions_bike,
-                                          size: 60,
-                                        ),
-                                      ),
-                                    ),
-                            ),
+              return GestureDetector(
 
-                            // BRAND CHIP
-                            Positioned(
-                              top: 12,
-                              left: 12,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primary,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  brand,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
+  onTap: () {
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => VehicleDetailScreen(
+          vehicle: item,
+        ),
+      ),
+    );
+  },
+
+  child: Container(
+    width: 250,
+    margin: const EdgeInsets.only(
+      right: 16,
+      bottom: 8,
+    ),
+
+    child: Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(24),
+      shadowColor:
+          theme.colorScheme.primary.withOpacity(0.2),
+
+      child: Container(
+
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          color: theme.colorScheme.surface,
+        ),
+
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+
+            // IMAGE
+            Stack(
+              children: [
+
+                ClipRRect(
+                  borderRadius:
+                      const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+
+                  child: imageUrl != null
+                      ? CachedNetworkImage(
+                          imageUrl: imageUrl,
+                          height: 170,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+
+                          placeholder:
+                              (context, url) => Container(
+                            height: 170,
+                            color: theme.colorScheme
+                                .surfaceContainerHighest,
+
+                            child: const Center(
+                              child:
+                                  CircularProgressIndicator(
+                                strokeWidth: 2,
                               ),
                             ),
-                          ],
+                          ),
+
+                          errorWidget:
+                              (context, url, error) =>
+                                  Container(
+                            height: 170,
+                            color: theme.colorScheme
+                                .surfaceContainerHighest,
+
+                            child: const Icon(
+                              Icons.directions_bike,
+                              size: 60,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          height: 170,
+                          color: theme.colorScheme
+                              .surfaceContainerHighest,
+
+                          child: const Center(
+                            child: Icon(
+                              Icons.directions_bike,
+                              size: 60,
+                            ),
+                          ),
+                        ),
+                ),
+
+                Positioned(
+                  top: 12,
+                  left: 12,
+
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary,
+                      borderRadius:
+                          BorderRadius.circular(20),
+                    ),
+
+                    child: Text(
+                      brand,
+
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+
+                child: Column(
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start,
+
+                  children: [
+
+                    Text(
+                      model,
+
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    Text(
+                      variant,
+
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    Row(
+                      children: [
+
+                        const Icon(
+                          Icons.currency_rupee,
+                          size: 18,
+                          color: Colors.green,
                         ),
 
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.all(14),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // MODEL
-                                Text(
-                                  model,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleLarge?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
+                        Text(
+                          price.toString(),
 
-                                const SizedBox(height: 4),
-
-                                // VARIANT
-                                Text(
-                                  variant,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Colors.grey.shade700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // PRICE
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.currency_rupee,
-                                      size: 18,
-                                      color: Colors.green,
-                                    ),
-                                    Text(
-                                      price.toString(),
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 22,
-                                        color: Colors.green,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                const SizedBox(height: 12),
-
-                                // COLORS TITLE
-                                Text(
-                                  "Available Colors",
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 8),
-
-                                // COLOR OPTIONS
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: colors.map((color) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 5,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withOpacity(0.08),
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                      child: Text(
-                                        color,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-
-                                const Spacer(),
-
-                                // Price Badge
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 6,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '₹$price',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 22,
+                            color: Colors.green,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
 
-        const SizedBox(height: 26),
-      ],
-    );
-  }
+                    const SizedBox(height: 12),
+
+                    Text(
+                      "Available Colors",
+
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade800,
+                      ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+
+                      children: colors.map((color) {
+
+                        return Container(
+                          padding:
+                              const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme
+                                .primary
+                                .withOpacity(0.08),
+
+                            borderRadius:
+                                BorderRadius.circular(14),
+                          ),
+
+                          child: Text(
+                            color,
+
+                            style: TextStyle(
+                              color:
+                                  theme.colorScheme.primary,
+
+                              fontWeight:
+                                  FontWeight.w600,
+
+                              fontSize: 12,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+
+                    const Spacer(),
+
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary
+                            .withOpacity(0.1),
+
+                        borderRadius:
+                            BorderRadius.circular(8),
+                      ),
+
+                      child: Text(
+                        '₹$price',
+
+                        style: theme.textTheme.titleSmall
+                            ?.copyWith(
+                          color:
+                              theme.colorScheme.primary,
+
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  ),
+);
+              },
+            ),
+          ),
+        ],
+      );                      
+    }
 
   Widget buildActionCard(
     BuildContext context,
@@ -642,7 +709,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                 final brands = <String>{};
                 for (final doc in docs) {
                   final data = doc.data() as Map<String, dynamic>;
-                  final brand = (data['ParentBrand'] ?? 'Other').toString();
+                  final brand = (data['ParentBrand'] ?? '').toString().trim();
+
+                  if (brand.isEmpty) continue;
                   brands.add(brand);
                 }
 

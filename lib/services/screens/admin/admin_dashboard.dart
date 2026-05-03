@@ -196,7 +196,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   children: [
 
                     const Text(
-                      "Jiten Auto CRM",
+                      "Jiten Auto ",
 
                       style: TextStyle(
                         color: Colors.white,
@@ -208,11 +208,11 @@ class _AdminDashboardState extends State<AdminDashboard> {
                     const SizedBox(height: 8),
 
                     Text(
-                      "Manage inquiries, vehicles and showroom leads",
+                      "Manage inquiries, vehicles & showroom leads",
 
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.85),
-                        fontSize: 15,
+                        fontSize: 14,
                       ),
                     ),
                   ],
@@ -440,8 +440,8 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                           TableRow(
 
-                            decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                            decoration: const BoxDecoration(
+                                color: Color(0xFF7B1F3F),
                             ),
 
                             children: [
@@ -470,7 +470,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                               const _TableCell(
                                 label: 'Leads',
-                                isHeader: true,
+                                //isHeader: true,
                               ),
 
                               ...dailyCounts.map(
@@ -614,7 +614,7 @@ class _TableCell extends StatelessWidget {
               : FontWeight.w500,
 
           color: isHeader
-              ? Colors.black87
+              ? Colors.white
               : Colors.black54,
         ),
       ),
