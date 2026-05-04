@@ -148,7 +148,7 @@ class _VariantScreenState extends State<VariantScreen> {
                               if (url != null) {
                                 // Save to VehicleImages/{variantName}/images
                                 final vehicleDocName =
-                                    '${brand} ${variant}'.trim();
+                                    '$brand $variant'.trim();
                                 await FirebaseFirestore.instance
                                     .collection('VehicleImages')
                                     .doc(vehicleDocName)
