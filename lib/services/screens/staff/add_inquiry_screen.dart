@@ -198,7 +198,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         "staffId": user.uid,
         "createdBy": user.uid,
         "createdAt": Timestamp.now(),
-        "status": "New Inquiry",
+        "status": paymentType == "Loan"
+            ? "Finance"
+            : "New Inquiry",
         if (followUpDate != null) "nextFollowUp": Timestamp.fromDate(followUpDate!),
       });
 

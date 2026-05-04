@@ -343,7 +343,9 @@ void initState() {
             'editHistory': editHistory,
             'isClosed': isClosed,
             'isBooked': isBooked,
-            'status': status,
+            'status': paymentType == 'Loan'
+                ? 'Finance'
+                : status,
           });
 
       if (mounted) {
