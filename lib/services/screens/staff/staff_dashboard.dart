@@ -59,15 +59,75 @@ class _StaffDashboardState extends State<StaffDashboard> {
           final filteredData = selectedFilter == 'All'
               ? data
               : data.where((item) {
-                  final itemData = item.data() as Map<String, dynamic>;
-                  final status = itemData['status'] as String? ?? 'New Inquiry';
-                  
-                  // For New Inquiry filter, only show inquiries created today
+
+                  final itemData =
+                      item.data() as Map<String, dynamic>;
+
+                  final status =
+                      itemData['status'] as String? ??
+                      'New Inquiry';
+
+                  final isClosed =
+                      itemData['isClosed'] == true;
+
+                  final isBooked =
+                      itemData['isBooked'] == true;
+
+                  final isCompleted =
+                      isClosed ||
+                      isBooked ||
+                      status.toLowerCase() == 'booked' ||
+                      status.toLowerCase() == 'closed';
+
+                  // NEW INQUIRY FILTER
                   if (selectedFilter == 'New Inquiry') {
-                    return status == selectedFilter && _isCreatedToday(itemData);
+                    return status == 'New Inquiry' &&
+                        _isCreatedToday(itemData);
                   }
-                  
+
+                  // FINANCE FILTER
+                  if (selectedFilter == 'Finance') {
+                    return itemData['paymentType'] == 'Loan';
+                  }
+
+                  // FOLLOW UPS FILTER
+                  if (selectedFilter == 'Follow Ups') {
+
+                    final nextFollowUp =
+                        itemData['nextFollowUp'];
+
+                    if (nextFollowUp is Timestamp) {
+
+                      final followUpDate =
+                          nextFollowUp.toDate();
+
+                      final followUpDay = DateTime(
+                        followUpDate.year,
+                        followUpDate.month,
+                        followUpDate.day,
+                      );
+
+                      final today = DateTime.now();
+
+                      final todayDay = DateTime(
+                        today.year,
+                        today.month,
+                        today.day,
+                      );
+
+                      return !isCompleted &&
+                          status == 'New Inquiry' &&
+                          (
+                            followUpDay.isBefore(todayDay) ||
+                            followUpDay == todayDay
+                          );
+                    }
+
+                    return false;
+                  }
+
                   return status == selectedFilter;
+
                 }).toList();
 
           if (data.isEmpty) {

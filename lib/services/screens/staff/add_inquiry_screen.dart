@@ -133,34 +133,46 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
     }
   }
 
-  Future<void> sendWhatsAppAndSave() async {
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
+//   Future<void> sendPdfToWhatsApp() async {
 
-    if (phone.isEmpty) {
-      showMessage('Please enter a phone number.');
-      return;
-    }
+//   final phone = phoneController.text.trim();
 
-    final filePath = await saveQuotationPdfToLocalStorage();
-    if (filePath == null) {
-      showMessage('Unable to save quotation PDF.');
-      return;
-    }
+//   if (phone.isEmpty) {
+//     showMessage('Please enter a phone number before sending.');
+//     return;
+//   }
 
-    final message =
-        "Hello $name 🙏\n\n"
-        "Thank you for visiting Jiten Auto.\n"
-        "Your quotation voucher is saved locally.\n\n"
-        "Regards,\nJiten Auto Team";
+//   final path = await saveQuotationPdfToLocalStorage();
 
-    final url = Uri.parse(
-      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
-    );
+//   if (path == null) {
+//     showMessage('Unable to save quotation PDF.');
+//     return;
+//   }
 
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-    await saveInquiry();
-  }
+//   final message =
+//       "Hello 👋\n\n"
+//       "Your quotation PDF has been generated successfully.\n\n"
+//       "Please check the attached file stored locally on the device.\n\n"
+//       "Regards,\nJiten Auto Team";
+
+//   final url = Uri.parse(
+//     "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
+//   );
+
+//   if (await canLaunchUrl(url)) {
+
+//     await launchUrl(
+//       url,
+//       mode: LaunchMode.externalApplication,
+//     );
+
+//     showMessage("WhatsApp opened successfully.");
+
+//   } else {
+
+//     showMessage("Could not open WhatsApp.");
+//   }
+// }
 
   Future<bool> saveInquiry() async {
     setState(() => loading = true);
@@ -189,12 +201,14 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
         "staffId": user.uid,
         "createdBy": user.uid,
         "createdAt": Timestamp.now(),
-        "status": "New Inquiry",
+        "status": paymentType == "Loan"
+            ? "Finance"
+            : "New Inquiry",
         if (followUpDate != null) "nextFollowUp": Timestamp.fromDate(followUpDate!),
       });
 
       if (mounted) {
-        showMessage("WhatsApp launched and inquiry saved.");
+        showMessage("Lead generated successfully.");
         Navigator.pop(context);
       }
       return true;
@@ -281,6 +295,7 @@ await file.writeAsBytes(bytes, flush: true);
     return null;
   }
 }
+
 
 Future<void> sendPdfToWhatsApp() async {
   final phone = phoneController.text.trim();
@@ -388,6 +403,112 @@ Future<void> sendPdfToWhatsApp() async {
     if (mounted) setState(() => loading = false);
   }
 }
+// Future<void> sendPdfToWhatsApp() async {
+//   final phone = phoneController.text.trim();
+//   final name = nameController.text.trim();
+
+//   if (phone.isEmpty) {
+//     showMessage('Please enter a phone number.');
+//     return;
+//   }
+
+//   setState(() => loading = true);
+
+//   try {
+//     // 1. Request permissions
+//     await Permission.manageExternalStorage.request();
+//     await Permission.storage.request();
+
+//     // 2. Generate PDF
+//     final pdf = pw.Document();
+//     final reference = referenceController.text.trim();
+//     final brand = brandController.text.trim();
+//     final model = modelController.text.trim();
+//     final variant = variantController.text.trim();
+//     final price = priceController.text.trim();
+//     final date = DateTime.now().toString().split(' ')[0];
+
+//     pdf.addPage(
+//       pw.Page(
+//         build: (context) => pw.Padding(
+//           padding: const pw.EdgeInsets.all(24),
+//           child: pw.Column(
+//             crossAxisAlignment: pw.CrossAxisAlignment.start,
+//             children: [
+//               pw.Text("JITEN AUTO",
+//                   style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+//               pw.SizedBox(height: 5),
+//               pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
+//               pw.Divider(),
+//               pw.SizedBox(height: 8),
+//               pw.Text("Customer Details",
+//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+//               pw.SizedBox(height: 8),
+//               pw.Text("Name: $name"),
+//               pw.Text("Mobile: $phone"),
+//               pw.Text("Reference: $reference"),
+//               pw.Text("Date: $date"),
+//               pw.SizedBox(height: 20),
+//               pw.Text("Vehicle Details",
+//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+//               pw.SizedBox(height: 8),
+//               pw.Text("Brand: $brand"),
+//               pw.Text("Model: $model"),
+//               pw.Text("Variant: $variant"),
+//               pw.SizedBox(height: 10),
+//               pw.Text("Price: ₹$price",
+//                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+//               pw.SizedBox(height: 30),
+//               pw.Text("Thank you for your inquiry.",
+//                   style: pw.TextStyle(fontSize: 12)),
+//               pw.SizedBox(height: 10),
+//               pw.Text("Regards,\nJiten Auto",
+//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+//             ],
+//           ),
+//         ),
+//       ),
+//     );
+
+//     final bytes = await pdf.save();
+
+//     // 3. Save to Downloads/JitenAuto/
+//     final downloadsDir = Directory('/storage/emulated/0/Download/JitenAuto');
+//     if (!await downloadsDir.exists()) {
+//       await downloadsDir.create(recursive: true);
+//     }
+
+//     final nameCleaned = name.replaceAll(' ', '_');
+//     final fileName = 'Quotation_$nameCleaned.pdf';
+//     final filePath = '${downloadsDir.path}/$fileName';
+
+//     final file = File(filePath);
+//     await file.writeAsBytes(bytes, flush: true);
+
+//     // 4. Verify
+//     if (!await file.exists() || await file.length() == 0) {
+//       showMessage('Failed to save PDF.');
+//       return;
+//     }
+
+//     // 5. Send via native Android intent
+//     final message =
+//         "Hello $name 👋\n\n"
+//         "Please find the attached quotation.\n\n"
+//         "Regards,\nJiten Auto Team";
+
+//     await _platform.invokeMethod('shareToWhatsApp', {
+//       'filePath': filePath,
+//       'phone': phone,
+//       'message': message,
+//     });
+
+//   } catch (e) {
+//     showMessage('Error: ${e.toString()}');
+//   } finally {
+//     if (mounted) setState(() => loading = false);
+//   }
+// }
 
   // Future<Package?> _resolveWhatsappPackage() async {
   //   if (await WhatsappShare.isInstalled(package: Package.whatsapp) == true) {
@@ -632,61 +753,61 @@ Future<void> sendPdfToWhatsApp() async {
                       
                       const SizedBox(height: 16),
                       
-                      // 🎨 VEHICLE PHOTO DISPLAY
-                      if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Theme.of(context).colorScheme.primary,
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(14),
-                            child: CachedNetworkImage(
-                              imageUrl: selectedVariantPhotoUrl!,
-                              fit: BoxFit.cover,
-                              placeholder: (context, url) => const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                              errorWidget: (context, url, error) => const Center(
-                                child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
-                              ),
-                            ),
-                          ),
-                        )
-                      else if (selectedVariant != null)
-                        Container(
-                          width: double.infinity,
-                          height: 220,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            color: Colors.grey[200],
-                            border: Border.all(color: Colors.grey[400]!, width: 1),
-                          ),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.image_not_supported, 
-                                  size: 60, 
-                                  color: Colors.grey[400],
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'No photo available',
-                                  style: TextStyle(
-                                    color: Colors.grey[600],
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                      // // 🎨 VEHICLE PHOTO DISPLAY
+                      // if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
+                      //   Container(
+                      //     width: double.infinity,
+                      //     height: 220,
+                      //     decoration: BoxDecoration(
+                      //       borderRadius: BorderRadius.circular(16),
+                      //       border: Border.all(
+                      //         color: Theme.of(context).colorScheme.primary,
+                      //         width: 2,
+                      //       ),
+                      //     ),
+                        //   child: ClipRRect(
+                        //     borderRadius: BorderRadius.circular(14),
+                        //     child: CachedNetworkImage(
+                        //       imageUrl: selectedVariantPhotoUrl!,
+                        //       fit: BoxFit.cover,
+                        //       placeholder: (context, url) => const Center(
+                        //         child: CircularProgressIndicator(),
+                        //       ),
+                        //       errorWidget: (context, url, error) => const Center(
+                        //         child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
+                        //       ),
+                        //     ),
+                        //   ),
+                        // )
+                      // else if (selectedVariant != null)
+                      //   Container(
+                      //     width: double.infinity,
+                      //     height: 220,
+                      //     decoration: BoxDecoration(
+                      //       borderRadius: BorderRadius.circular(16),
+                      //       color: Colors.grey[200],
+                      //       border: Border.all(color: Colors.grey[400]!, width: 1),
+                      //     ),
+                      //     child: Center(
+                      //       child: Column(
+                      //         mainAxisAlignment: MainAxisAlignment.center,
+                      //         children: [
+                      //           Icon(Icons.image_not_supported, 
+                      //             size: 60, 
+                      //             color: Colors.grey[400],
+                      //           ),
+                      //           const SizedBox(height: 8),
+                      //           Text(
+                      //             'No photo available',
+                      //             style: TextStyle(
+                      //               color: Colors.grey[600],
+                      //               fontSize: 14,
+                      //             ),
+                      //           ),
+                      //         ],
+                      //       ),
+                      //     ),
+                      //   ),
                       
                       const SizedBox(height: 16),
                       
@@ -820,44 +941,77 @@ Future<void> sendPdfToWhatsApp() async {
                         ),
                       ),
                       const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: sendThankYou,
-                                child: const Text("Send Thank You"),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: sendQuotation,
-                                child: const Text("Send Quotation"),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-
+                        
                         SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.picture_as_pdf),
-                            onPressed: sendPdfToWhatsApp,
-                            label: const Text("Send PDF via WhatsApp"),
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+
+                          icon: const Icon(Icons.favorite_outline),
+
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF7B1F3F),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+
+                          onPressed: () async {
+
+                            final saved = await saveInquiry();
+
+                            if (saved) {
+                              await sendThankYou();
+                            }
+                          },
+
+                          label: const Text(
+                            "Send Thank You & Generate Lead",
+
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+                      ),
 
-                        const SizedBox(height: 10),
+                      const SizedBox(height: 12),
 
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: saveInquiry,
-                            child: const Text("Save Inquiry"),
+                      SizedBox(
+                        width: double.infinity,
+
+                        child: OutlinedButton.icon(
+
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
+
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF7B1F3F),
+                            side: const BorderSide(
+                              color: Color(0xFF7B1F3F),
+                            ),
+
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+
+                          onPressed: sendPdfToWhatsApp,
+
+                          label: const Text(
+                            "Send PDF via WhatsApp",
+
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ),

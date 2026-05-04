@@ -1,6 +1,7 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+
 import 'inquiry_list_screen.dart';
 import 'vehicle_catalog_screen.dart';
 import '../shared/user_settings_screen.dart';
@@ -14,418 +15,566 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
-  late DateTime selectedStartDate;
-  late DateTime selectedEndDate;
-  late DateTime appliedStartDate;
-  late DateTime appliedEndDate;
-  String selectedMake = 'All';
-  String selectedModel = 'All';
-  String selectedSource = 'All';
-  String appliedMake = 'All';
-  String appliedModel = 'All';
-  String appliedSource = 'All';
-
-  @override
-  void initState() {
-    super.initState();
-    final today = DateTime.now();
-    // Show from day 1 to current day of the month
-    selectedStartDate = DateTime(today.year, today.month, 1);
-    selectedEndDate = DateTime(today.year, today.month, today.day);
-    appliedStartDate = selectedStartDate;
-    appliedEndDate = selectedEndDate;
-  }
-
-  Future<void> _pickDate({required bool isStart}) async {
-    final initialDate = isStart ? selectedStartDate : selectedEndDate;
-    final firstDate = DateTime(2020);
-    final lastDate = DateTime.now();
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initialDate,
-      firstDate: firstDate,
-      lastDate: lastDate,
-    );
-
-    if (picked == null) return;
-
-    setState(() {
-      if (isStart) {
-        selectedStartDate = picked.isAfter(selectedEndDate) ? selectedEndDate : picked;
-      } else {
-        selectedEndDate = picked.isBefore(selectedStartDate) ? selectedStartDate : picked;
-      }
-    });
-  }
-
-  String _normalizeField(dynamic value) {
-    if (value == null) return '';
-    return value.toString().trim();
-  }
-
-  List<String> _uniqueValues(List<QueryDocumentSnapshot> docs, String field) {
-    final values = <String>{};
-    for (final doc in docs) {
-      final data = doc.data();
-      if (data is Map<String, dynamic>) {
-        final value = _normalizeField(data[field]);
-        if (value.isNotEmpty) {
-          values.add(value);
-        }
-      }
-    }
-    final sorted = values.toList()..sort();
-    return ['All', ...sorted];
-  }
-
-  bool _applyFilter(Map<String, dynamic> data, DateTime dayKey) {
-    if (appliedMake != 'All') {
-      final brand = _normalizeField(data['brand']);
-      if (brand.toLowerCase() != appliedMake.toLowerCase()) {
-        return false;
-      }
-    }
-
-    if (appliedModel != 'All') {
-      final model = _normalizeField(data['model']);
-      if (model.toLowerCase() != appliedModel.toLowerCase()) {
-        return false;
-      }
-    }
-
-    if (appliedSource != 'All') {
-      final source = _normalizeField(data['source']);
-      if (source.toLowerCase() != appliedSource.toLowerCase()) {
-        return false;
-      }
-    }
-
-    final createdAt = data['createdAt'];
-    if (createdAt is! Timestamp) {
-      return false;
-    }
-
-    final createdDate = createdAt.toDate();
-    final createdDay = DateTime(createdDate.year, createdDate.month, createdDate.day);
-    return !createdDay.isBefore(appliedStartDate) && !createdDay.isAfter(appliedEndDate);
-  }
 
   Map<DateTime, int> _calculateCounts(List<QueryDocumentSnapshot> inquiries) {
+
     final counts = <DateTime, int>{};
+
     for (final doc in inquiries) {
+
       final data = doc.data();
+
       if (data is Map<String, dynamic>) {
+
         final createdAt = data['createdAt'];
+
         if (createdAt is Timestamp) {
+
           final createdDate = createdAt.toDate();
-          final dayKey = DateTime(createdDate.year, createdDate.month, createdDate.day);
-          if (_applyFilter(data, dayKey)) {
-            counts[dayKey] = (counts[dayKey] ?? 0) + 1;
-          }
+
+          final dayKey = DateTime(
+            createdDate.year,
+            createdDate.month,
+            createdDate.day,
+          );
+
+          counts[dayKey] = (counts[dayKey] ?? 0) + 1;
         }
       }
     }
+
     return counts;
   }
 
   @override
   Widget build(BuildContext context) {
+
+    final today = DateTime.now();
+
+    final startDate = DateTime(today.year, today.month, 1);
+
+    final endDate = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    );
+
     return Scaffold(
+
+      backgroundColor: const Color(0xFFF4EBEE),
+
       appBar: AppBar(
-        title: const Text('Admin Dashboard'),
+        elevation: 0,
+        backgroundColor: const Color(0xFFF4EBEE),
+
+        title: const Text(
+          'Admin Dashboard',
+
+          style: TextStyle(
+            color: Color(0xFF7B1F3F),
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+
         actions: [
-          // 🔵 USER MANAGEMENT FIRST
-          IconButton(
-            icon: const Icon(Icons.people),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const UserManagementScreen(),
-                ),
-              );
-            },
+
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+
+            child: IconButton(
+              icon: const Icon(
+                Icons.people_alt_outlined,
+                color: Color(0xFF7B1F3F),
+              ),
+
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const UserManagementScreen(),
+                  ),
+                );
+              },
+            ),
           ),
 
-          // ⚙️ SETTINGS AFTER
-          IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const UserSettingsScreen()),
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
             ),
-            icon: const Icon(Icons.settings),
+
+            child: IconButton(
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: Color(0xFF7B1F3F),
+              ),
+
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const UserSettingsScreen(),
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
+
       body: StreamBuilder<QuerySnapshot>(
+
         stream: FirebaseFirestore.instance
-          .collection('inquiries')
-          .orderBy('createdAt', descending: true)
-          .limit(1000) // Limit to last 1000 inquiries for performance
-          .snapshots(),
+            .collection('inquiries')
+            .orderBy('createdAt', descending: true)
+            .limit(1000)
+            .snapshots(),
+
         builder: (context, snapshot) {
+
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
           }
 
           final inquiries = snapshot.data!.docs;
-          
-          // Cache expensive calculations
-          final makeOptions = _uniqueValues(inquiries, 'brand');
-          final modelOptions = _uniqueValues(inquiries, 'model');
-          final sourceOptions = _uniqueValues(inquiries, 'source');
 
-          // Use memoization for expensive calculations
           final counts = _calculateCounts(inquiries);
-          
+
           final days = List.generate(
-            appliedEndDate.difference(appliedStartDate).inDays + 1,
-            (index) => appliedStartDate.add(Duration(days: index)),
+            endDate.difference(startDate).inDays + 1,
+                (index) => startDate.add(Duration(days: index)),
           );
-          final dailyCounts = days.map((day) => counts[day] ?? 0).toList();
-          final totalLeads = dailyCounts.fold<int>(0, (total, value) => total + value);
+
+          final dailyCounts = days
+              .map((day) => counts[day] ?? 0)
+              .toList();
+
+          final totalLeads = dailyCounts.fold<int>(
+            0,
+                (total, value) => total + value,
+          );
 
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 1.5,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Filters', style: Theme.of(context).textTheme.titleLarge),
-                        const SizedBox(height: 12),
-                        Column(
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    initialValue: selectedMake,
-                                    decoration: const InputDecoration(labelText: 'Make'),
-                                    items: makeOptions.map((value) {
-                                      return DropdownMenuItem(value: value, child: Text(value));
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(() {
-                                        selectedMake = value;
-                                      });
-                                    },
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    initialValue: selectedModel,
-                                    decoration: const InputDecoration(labelText: 'Model'),
-                                    items: modelOptions.map((value) {
-                                      return DropdownMenuItem(value: value, child: Text(value));
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(() {
-                                        selectedModel = value;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: DropdownButtonFormField<String>(
-                                    initialValue: selectedSource,
-                                    decoration: const InputDecoration(labelText: 'Source'),
-                                    items: sourceOptions.map((value) {
-                                      return DropdownMenuItem(value: value, child: Text(value));
-                                    }).toList(),
-                                    onChanged: (value) {
-                                      if (value == null) return;
-                                      setState(() {
-                                        selectedSource = value;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _pickDate(isStart: true),
-                                    child: Text('From: ${DateFormat('dd/MM/yyyy').format(selectedStartDate)}'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _pickDate(isStart: false),
-                                    child: Text('To: ${DateFormat('dd/MM/yyyy').format(selectedEndDate)}'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: SizedBox(
-                                width: 160,
-                                child: ElevatedButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      appliedMake = selectedMake;
-                                      appliedModel = selectedModel;
-                                      appliedSource = selectedSource;
-                                      appliedStartDate = selectedStartDate;
-                                      appliedEndDate = selectedEndDate;
-                                    });
-                                  },
-                                  child: const Text('Search'),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+
+          padding: const EdgeInsets.all(16),
+
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+
+            children: [
+
+              // CRM HEADER
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(22),
+
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [
+                      Color(0xFF7B1F3F),
+                      Color(0xFF4A1025),
+                    ],
                   ),
+
+                  borderRadius: BorderRadius.circular(24),
                 ),
-                const SizedBox(height: 16),
-                Row(
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
                   children: [
-                    Expanded(
-                      child: _StatusCard(
-                        title: 'Total Leads',
-                        value: totalLeads.toString(),
-                        color: Theme.of(context).colorScheme.primary,
+
+                    const Text(
+                      "Jiten Auto ",
+
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatusCard(
-                        title: 'Active Leads',
-                        value: inquiries.length.toString(),
-                        color: Theme.of(context).colorScheme.secondary,
+
+                    const SizedBox(height: 8),
+
+                    Text(
+                      "Manage inquiries, vehicles & showroom leads",
+
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.85),
+                        fontSize: 14,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                Card(
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 2,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          DateFormat('MMMM').format(appliedStartDate),
-                          style: Theme.of(context).textTheme.titleLarge,
+              ),
+
+              const SizedBox(height: 22),
+
+              // LEAD CARDS
+              Row(
+                children: [
+
+                  Expanded(
+                    child: GestureDetector(
+
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const InquiryListScreen(),
+                          ),
+                        );
+                      },
+
+                      child: _ModernCard(
+                        title: 'All Leads',
+                        value: inquiries.length.toString(),
+                        icon: Icons.people_alt_outlined,
+                        color: const Color(0xFF7B1F3F),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: GestureDetector(
+
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const InquiryListScreen(),
+                          ),
+                        );
+                      },
+
+                      child: _ModernCard(
+                        title: 'Monthly Leads',
+                        value: totalLeads.toString(),
+                        icon: Icons.analytics_outlined,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // VEHICLE CARD
+              GestureDetector(
+
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const VehicleCatalogScreen(),
+                    ),
+                  );
+                },
+
+                child: Container(
+
+                  width: double.infinity,
+
+                  padding: const EdgeInsets.all(18),
+
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+
+                  child: Row(
+                    children: [
+
+                      Container(
+                        padding: const EdgeInsets.all(12),
+
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        const SizedBox(height: 16),
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Table(
-                            defaultColumnWidth: const IntrinsicColumnWidth(),
-                            border: TableBorder.all(color: Colors.grey.shade300),
-                            children: [
-                              TableRow(
-                                decoration: BoxDecoration(color: Colors.grey.shade100),
-                                children: [
-                                  _TableCell(label: 'Days', isHeader: true),
-                                  ...days.map((day) => _TableCell(label: DateFormat('d').format(day), isHeader: true)),
-                                  _TableCell(label: 'Total', isHeader: true),
-                                ],
+
+                        child: const Icon(
+                          Icons.directions_car,
+                          color: Colors.black87,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+
+                          children: [
+
+                            Text(
+                              "Manage Vehicles",
+
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
                               ),
-                              TableRow(
-                                children: [
-                                  _TableCell(label: 'Leads', isHeader: true),
-                                  ...dailyCounts.map((leadCount) => _TableCell(label: leadCount.toString())),
-                                  _TableCell(label: totalLeads.toString(), isBold: true),
-                                ],
+                            ),
+
+                            SizedBox(height: 4),
+
+                            Text(
+                              "Add and manage showroom vehicles",
+                              style: TextStyle(
+                                color: Colors.grey,
                               ),
-                            ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const Icon(Icons.arrow_forward_ios_rounded),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // MONTHLY REPORT
+              Container(
+
+                width: double.infinity,
+
+                padding: const EdgeInsets.all(16),
+
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+
+                  children: [
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                      children: [
+
+                        const Text(
+                          'Monthly Lead Report',
+
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
+                          ),
+
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF7B1F3F).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+
+                          child: Text(
+                            DateFormat('MMMM yyyy').format(today),
+
+                            style: const TextStyle(
+                              color: Color(0xFF7B1F3F),
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => InquiryListScreen()),
-                            );
-                          },
-                          child: const Text('View All Inquiries'),
+
+                    const SizedBox(height: 20),
+
+                    SingleChildScrollView(
+
+                      scrollDirection: Axis.horizontal,
+
+                      child: Table(
+
+                        defaultColumnWidth:
+                        const IntrinsicColumnWidth(),
+
+                        border: TableBorder.all(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(12),
                         ),
+
+                        children: [
+
+                          TableRow(
+
+                            decoration: const BoxDecoration(
+                                color: Color(0xFF7B1F3F),
+                            ),
+
+                            children: [
+
+                              const _TableCell(
+                                label: 'Days',
+                                isHeader: true,
+                              ),
+
+                              ...days.map(
+                                    (day) => _TableCell(
+                                  label: DateFormat('d').format(day),
+                                  isHeader: true,
+                                ),
+                              ),
+
+                              const _TableCell(
+                                label: 'Total',
+                                isHeader: true,
+                              ),
+                            ],
+                          ),
+
+                          TableRow(
+                            children: [
+
+                              const _TableCell(
+                                label: 'Leads',
+                                //isHeader: true,
+                              ),
+
+                              ...dailyCounts.map(
+                                    (leadCount) => _TableCell(
+                                  label: leadCount.toString(),
+                                ),
+                              ),
+
+                              _TableCell(
+                                label: totalLeads.toString(),
+                                isBold: true,
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const VehicleCatalogScreen()),
-                            );
-                          },
-                          child: const Text('Manage Vehicles'),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          );
+              ),
+
+              const SizedBox(height: 30),
+            ],
+          ),
+        );
         },
       ),
     );
   }
 }
 
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({required this.title, required this.value, required this.color});
+class _ModernCard extends StatelessWidget {
+
+  const _ModernCard({
+    required this.title,
+    required this.value,
+    required this.icon,
+    required this.color,
+  });
 
   final String title;
   final String value;
+  final IconData icon;
   final Color color;
 
   @override
   Widget build(BuildContext context) {
+
     return Container(
+
+      padding: const EdgeInsets.all(18),
+
       decoration: BoxDecoration(
-        color: color.withAlpha((0.1 * 255).round()),
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
+
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+
         children: [
-          Text(title, style: Theme.of(context).textTheme.bodyLarge),
-          const SizedBox(height: 12),
+
+          Container(
+            padding: const EdgeInsets.all(10),
+
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+
+            child: Icon(
+              icon,
+              color: color,
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          Text(
+            title,
+
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 14,
+            ),
+          ),
+
+          const SizedBox(height: 6),
+
           Text(
             value,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
@@ -434,7 +583,12 @@ class _StatusCard extends StatelessWidget {
 }
 
 class _TableCell extends StatelessWidget {
-  const _TableCell({required this.label, this.isHeader = false, this.isBold = false});
+
+  const _TableCell({
+    required this.label,
+    this.isHeader = false,
+    this.isBold = false,
+  });
 
   final String label;
   final bool isHeader;
@@ -442,14 +596,26 @@ class _TableCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 12,
+      ),
+
       child: Text(
         label,
+
         textAlign: TextAlign.center,
+
         style: TextStyle(
-          fontWeight: isHeader || isBold ? FontWeight.w700 : FontWeight.w500,
-          color: isHeader ? Colors.black87 : Colors.black54,
+          fontWeight: isHeader || isBold
+              ? FontWeight.bold
+              : FontWeight.w500,
+
+          color: isHeader
+              ? Colors.white
+              : Colors.black54,
         ),
       ),
     );
