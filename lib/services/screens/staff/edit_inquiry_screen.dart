@@ -27,7 +27,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late String paymentType;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
-  late DateTime callDateTime;
+  late DateTime callDate;
+  late TimeOfDay callStartTime;
+  late TimeOfDay callEndTime;
   bool loading = false;
   bool isClosed = false;
   bool isBooked = false;
@@ -90,103 +92,106 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   }
 
   @override
-void initState() {
-  super.initState();
+  void initState() {
+    super.initState();
 
-  final data = widget.inquiry.data() as Map<String, dynamic>;
+    final data = widget.inquiry.data() as Map<String, dynamic>;
 
-  nameController = TextEditingController(text: data['name'] ?? '');
-  phoneController = TextEditingController(text: data['phone'] ?? '');
-  brandController = TextEditingController(text: data['brand'] ?? '');
-  modelController = TextEditingController(text: data['model'] ?? '');
-  variantController = TextEditingController(text: data['variant'] ?? '');
-  priceController = TextEditingController(text: data['price'] ?? '');
-  descriptionController = TextEditingController(
-    text: data['description'] ?? '',
-  );
-  referenceController =
-      TextEditingController(text: data['reference'] ?? '');
+    nameController = TextEditingController(text: data['name'] ?? '');
+    phoneController = TextEditingController(text: data['phone'] ?? '');
+    brandController = TextEditingController(text: data['brand'] ?? '');
+    modelController = TextEditingController(text: data['model'] ?? '');
+    variantController = TextEditingController(text: data['variant'] ?? '');
+    priceController = TextEditingController(text: data['price'] ?? '');
+    descriptionController = TextEditingController(
+      text: data['description'] ?? '',
+    );
+    referenceController =
+        TextEditingController(text: data['reference'] ?? '');
 
-  otherController = TextEditingController(
-    text: data['otherDescription'] ?? '',
-  );
+    otherController = TextEditingController(
+      text: data['otherDescription'] ?? '',
+    );
 
-  followUpCommentController = TextEditingController();
-  callDurationController = TextEditingController();
-  callNotesController = TextEditingController();
+    followUpCommentController = TextEditingController();
+    callDurationController = TextEditingController();
+    callNotesController = TextEditingController();
 
-  paymentType = data['paymentType'] ?? 'Loan';
+    paymentType = data['paymentType'] ?? 'Loan';
 
-  final nextFollowUp = data['nextFollowUp'];
+    final nextFollowUp = data['nextFollowUp'];
 
-  selectedDate = nextFollowUp is Timestamp
-      ? nextFollowUp.toDate()
-      : DateTime.now();
+    selectedDate = nextFollowUp is Timestamp
+        ? nextFollowUp.toDate()
+        : DateTime.now();
 
-  newFollowUpDate = DateTime.now();
-  callDateTime = DateTime.now();
+    newFollowUpDate = DateTime.now();
+    final now = DateTime.now();
+    callDate = DateTime(now.year, now.month, now.day);
+    callStartTime = TimeOfDay.fromDateTime(now);
+    callEndTime = TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5)));
 
-  // DROPDOWN VALUES
-  selectedBrand = data['brand'];
-  selectedModel = data['model'];
-  selectedVariant = data['variant'];
+    // DROPDOWN VALUES
+    selectedBrand = data['brand'];
+    selectedModel = data['model'];
+    selectedVariant = data['variant'];
 
-  selectedVariantPhotoUrl = data['vehiclePhotoUrl'];
+    selectedVariantPhotoUrl = data['vehiclePhotoUrl'];
 
-  fetchBrands();
+    fetchBrands();
 
-  if (selectedBrand != null) {
-    fetchModels(selectedBrand!);
+    if (selectedBrand != null) {
+      fetchModels(selectedBrand!);
+    }
+
+    if (selectedModel != null) {
+      fetchVariants(selectedModel!);
+      Future.delayed(const Duration(milliseconds: 500), () {
+        setState(() {});
+      });
+    }
+
+    // FOLLOWUP HISTORY
+    final history = data['followUpHistory'];
+
+    if (history is List) {
+      followUpHistory =
+          List<Map<String, dynamic>>.from(history);
+    }
+
+    // CALL HISTORY
+    final calls = data['callHistory'];
+
+    if (calls is List) {
+      callHistory =
+          List<Map<String, dynamic>>.from(calls);
+    }
+
+    // EDIT HISTORY
+    final changes = data['editHistory'];
+
+    if (changes is List) {
+      editHistory =
+          List<Map<String, dynamic>>.from(changes);
+    }
+
+    // STATUS
+    isClosed = data['isClosed'] == true;
+    isBooked = data['isBooked'] == true;
+
+    final savedStatus =
+        data['status'] as String? ?? 'New Inquiry';
+
+    if (isClosed) {
+      status = 'Closed';
+    } else if (isBooked) {
+      status = 'Booked';
+    } else {
+      status = _statusOptions.contains(savedStatus)
+          ? savedStatus
+          : 'New Inquiry';
+    }
   }
-
-  if (selectedModel != null) {
-    fetchVariants(selectedModel!);
-    Future.delayed(const Duration(milliseconds: 500), () {
-      setState(() {});
-    });
-  }
-
-  // FOLLOWUP HISTORY
-  final history = data['followUpHistory'];
-
-  if (history is List) {
-    followUpHistory =
-        List<Map<String, dynamic>>.from(history);
-  }
-
-  // CALL HISTORY
-  final calls = data['callHistory'];
-
-  if (calls is List) {
-    callHistory =
-        List<Map<String, dynamic>>.from(calls);
-  }
-
-  // EDIT HISTORY
-  final changes = data['editHistory'];
-
-  if (changes is List) {
-    editHistory =
-        List<Map<String, dynamic>>.from(changes);
-  }
-
-  // STATUS
-  isClosed = data['isClosed'] == true;
-  isBooked = data['isBooked'] == true;
-
-  final savedStatus =
-      data['status'] as String? ?? 'New Inquiry';
-
-  if (isClosed) {
-    status = 'Closed';
-  } else if (isBooked) {
-    status = 'Booked';
-  } else {
-    status = _statusOptions.contains(savedStatus)
-        ? savedStatus
-        : 'New Inquiry';
-  }
-}
 
   @override
   void dispose() {
@@ -235,8 +240,34 @@ void initState() {
       return;
     }
 
+    final startDateTime = DateTime(
+      callDate.year,
+      callDate.month,
+      callDate.day,
+      callStartTime.hour,
+      callStartTime.minute,
+    );
+
+    final endDateTime = DateTime(
+      callDate.year,
+      callDate.month,
+      callDate.day,
+      callEndTime.hour,
+      callEndTime.minute,
+    );
+
+    if (endDateTime.isBefore(startDateTime) ||
+        endDateTime.isAtSameMomentAs(startDateTime)) {
+      showMessage('End time must be after start time.');
+      return;
+    }
+
     final newCall = {
-      'dateTime': Timestamp.fromDate(callDateTime),
+      'date': Timestamp.fromDate(
+        DateTime(callDate.year, callDate.month, callDate.day),
+      ),
+      'startTime': Timestamp.fromDate(startDateTime),
+      'endTime': Timestamp.fromDate(endDateTime),
       'duration': duration,
       'notes': notes,
       'createdAt': Timestamp.now(),
@@ -246,16 +277,19 @@ void initState() {
       callHistory.add(newCall);
       callDurationController.clear();
       callNotesController.clear();
-      callDateTime = DateTime.now();
+      final now = DateTime.now();
+      callDate = DateTime(now.year, now.month, now.day);
+      callStartTime = TimeOfDay.fromDateTime(now);
+      callEndTime = TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5)));
     });
   }
 
   Future<void> _saveChanges() async {
     final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        showMessage('Unable to save inquiry: user not signed in.');
-        return;
-      }
+    if (user == null) {
+      showMessage('Unable to save inquiry: user not signed in.');
+      return;
+    }
 
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
@@ -267,7 +301,7 @@ void initState() {
     final reference = referenceController.text.trim();
     final otherDescription = otherController.text.trim();
     final oldData =
-    widget.inquiry.data() as Map<String, dynamic>;
+        widget.inquiry.data() as Map<String, dynamic>;
 
     List<String> changes = [];
 
@@ -320,33 +354,31 @@ void initState() {
     setState(() => loading = true);
 
     try {
-      
-
       await FirebaseFirestore.instance
           .collection('inquiries')
           .doc(widget.inquiry.id)
           .update({
-            'name': name,
-            'phone': phone,
-            'brand': brand,
-            'model': model,
-            'variant': variant,
-            'price': price,
-            'description': description,
-            'paymentType': paymentType,
-            'otherDescription': otherDescription,
-            'reference': reference,
-            'nextFollowUp': Timestamp.fromDate(selectedDate),
-            'followUpHistory': followUpHistory,
-            'callHistory': callHistory,
-            'vehiclePhotoUrl': selectedVariantPhotoUrl,
-            'editHistory': editHistory,
-            'isClosed': isClosed,
-            'isBooked': isBooked,
-            'status': paymentType == 'Loan'
-                ? 'Finance'
-                : status,
-          });
+        'name': name,
+        'phone': phone,
+        'brand': brand,
+        'model': model,
+        'variant': variant,
+        'price': price,
+        'description': description,
+        'paymentType': paymentType,
+        'otherDescription': otherDescription,
+        'reference': reference,
+        'nextFollowUp': Timestamp.fromDate(selectedDate),
+        'followUpHistory': followUpHistory,
+        'callHistory': callHistory,
+        'vehiclePhotoUrl': selectedVariantPhotoUrl,
+        'editHistory': editHistory,
+        'isClosed': isClosed,
+        'isBooked': isBooked,
+        'status': paymentType == 'Loan'
+            ? 'Finance'
+            : status,
+      });
 
       if (mounted) {
         showMessage('Inquiry updated successfully.');
@@ -411,8 +443,8 @@ void initState() {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       initialValue: brands.contains(selectedBrand)
-                        ? selectedBrand
-                        : null,
+                          ? selectedBrand
+                          : null,
                       isExpanded: true,
                       hint: const Text("Select Brand"),
                       items: brands.map((b) {
@@ -443,8 +475,8 @@ void initState() {
 
                     DropdownButtonFormField<String>(
                       initialValue: models.contains(selectedModel)
-                        ? selectedModel
-                        : null,
+                          ? selectedModel
+                          : null,
                       isExpanded: true,
                       hint: const Text("Select Model"),
                       items: models.map((m) {
@@ -472,8 +504,8 @@ void initState() {
 
                     DropdownButtonFormField<String>(
                       initialValue: variants.any(
-                              (v) => v['Name'] == selectedVariant,
-                            )
+                        (v) => v['Name'] == selectedVariant,
+                      )
                           ? selectedVariant
                           : null,
                       isExpanded: true,
@@ -495,8 +527,8 @@ void initState() {
                           selectedVariant = val;
 
                           selectedVariantPhotoUrl =
-                            selected['photoUrl'] ??
-                            selected['photos']?[0];
+                              selected['photoUrl'] ??
+                                  selected['photos']?[0];
 
                           variantController.text = val ?? '';
                           priceController.text =
@@ -571,10 +603,10 @@ void initState() {
                       items: _statusOptions
                           .map(
                             (option) => DropdownMenuItem(
-                              value: option,
-                              child: Text(option),
-                            ),
-                          )
+                          value: option,
+                          child: Text(option),
+                        ),
+                      )
                           .toList(),
                       onChanged: (value) {
                         if (value != null) {
@@ -600,7 +632,7 @@ void initState() {
                               isClosed = value ?? false;
                               if (isClosed) {
                                 isBooked = false;
-                                status = 'Closed'; // Auto-set status when closed
+                                status = 'Closed';
                               } else if (status == 'Closed') {
                                 status = 'New Inquiry';
                               }
@@ -616,7 +648,7 @@ void initState() {
                               isBooked = value ?? false;
                               if (isBooked) {
                                 isClosed = false;
-                                status = 'Booked'; // Auto-set status when booked
+                                status = 'Booked';
                               } else if (status == 'Booked') {
                                 status = 'New Inquiry';
                               }
@@ -685,7 +717,7 @@ void initState() {
                 ),
               ),
             ),
-            
+
             const SizedBox(height: 20),
 
             // Add Call Log Section
@@ -706,9 +738,11 @@ void initState() {
                     const SizedBox(height: 16),
                     Row(
                       children: [
+                        const Icon(Icons.calendar_month, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Call Date & Time: ${callDateTime.toString()}',
+                            'Date: ${callDate.toString().split(' ')[0]}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -716,27 +750,68 @@ void initState() {
                           onPressed: () async {
                             final picked = await showDatePicker(
                               context: context,
-                              initialDate: callDateTime,
+                              initialDate: callDate,
                               firstDate: DateTime(2020),
                               lastDate: DateTime.now(),
                             );
                             if (picked != null) {
-                              if (!context.mounted) return;
-                              final timePicked = await showTimePicker(
-                                context: context,
-                                initialTime: TimeOfDay.fromDateTime(callDateTime),
-                              );
-                              if (timePicked != null) {
-                                setState(() {
-                                  callDateTime = DateTime(
-                                    picked.year,
-                                    picked.month,
-                                    picked.day,
-                                    timePicked.hour,
-                                    timePicked.minute,
-                                  );
-                                });
-                              }
+                              setState(() {
+                                callDate = picked;
+                              });
+                            }
+                          },
+                          child: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Start Time: ${callStartTime.format(context)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: callStartTime,
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                callStartTime = picked;
+                              });
+                            }
+                          },
+                          child: const Text('Change'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time_filled, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'End Time: ${callEndTime.format(context)}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () async {
+                            final picked = await showTimePicker(
+                              context: context,
+                              initialTime: callEndTime,
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                callEndTime = picked;
+                              });
                             }
                           },
                           child: const Text('Change'),
@@ -797,7 +872,7 @@ void initState() {
 
                       ...editHistory.reversed.map((e) {
                         final changes =
-                            List<String>.from(e['changes'] ?? []);
+                        List<String>.from(e['changes'] ?? []);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -808,7 +883,7 @@ void initState() {
                           ),
                           child: Column(
                             crossAxisAlignment:
-                                CrossAxisAlignment.start,
+                            CrossAxisAlignment.start,
                             children: [
                               Text(
                                 e['staff'] ?? '',
@@ -820,9 +895,9 @@ void initState() {
                               const SizedBox(height: 6),
 
                               ...changes.map(
-                                (c) => Padding(
+                                    (c) => Padding(
                                   padding:
-                                      const EdgeInsets.only(bottom: 4),
+                                  const EdgeInsets.only(bottom: 4),
                                   child: Text("• $c"),
                                 ),
                               ),
@@ -856,13 +931,13 @@ void initState() {
                 onPressed: loading ? null : _saveChanges,
                 child: loading
                     ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
                     : const Text('Save Changes'),
               ),
             ),
