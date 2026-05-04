@@ -131,7 +131,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     callStartTime = TimeOfDay.fromDateTime(now);
     callEndTime = TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5)));
 
-    // DROPDOWN VALUES
     selectedBrand = data['brand'];
     selectedModel = data['model'];
     selectedVariant = data['variant'];
@@ -151,45 +150,32 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       });
     }
 
-    // FOLLOWUP HISTORY
     final history = data['followUpHistory'];
-
     if (history is List) {
-      followUpHistory =
-          List<Map<String, dynamic>>.from(history);
+      followUpHistory = List<Map<String, dynamic>>.from(history);
     }
 
-    // CALL HISTORY
     final calls = data['callHistory'];
-
     if (calls is List) {
-      callHistory =
-          List<Map<String, dynamic>>.from(calls);
+      callHistory = List<Map<String, dynamic>>.from(calls);
     }
 
-    // EDIT HISTORY
     final changes = data['editHistory'];
-
     if (changes is List) {
-      editHistory =
-          List<Map<String, dynamic>>.from(changes);
+      editHistory = List<Map<String, dynamic>>.from(changes);
     }
 
-    // STATUS
     isClosed = data['isClosed'] == true;
     isBooked = data['isBooked'] == true;
 
-    final savedStatus =
-        data['status'] as String? ?? 'New Inquiry';
+    final savedStatus = data['status'] as String? ?? 'New Inquiry';
 
     if (isClosed) {
       status = 'Closed';
     } else if (isBooked) {
       status = 'Booked';
     } else {
-      status = _statusOptions.contains(savedStatus)
-          ? savedStatus
-          : 'New Inquiry';
+      status = _statusOptions.contains(savedStatus) ? savedStatus : 'New Inquiry';
     }
   }
 
@@ -263,9 +249,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     }
 
     final newCall = {
-      'date': Timestamp.fromDate(
-        DateTime(callDate.year, callDate.month, callDate.day),
-      ),
+      'date': Timestamp.fromDate(DateTime(callDate.year, callDate.month, callDate.day)),
       'startTime': Timestamp.fromDate(startDateTime),
       'endTime': Timestamp.fromDate(endDateTime),
       'duration': duration,
@@ -300,34 +284,28 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final description = descriptionController.text.trim();
     final reference = referenceController.text.trim();
     final otherDescription = otherController.text.trim();
-    final oldData =
-        widget.inquiry.data() as Map<String, dynamic>;
+    final oldData = widget.inquiry.data() as Map<String, dynamic>;
 
     List<String> changes = [];
 
     if (oldData['brand'] != brand) {
-      changes.add(
-          'Brand changed from "${oldData['brand']}" to "$brand"');
+      changes.add('Brand changed from "${oldData['brand']}" to "$brand"');
     }
 
     if (oldData['model'] != model) {
-      changes.add(
-          'Model changed from "${oldData['model']}" to "$model"');
+      changes.add('Model changed from "${oldData['model']}" to "$model"');
     }
 
     if (oldData['variant'] != variant) {
-      changes.add(
-          'Variant changed from "${oldData['variant']}" to "$variant"');
+      changes.add('Variant changed from "${oldData['variant']}" to "$variant"');
     }
 
     if (oldData['price'] != price) {
-      changes.add(
-          'Price changed from "${oldData['price']}" to "$price"');
+      changes.add('Price changed from "${oldData['price']}" to "$price"');
     }
 
     if (oldData['status'] != status) {
-      changes.add(
-          'Status changed from "${oldData['status']}" to "$status"');
+      changes.add('Status changed from "${oldData['status']}" to "$status"');
     }
 
     if (changes.isNotEmpty) {
@@ -375,9 +353,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         'editHistory': editHistory,
         'isClosed': isClosed,
         'isBooked': isBooked,
-        'status': paymentType == 'Loan'
-            ? 'Finance'
-            : status,
+        'status': paymentType == 'Loan' ? 'Finance' : status,
       });
 
       if (mounted) {
@@ -415,7 +391,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-            // Basic Information Section
             Card(
               elevation: 2,
               child: Padding(
@@ -425,10 +400,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   children: [
                     const Text(
                       'Basic Information',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -442,16 +414,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: brands.contains(selectedBrand)
-                          ? selectedBrand
-                          : null,
+                      initialValue: brands.contains(selectedBrand) ? selectedBrand : null,
                       isExpanded: true,
                       hint: const Text("Select Brand"),
                       items: brands.map((b) {
-                        return DropdownMenuItem(
-                          value: b,
-                          child: Text(b),
-                        );
+                        return DropdownMenuItem(value: b, child: Text(b));
                       }).toList(),
                       onChanged: (val) async {
                         setState(() {
@@ -470,20 +437,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-
                     const SizedBox(height: 12),
-
                     DropdownButtonFormField<String>(
-                      initialValue: models.contains(selectedModel)
-                          ? selectedModel
-                          : null,
+                      initialValue: models.contains(selectedModel) ? selectedModel : null,
                       isExpanded: true,
                       hint: const Text("Select Model"),
                       items: models.map((m) {
-                        return DropdownMenuItem(
-                          value: m,
-                          child: Text(m),
-                        );
+                        return DropdownMenuItem(value: m, child: Text(m));
                       }).toList(),
                       onChanged: (val) async {
                         setState(() {
@@ -501,11 +461,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-
                     DropdownButtonFormField<String>(
-                      initialValue: variants.any(
-                        (v) => v['Name'] == selectedVariant,
-                      )
+                      initialValue: variants.any((v) => v['Name'] == selectedVariant)
                           ? selectedVariant
                           : null,
                       isExpanded: true,
@@ -513,26 +470,17 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       items: variants.map((v) {
                         return DropdownMenuItem<String>(
                           value: v['Name'],
-                          child: Text(
-                            v['Name'],
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                          child: Text(v['Name'], overflow: TextOverflow.ellipsis),
                         );
                       }).toList(),
                       onChanged: (val) {
-                        final selected =
-                            variants.firstWhere((e) => e['Name'] == val);
+                        final selected = variants.firstWhere((e) => e['Name'] == val);
 
                         setState(() {
                           selectedVariant = val;
-
-                          selectedVariantPhotoUrl =
-                              selected['photoUrl'] ??
-                                  selected['photos']?[0];
-
+                          selectedVariantPhotoUrl = selected['photoUrl'] ?? selected['photos']?[0];
                           variantController.text = val ?? '';
-                          priceController.text =
-                              selected['Price'].toString();
+                          priceController.text = selected['Price'].toString();
                         });
                       },
                       decoration: const InputDecoration(
@@ -570,7 +518,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
-
                     TextField(
                       controller: referenceController,
                       decoration: const InputDecoration(labelText: 'Reference'),
@@ -597,32 +544,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ),
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey(status),
-                      initialValue: status,
-                      items: _statusOptions
-                          .map(
-                            (option) => DropdownMenuItem(
-                          value: option,
-                          child: Text(option),
-                        ),
-                      )
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() {
-                            status = value;
-                            isBooked = value == 'Booked';
-                            isClosed = value == 'Closed';
-                          });
-                        }
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Current Status',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Checkbox(
@@ -632,7 +553,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               isClosed = value ?? false;
                               if (isClosed) {
                                 isBooked = false;
-                                status = 'Closed';
+                                status = 'Closed'; // Auto-set status when closed
                               } else if (status == 'Closed') {
                                 status = 'New Inquiry';
                               }
@@ -648,7 +569,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               isBooked = value ?? false;
                               if (isBooked) {
                                 isClosed = false;
-                                status = 'Booked';
+                                status = 'Booked'; // Auto-set status when booked
                               } else if (status == 'Booked') {
                                 status = 'New Inquiry';
                               }
@@ -665,7 +586,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             const SizedBox(height: 20),
 
-            // Add New Follow-up Section
             Card(
               elevation: 2,
               child: Padding(
@@ -675,10 +595,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   children: [
                     const Text(
                       'Add New Follow-up',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -720,7 +637,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             const SizedBox(height: 20),
 
-            // Add Call Log Section
             Card(
               elevation: 2,
               child: Padding(
@@ -730,10 +646,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   children: [
                     const Text(
                       'Log Call',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -867,12 +780,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           fontSize: 18,
                         ),
                       ),
-
                       const SizedBox(height: 14),
-
                       ...editHistory.reversed.map((e) {
-                        final changes =
-                        List<String>.from(e['changes'] ?? []);
+                        final changes = List<String>.from(e['changes'] ?? []);
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -882,8 +792,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
-                            crossAxisAlignment:
-                            CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 e['staff'] ?? '',
@@ -891,23 +800,16 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-
                               const SizedBox(height: 6),
-
                               ...changes.map(
-                                    (c) => Padding(
-                                  padding:
-                                  const EdgeInsets.only(bottom: 4),
+                                (c) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 4),
                                   child: Text("• $c"),
                                 ),
                               ),
-
                               const SizedBox(height: 6),
-
                               Text(
-                                (e['time'] as Timestamp)
-                                    .toDate()
-                                    .toString(),
+                                (e['time'] as Timestamp).toDate().toString(),
                                 style: TextStyle(
                                   color: Colors.grey.shade600,
                                   fontSize: 12,
@@ -924,20 +826,19 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             const SizedBox(height: 20),
 
-            // Save Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: loading ? null : _saveChanges,
                 child: loading
                     ? const SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 2,
-                  ),
-                )
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
                     : const Text('Save Changes'),
               ),
             ),
