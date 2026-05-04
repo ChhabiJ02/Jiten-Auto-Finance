@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 // remove share_plus import
@@ -132,47 +131,6 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       if (mounted) setState(() => lookupLoading = false);
     }
   }
-
-//   Future<void> sendPdfToWhatsApp() async {
-
-//   final phone = phoneController.text.trim();
-
-//   if (phone.isEmpty) {
-//     showMessage('Please enter a phone number before sending.');
-//     return;
-//   }
-
-//   final path = await saveQuotationPdfToLocalStorage();
-
-//   if (path == null) {
-//     showMessage('Unable to save quotation PDF.');
-//     return;
-//   }
-
-//   final message =
-//       "Hello 👋\n\n"
-//       "Your quotation PDF has been generated successfully.\n\n"
-//       "Please check the attached file stored locally on the device.\n\n"
-//       "Regards,\nJiten Auto Team";
-
-//   final url = Uri.parse(
-//     "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
-//   );
-
-//   if (await canLaunchUrl(url)) {
-
-//     await launchUrl(
-//       url,
-//       mode: LaunchMode.externalApplication,
-//     );
-
-//     showMessage("WhatsApp opened successfully.");
-
-//   } else {
-
-//     showMessage("Could not open WhatsApp.");
-//   }
-// }
 
   Future<bool> saveInquiry() async {
     setState(() => loading = true);
@@ -403,122 +361,6 @@ Future<void> sendPdfToWhatsApp() async {
     if (mounted) setState(() => loading = false);
   }
 }
-// Future<void> sendPdfToWhatsApp() async {
-//   final phone = phoneController.text.trim();
-//   final name = nameController.text.trim();
-
-//   if (phone.isEmpty) {
-//     showMessage('Please enter a phone number.');
-//     return;
-//   }
-
-//   setState(() => loading = true);
-
-//   try {
-//     // 1. Request permissions
-//     await Permission.manageExternalStorage.request();
-//     await Permission.storage.request();
-
-//     // 2. Generate PDF
-//     final pdf = pw.Document();
-//     final reference = referenceController.text.trim();
-//     final brand = brandController.text.trim();
-//     final model = modelController.text.trim();
-//     final variant = variantController.text.trim();
-//     final price = priceController.text.trim();
-//     final date = DateTime.now().toString().split(' ')[0];
-
-//     pdf.addPage(
-//       pw.Page(
-//         build: (context) => pw.Padding(
-//           padding: const pw.EdgeInsets.all(24),
-//           child: pw.Column(
-//             crossAxisAlignment: pw.CrossAxisAlignment.start,
-//             children: [
-//               pw.Text("JITEN AUTO",
-//                   style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-//               pw.SizedBox(height: 5),
-//               pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
-//               pw.Divider(),
-//               pw.SizedBox(height: 8),
-//               pw.Text("Customer Details",
-//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-//               pw.SizedBox(height: 8),
-//               pw.Text("Name: $name"),
-//               pw.Text("Mobile: $phone"),
-//               pw.Text("Reference: $reference"),
-//               pw.Text("Date: $date"),
-//               pw.SizedBox(height: 20),
-//               pw.Text("Vehicle Details",
-//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-//               pw.SizedBox(height: 8),
-//               pw.Text("Brand: $brand"),
-//               pw.Text("Model: $model"),
-//               pw.Text("Variant: $variant"),
-//               pw.SizedBox(height: 10),
-//               pw.Text("Price: ₹$price",
-//                   style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-//               pw.SizedBox(height: 30),
-//               pw.Text("Thank you for your inquiry.",
-//                   style: pw.TextStyle(fontSize: 12)),
-//               pw.SizedBox(height: 10),
-//               pw.Text("Regards,\nJiten Auto",
-//                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-//             ],
-//           ),
-//         ),
-//       ),
-//     );
-
-//     final bytes = await pdf.save();
-
-//     // 3. Save to Downloads/JitenAuto/
-//     final downloadsDir = Directory('/storage/emulated/0/Download/JitenAuto');
-//     if (!await downloadsDir.exists()) {
-//       await downloadsDir.create(recursive: true);
-//     }
-
-//     final nameCleaned = name.replaceAll(' ', '_');
-//     final fileName = 'Quotation_$nameCleaned.pdf';
-//     final filePath = '${downloadsDir.path}/$fileName';
-
-//     final file = File(filePath);
-//     await file.writeAsBytes(bytes, flush: true);
-
-//     // 4. Verify
-//     if (!await file.exists() || await file.length() == 0) {
-//       showMessage('Failed to save PDF.');
-//       return;
-//     }
-
-//     // 5. Send via native Android intent
-//     final message =
-//         "Hello $name 👋\n\n"
-//         "Please find the attached quotation.\n\n"
-//         "Regards,\nJiten Auto Team";
-
-//     await _platform.invokeMethod('shareToWhatsApp', {
-//       'filePath': filePath,
-//       'phone': phone,
-//       'message': message,
-//     });
-
-//   } catch (e) {
-//     showMessage('Error: ${e.toString()}');
-//   } finally {
-//     if (mounted) setState(() => loading = false);
-//   }
-// }
-
-  // Future<Package?> _resolveWhatsappPackage() async {
-  //   if (await WhatsappShare.isInstalled(package: Package.whatsapp) == true) {
-  //     return Package.whatsapp;
-  //   }
-  //   if (await WhatsappShare.isInstalled(package: Package.businessWhatsapp) == true) {
-  //     return Package.businessWhatsapp;
-  //   }
-  //   return null;
-  // }
 
   Future<void> sendThankYou() async {
     final name = nameController.text.trim();
