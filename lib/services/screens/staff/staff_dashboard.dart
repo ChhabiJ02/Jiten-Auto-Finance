@@ -90,8 +90,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       status.toLowerCase() == 'closed';
 
                   // NEW INQUIRY FILTER
+                  // NEW INQUIRY FILTER (FIXED)
                   if (selectedFilter == 'New Inquiry') {
-                    return _isCreatedToday(itemData) && !isCompleted;
+                    final paymentType = itemData['paymentType'];
+
+                    return _isCreatedToday(itemData) &&
+                        !isCompleted &&
+                        paymentType != 'Loan'; // exclude finance
                   }
 
                   // FINANCE FILTER
@@ -157,15 +162,22 @@ class _StaffDashboardState extends State<StaffDashboard> {
           filteredData.sort((a, b) {
             final aData = a.data() as Map<String, dynamic>;
             final bData = b.data() as Map<String, dynamic>;
+
             final aCreated = aData['createdAt'];
             final bCreated = bData['createdAt'];
 
-            if (aCreated is Timestamp && bCreated is Timestamp) {
-              return bCreated.compareTo(aCreated);
+            DateTime aTime = DateTime(2000);
+            DateTime bTime = DateTime(2000);
+
+            if (aCreated is Timestamp) {
+              aTime = aCreated.toDate();
             }
-            if (aCreated is Timestamp) return -1;
-            if (bCreated is Timestamp) return 1;
-            return 0;
+
+            if (bCreated is Timestamp) {
+              bTime = bCreated.toDate();
+            }
+
+            return bTime.compareTo(aTime); // latest first
           });
 
           if (data.isEmpty) {
