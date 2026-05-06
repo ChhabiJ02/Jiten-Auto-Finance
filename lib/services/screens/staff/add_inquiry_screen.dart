@@ -133,7 +133,34 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
   }
 
   Future<bool> saveInquiry() async {
+
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+
+    // NAME VALIDATION
+    if (name.isEmpty) {
+      showMessage("Please enter customer name.");
+      return false;
+    }
+
+    if (name.length < 3) {
+      showMessage("Name must be at least 3 characters.");
+      return false;
+    }
+
+    // PHONE VALIDATION
+    if (phone.isEmpty) {
+      showMessage("Please enter phone number.");
+      return false;
+    }
+
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+      showMessage("Enter valid 10-digit phone number.");
+      return false;
+    }
+
     setState(() => loading = true);
+
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -571,7 +598,7 @@ Future<void> sendPdfToWhatsApp() async {
 
                       // 🔵 VARIANT DROPDOWN
                       DropdownButtonFormField<String>(
-                        initialValue: selectedVariant,
+                        value: selectedVariant,
                         isExpanded: true, // ✅ FIX OVERFLOW
                         hint: const Text("Select Variant"),
                         items: variants.map<DropdownMenuItem<String>>((v) {
@@ -588,7 +615,7 @@ Future<void> sendPdfToWhatsApp() async {
                               variants.firstWhere((e) => e['Name'] == val);
 
                           setState(() {
-                            selectedVariant = val;
+                            selectedVariant = val ?? '';
                             selectedVariantPhotoUrl = selected['photoUrl']; // Capture photo URL
 
                             brandController.text = selectedBrand!;
