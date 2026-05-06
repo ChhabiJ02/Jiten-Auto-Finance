@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:permission_handler/permission_handler.dart';
+import 'package:pdf/pdf.dart';
 import 'package:flutter/services.dart';
 // remove share_plus import
 
@@ -254,7 +254,6 @@ await file.writeAsBytes(bytes, flush: true);
   }
 }
 
-
 Future<void> sendPdfToWhatsApp() async {
   final phone = phoneController.text.trim();
   final name = nameController.text.trim();
@@ -267,9 +266,12 @@ Future<void> sendPdfToWhatsApp() async {
   setState(() => loading = true);
 
   try {
-    // 1. Request permissions
-    await Permission.manageExternalStorage.request();
-    await Permission.storage.request();
+    // 1. Save inquiry first
+    final inquirySaved = await saveInquiry();
+    if (!inquirySaved) {
+      setState(() => loading = false);
+      return;
+    }
 
     // 2. Generate PDF
     final pdf = pw.Document();
@@ -282,41 +284,112 @@ Future<void> sendPdfToWhatsApp() async {
 
     pdf.addPage(
       pw.Page(
-        build: (context) => pw.Padding(
-          padding: const pw.EdgeInsets.all(24),
-          child: pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.start,
-            children: [
-              pw.Text("JITEN AUTO",
-                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 5),
-              pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
-              pw.Divider(),
-              pw.SizedBox(height: 8),
-              pw.Text("Customer Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 8),
-              pw.Text("Name: $name"),
-              pw.Text("Mobile: $phone"),
-              pw.Text("Reference: $reference"),
-              pw.Text("Date: $date"),
-              pw.SizedBox(height: 20),
-              pw.Text("Vehicle Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 8),
-              pw.Text("Brand: $brand"),
-              pw.Text("Model: $model"),
-              pw.Text("Variant: $variant"),
-              pw.SizedBox(height: 10),
-              pw.Text("Price: ₹$price",
-                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 30),
-              pw.Text("Thank you for your inquiry.",
-                  style: pw.TextStyle(fontSize: 12)),
-              pw.SizedBox(height: 10),
-              pw.Text("Regards,\nJiten Auto",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-            ],
+        build: (context) => pw.Container(
+          color: PdfColor.fromInt(0xFFF4DBE1),
+          child: pw.Padding(
+            padding: const pw.EdgeInsets.all(24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                
+                // Header
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFF7B1F3F),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(12),
+                    ),
+                  ),
+                  child: pw.Text(
+                    "🚗 JITEN AUTO\nPremium Vehicle Quotation",
+                    style: pw.TextStyle(
+                      fontSize: 20,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                ),
+
+                pw.SizedBox(height: 20),
+
+                // Customer Details
+                pw.Text(
+                  "Customer Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text("Name: $name"),
+                pw.Text("Phone: +91 $phone"),
+                pw.Text("Reference: $reference"),
+                pw.Text("Date: $date"),
+
+                pw.SizedBox(height: 20),
+
+                // Vehicle Details
+                pw.Text(
+                  "Vehicle Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+                pw.SizedBox(height: 8),
+                pw.Text("Brand: $brand"),
+                pw.Text("Model: $model"),
+                pw.Text("Variant: $variant"),
+
+                pw.SizedBox(height: 20),
+
+                // 🔥 FIXED GRADIENT SECTION
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    gradient: pw.LinearGradient(   // ✅ FIX HERE
+                      colors: [
+                        PdfColor.fromInt(0xFF7B1F3F),
+                        PdfColor.fromInt(0xFF5A1530),
+                      ],
+                    ),
+                    borderRadius: const pw.BorderRadius.all(
+                      pw.Radius.circular(8),
+                    ),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.center,
+                    children: [
+                      pw.Text(
+                        "Quoted Price",
+                        style: pw.TextStyle(
+                          fontSize: 12,
+                          color: PdfColor.fromInt(0xFFF4DBE1),
+                        ),
+                      ),
+                      pw.SizedBox(height: 6),
+                      pw.Text(
+                        "₹ $price",
+                        style: pw.TextStyle(
+                          fontSize: 28,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                pw.SizedBox(height: 20),
+
+                // Footer
+                pw.Text(
+                  "Thank you for your inquiry 🙏",
+                  style: pw.TextStyle(fontSize: 12),
+                ),
+                pw.Text(
+                  "Regards,\nJiten Auto Team",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -324,26 +397,19 @@ Future<void> sendPdfToWhatsApp() async {
 
     final bytes = await pdf.save();
 
-    // 3. Save to Downloads/JitenAuto/
-    final downloadsDir = Directory('/storage/emulated/0/Download/JitenAuto');
-    if (!await downloadsDir.exists()) {
-      await downloadsDir.create(recursive: true);
-    }
-
-    final nameCleaned = name.replaceAll(' ', '_');
-    final fileName = 'Quotation_$nameCleaned.pdf';
-    final filePath = '${downloadsDir.path}/$fileName';
-
+    // 3. Save to cache
+    final cacheDir = await getTemporaryDirectory();
+    final filePath = '${cacheDir.path}/quotation.pdf';
     final file = File(filePath);
     await file.writeAsBytes(bytes, flush: true);
 
-    // 4. Verify
+    // 4. Validate file
     if (!await file.exists() || await file.length() == 0) {
-      showMessage('Failed to save PDF.');
+      showMessage('Failed to generate PDF.');
       return;
     }
 
-    // 5. Send via native Android intent
+    // 5. Send to WhatsApp
     final message =
         "Hello $name 👋\n\n"
         "Please find the attached quotation.\n\n"
@@ -595,62 +661,6 @@ Future<void> sendPdfToWhatsApp() async {
                       
                       const SizedBox(height: 16),
                       
-                      // // 🎨 VEHICLE PHOTO DISPLAY
-                      // if (selectedVariantPhotoUrl != null && selectedVariantPhotoUrl!.isNotEmpty)
-                      //   Container(
-                      //     width: double.infinity,
-                      //     height: 220,
-                      //     decoration: BoxDecoration(
-                      //       borderRadius: BorderRadius.circular(16),
-                      //       border: Border.all(
-                      //         color: Theme.of(context).colorScheme.primary,
-                      //         width: 2,
-                      //       ),
-                      //     ),
-                        //   child: ClipRRect(
-                        //     borderRadius: BorderRadius.circular(14),
-                        //     child: CachedNetworkImage(
-                        //       imageUrl: selectedVariantPhotoUrl!,
-                        //       fit: BoxFit.cover,
-                        //       placeholder: (context, url) => const Center(
-                        //         child: CircularProgressIndicator(),
-                        //       ),
-                        //       errorWidget: (context, url, error) => const Center(
-                        //         child: Icon(Icons.broken_image, size: 60, color: Colors.grey),
-                        //       ),
-                        //     ),
-                        //   ),
-                        // )
-                      // else if (selectedVariant != null)
-                      //   Container(
-                      //     width: double.infinity,
-                      //     height: 220,
-                      //     decoration: BoxDecoration(
-                      //       borderRadius: BorderRadius.circular(16),
-                      //       color: Colors.grey[200],
-                      //       border: Border.all(color: Colors.grey[400]!, width: 1),
-                      //     ),
-                      //     child: Center(
-                      //       child: Column(
-                      //         mainAxisAlignment: MainAxisAlignment.center,
-                      //         children: [
-                      //           Icon(Icons.image_not_supported, 
-                      //             size: 60, 
-                      //             color: Colors.grey[400],
-                      //           ),
-                      //           const SizedBox(height: 8),
-                      //           Text(
-                      //             'No photo available',
-                      //             style: TextStyle(
-                      //               color: Colors.grey[600],
-                      //               fontSize: 14,
-                      //             ),
-                      //           ),
-                      //         ],
-                      //       ),
-                      //     ),
-                      //   ),
-                      
                       const SizedBox(height: 16),
                       
                       TextField(
@@ -784,57 +794,16 @@ Future<void> sendPdfToWhatsApp() async {
                       ),
                       const SizedBox(height: 20),
                         
-                        SizedBox(
+                      SizedBox(
                         width: double.infinity,
+
                         child: ElevatedButton.icon(
 
-                          icon: const Icon(Icons.favorite_outline),
+                          icon: const Icon(Icons.picture_as_pdf_outlined),
 
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF7B1F3F),
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-
-                          onPressed: () async {
-
-                            final saved = await saveInquiry();
-
-                            if (saved) {
-                              await sendThankYou();
-                            }
-                          },
-
-                          label: const Text(
-                            "Send Thank You & Generate Lead",
-
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      SizedBox(
-                        width: double.infinity,
-
-                        child: OutlinedButton.icon(
-
-                          icon: const Icon(Icons.picture_as_pdf_outlined),
-
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: const Color(0xFF7B1F3F),
-                            side: const BorderSide(
-                              color: Color(0xFF7B1F3F),
-                            ),
-
                             padding: const EdgeInsets.symmetric(vertical: 16),
 
                             shape: RoundedRectangleBorder(
