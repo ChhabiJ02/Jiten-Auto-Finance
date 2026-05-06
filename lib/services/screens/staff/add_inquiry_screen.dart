@@ -254,13 +254,29 @@ await file.writeAsBytes(bytes, flush: true);
   }
 }
 
-
 Future<void> sendPdfToWhatsApp() async {
-  final phone = phoneController.text.trim();
   final name = nameController.text.trim();
+  final phone = phoneController.text.trim();
 
+  // NAME VALIDATION
+  if (name.isEmpty) {
+    showMessage("Please enter customer name.");
+    return;
+  }
+
+  if (name.length < 3) {
+    showMessage("Name must be at least 3 characters.");
+    return;
+  }
+
+  // PHONE VALIDATION
   if (phone.isEmpty) {
-    showMessage('Please enter a phone number.');
+    showMessage("Please enter phone number.");
+    return;
+  }
+
+  if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+    showMessage("Enter valid 10-digit phone number.");
     return;
   }
 
@@ -672,7 +688,6 @@ Future<void> sendPdfToWhatsApp() async {
                       TextField(
                         controller: descriptionController,
                         maxLines: 3,
-                        readOnly: true,
                         decoration: InputDecoration(
                           labelText: "Vehicle Description",
                           prefixIcon: const Icon(Icons.info_outline),
