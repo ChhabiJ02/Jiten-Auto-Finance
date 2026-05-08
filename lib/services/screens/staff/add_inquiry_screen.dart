@@ -154,6 +154,24 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       return false;
     }
 
+    // BRAND VALIDATION
+    if (selectedBrand == null || selectedBrand!.isEmpty) {
+      showMessage("Please select vehicle brand.");
+      return false;
+    }
+
+    // MODEL VALIDATION
+    if (selectedModel == null || selectedModel!.isEmpty) {
+      showMessage("Please select vehicle model.");
+      return false;
+    }
+
+    // VARIANT VALIDATION
+    if (selectedVariant == null || selectedVariant!.isEmpty) {
+      showMessage("Please select vehicle variant.");
+      return false;
+    }
+
     if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
       showMessage("Enter valid 10-digit phone number.");
       return false;
@@ -184,7 +202,7 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       final newInquiryNumber = currentNumber + 1;
 
       // update counter
-      await counterRef.update({
+      await counterRef.set({
         'current': newInquiryNumber,
       });
 
@@ -214,7 +232,7 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
 
       if (mounted) {
         showMessage("Lead generated successfully.");
-        Navigator.pop(context);
+        
       }
       return true;
     } catch (e) {
@@ -484,8 +502,12 @@ Future<void> sendPdfToWhatsApp() async {
       'phone': phone,
       'message': message,
     });
+    if (mounted) {
+      Navigator.pop(context);
+    }
 
   } catch (e) {
+    print("WHATSAPP ERROR => $e");
     showMessage('Error: ${e.toString()}');
   } finally {
     if (mounted) setState(() => loading = false);
@@ -633,7 +655,7 @@ Future<void> sendPdfToWhatsApp() async {
                       
                       // 🔵 BRAND DROPDOWN
                       DropdownButtonFormField<String>(
-                        initialValue: selectedBrand,
+                        value: selectedBrand,
                         isExpanded: true,
                         hint: const Text("Select Brand"),
                         items: brands.map<DropdownMenuItem<String>>((b) {
@@ -659,7 +681,7 @@ Future<void> sendPdfToWhatsApp() async {
 
                       // 🔵 MODEL DROPDOWN
                       DropdownButtonFormField<String>(
-                        initialValue: selectedModel,
+                        value: selectedModel,
                         isExpanded: true,
                         hint: const Text("Select Model"),
                         items: models.map<DropdownMenuItem<String>>((m) {
