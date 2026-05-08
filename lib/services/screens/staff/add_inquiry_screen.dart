@@ -133,7 +133,34 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
   }
 
   Future<bool> saveInquiry() async {
+
+    final name = nameController.text.trim();
+    final phone = phoneController.text.trim();
+
+    // NAME VALIDATION
+    if (name.isEmpty) {
+      showMessage("Please enter customer name.");
+      return false;
+    }
+
+    if (name.length < 3) {
+      showMessage("Name must be at least 3 characters.");
+      return false;
+    }
+
+    // PHONE VALIDATION
+    if (phone.isEmpty) {
+      showMessage("Please enter phone number.");
+      return false;
+    }
+
+    if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+      showMessage("Enter valid 10-digit phone number.");
+      return false;
+    }
+
     setState(() => loading = true);
+
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -142,7 +169,27 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
         return false;
       }
 
+      final counterRef = FirebaseFirestore.instance
+          .collection('counters')
+          .doc('inquiryCounter');
+
+      final counterSnapshot = await counterRef.get();
+
+      int currentNumber = 0;
+
+      if (counterSnapshot.exists) {
+        currentNumber = counterSnapshot['current'] ?? 0;
+      }
+
+      final newInquiryNumber = currentNumber + 1;
+
+      // update counter
+      await counterRef.update({
+        'current': newInquiryNumber,
+      });
+
       await FirebaseFirestore.instance.collection('inquiries').add({
+        'inquiryNumber': newInquiryNumber,
         "name": nameController.text.trim(),
         "phone": phoneController.text.trim(),
         "brand": brandController.text.trim(),
@@ -255,11 +302,28 @@ await file.writeAsBytes(bytes, flush: true);
 }
 
 Future<void> sendPdfToWhatsApp() async {
-  final phone = phoneController.text.trim();
   final name = nameController.text.trim();
+  final phone = phoneController.text.trim();
 
+  // NAME VALIDATION
+  if (name.isEmpty) {
+    showMessage("Please enter customer name.");
+    return;
+  }
+
+  if (name.length < 3) {
+    showMessage("Name must be at least 3 characters.");
+    return;
+  }
+
+  // PHONE VALIDATION
   if (phone.isEmpty) {
-    showMessage('Please enter a phone number.');
+    showMessage("Please enter phone number.");
+    return;
+  }
+
+  if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+    showMessage("Enter valid 10-digit phone number.");
     return;
   }
 
@@ -638,7 +702,7 @@ Future<void> sendPdfToWhatsApp() async {
                               variants.firstWhere((e) => e['Name'] == val);
 
                           setState(() {
-                            selectedVariant = val;
+                            selectedVariant = val ?? '';
                             selectedVariantPhotoUrl = selected['photoUrl']; // Capture photo URL
 
                             brandController.text = selectedBrand!;
@@ -682,7 +746,6 @@ Future<void> sendPdfToWhatsApp() async {
                       TextField(
                         controller: descriptionController,
                         maxLines: 3,
-                        readOnly: true,
                         decoration: InputDecoration(
                           labelText: "Vehicle Description",
                           prefixIcon: const Icon(Icons.info_outline),

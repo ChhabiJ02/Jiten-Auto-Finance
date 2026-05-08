@@ -15,7 +15,7 @@ class StaffDashboard extends StatefulWidget {
 
 class _StaffDashboardState extends State<StaffDashboard> {
   String selectedFilter = 'All';
-  final filters = ['All', 'New Inquiry', 'Follow Ups', 'Finance', 'Booked'];
+  final filters = ['All', 'New Inquiry', 'Follow Ups', 'Finance', 'Cash', 'Booked', 'Closed'];
 
   bool _isCreatedToday(Map<String, dynamic> itemData) {
     final createdAt = itemData['createdAt'];
@@ -32,13 +32,25 @@ class _StaffDashboardState extends State<StaffDashboard> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final staffName = user?.displayName?.trim().isNotEmpty == true
+        ? user!.displayName!.trim()
+        : (user?.email?.split('@').first ?? 'Staff');
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Staff Dashboard"),
+        title: Text("Staff Dashboard - $staffName"),
         actions: [
           IconButton(
-            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const UserSettingsScreen())),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const UserSettingsScreen()),
+              );
+              await FirebaseAuth.instance.currentUser?.reload();
+              if (mounted) {
+                setState(() {});
+              }
+            },
             icon: const Icon(Icons.settings),
           ),
         ],
@@ -80,14 +92,33 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       status.toLowerCase() == 'closed';
 
                   // NEW INQUIRY FILTER
+                  // NEW INQUIRY FILTER (FIXED)
                   if (selectedFilter == 'New Inquiry') {
-                    return status == 'New Inquiry' &&
-                        _isCreatedToday(itemData);
+                    final paymentType = itemData['paymentType'];
+
+                    return _isCreatedToday(itemData) &&
+                        !isCompleted &&
+                        paymentType != 'Loan'; // exclude finance
                   }
 
                   // FINANCE FILTER
                   if (selectedFilter == 'Finance') {
                     return itemData['paymentType'] == 'Loan';
+                  }
+
+                  // CASH FILTER
+                  if (selectedFilter == 'Cash') {
+                    return itemData['paymentType'] == 'Cash';
+                  }
+
+                  // BOOKED FILTER
+                  if (selectedFilter == 'Booked') {
+                    return isBooked || status.toLowerCase() == 'booked';
+                  }
+
+                  // CLOSED FILTER
+                  if (selectedFilter == 'Closed') {
+                    return isClosed || status.toLowerCase() == 'closed';
                   }
 
                   // FOLLOW UPS FILTER
@@ -129,6 +160,27 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   return status == selectedFilter;
 
                 }).toList();
+
+          filteredData.sort((a, b) {
+            final aData = a.data() as Map<String, dynamic>;
+            final bData = b.data() as Map<String, dynamic>;
+
+            final aCreated = aData['createdAt'];
+            final bCreated = bData['createdAt'];
+
+            DateTime aTime = DateTime(2000);
+            DateTime bTime = DateTime(2000);
+
+            if (aCreated is Timestamp) {
+              aTime = aCreated.toDate();
+            }
+
+            if (bCreated is Timestamp) {
+              bTime = bCreated.toDate();
+            }
+
+            return bTime.compareTo(aTime); // latest first
+          });
 
           if (data.isEmpty) {
             return Column(

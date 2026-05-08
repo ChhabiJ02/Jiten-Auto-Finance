@@ -477,7 +477,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         final selected = variants.firstWhere((e) => e['Name'] == val);
 
                         setState(() {
-                          selectedVariant = val;
+                          selectedVariant = val ?? '';
                           selectedVariantPhotoUrl = selected['photoUrl'] ?? selected['photos']?[0];
                           variantController.text = val ?? '';
                           priceController.text = selected['Price'].toString();
@@ -637,6 +637,131 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             const SizedBox(height: 20),
 
+            if (followUpHistory.isNotEmpty)
+              Card(
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Follow-up History',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      ...followUpHistory.reversed.toList().asMap().entries.map((entry) {
+
+                        final index =
+                            followUpHistory.length - 1 - entry.key;
+
+                        final item = entry.value;
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    (item['date'] as Timestamp)
+                                        .toDate()
+                                        .toString()
+                                        .split(' ')[0],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+
+                                  Row(
+                                    children: [
+
+                                      IconButton(
+                                        icon: const Icon(Icons.edit),
+                                        onPressed: () {
+
+                                          followUpCommentController.text =
+                                              item['comment'] ?? '';
+
+                                          showDialog(
+                                            context: context,
+                                            builder: (_) {
+                                              return AlertDialog(
+                                                title: const Text(
+                                                    'Edit Follow-up'),
+                                                content: TextField(
+                                                  controller:
+                                                      followUpCommentController,
+                                                  maxLines: 3,
+                                                ),
+                                                actions: [
+                                                  TextButton(
+                                                    onPressed: () {
+                                                      Navigator.pop(context);
+                                                    },
+                                                    child: const Text('Cancel'),
+                                                  ),
+                                                  ElevatedButton(
+                                                    onPressed: () {
+
+                                                      setState(() {
+                                                        followUpHistory[index]
+                                                            ['comment'] =
+                                                            followUpCommentController
+                                                                .text
+                                                                .trim();
+                                                      });
+
+                                                      Navigator.pop(context);
+                                                    },
+                                                    child: const Text('Save'),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          );
+                                        },
+                                      ),
+
+                                      IconButton(
+                                        icon: const Icon(Icons.delete,
+                                            color: Colors.red),
+                                        onPressed: () {
+                                          setState(() {
+                                            followUpHistory.removeAt(index);
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 8),
+
+                              Text(item['comment'] ?? ''),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+
             Card(
               elevation: 2,
               child: Padding(
@@ -678,6 +803,89 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
+
+                    if (callHistory.isNotEmpty)
+                      Card(
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+
+                              const Text(
+                                'Call History',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 18,
+                                ),
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              ...callHistory.reversed.toList().asMap().entries.map((entry) {
+
+                                final index =
+                                    callHistory.length - 1 - entry.key;
+
+                                final item = entry.value;
+
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade100,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+
+                                          Text(
+                                            (item['date'] as Timestamp)
+                                                .toDate()
+                                                .toString()
+                                                .split(' ')[0],
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+
+                                          IconButton(
+                                            icon: const Icon(Icons.delete,
+                                                color: Colors.red),
+                                            onPressed: () {
+                                              setState(() {
+                                                callHistory.removeAt(index);
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+
+                                      const SizedBox(height: 6),
+
+                                      Text(
+                                          "Duration: ${item['duration'] ?? ''}"),
+
+                                      const SizedBox(height: 4),
+
+                                      Text(
+                                          "Notes: ${item['notes'] ?? ''}"),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
+                          ),
+                        ),
+                      ),
+
                     Row(
                       children: [
                         const Icon(Icons.access_time, size: 20),
