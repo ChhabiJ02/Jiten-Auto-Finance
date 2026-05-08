@@ -92,11 +92,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
                   // NEW INQUIRY FILTER
                   // NEW INQUIRY FILTER (FIXED)
                   if (selectedFilter == 'New Inquiry') {
-                    final paymentType = itemData['paymentType'];
-
                     return _isCreatedToday(itemData) &&
-                        !isCompleted &&
-                        paymentType != 'Loan'; // exclude finance
+                        !isCompleted;
                   }
 
                   // FINANCE FILTER

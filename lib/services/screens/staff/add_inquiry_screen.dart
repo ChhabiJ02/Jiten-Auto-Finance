@@ -133,119 +133,139 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
   }
 
   Future<bool> saveInquiry() async {
+  final name = nameController.text.trim();
+  final phone = phoneController.text.trim();
 
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
+  // NAME VALIDATION
+  if (name.isEmpty) {
+    showMessage("Please enter customer name.");
+    return false;
+  }
 
-    // NAME VALIDATION
-    if (name.isEmpty) {
-      showMessage("Please enter customer name.");
+  if (name.length < 3) {
+    showMessage("Name must be at least 3 characters.");
+    return false;
+  }
+
+  // PHONE VALIDATION
+  if (phone.isEmpty) {
+    showMessage("Please enter phone number.");
+    return false;
+  }
+
+  if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
+    showMessage("Enter valid 10-digit phone number.");
+    return false;
+  }
+
+  // BRAND VALIDATION
+  if (selectedBrand == null) {
+    showMessage("Please select vehicle brand.");
+    return false;
+  }
+
+  // MODEL VALIDATION
+  if (selectedModel == null) {
+    showMessage("Please select vehicle model.");
+    return false;
+  }
+
+  // VARIANT VALIDATION
+  if (selectedVariant == null) {
+    showMessage("Please select vehicle variant.");
+    return false;
+  }
+
+  // PRICE VALIDATION
+  final price = priceController.text.trim();
+
+  if (price.isEmpty) {
+    showMessage("Please enter vehicle price.");
+    return false; // use only return; inside sendPdfToWhatsApp()
+  }
+
+  // allow decimal values like 33333.0
+  if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(price)) {
+    showMessage("Enter valid price.");
+    return false;
+  }
+
+  // convert safely
+  final priceValue = double.tryParse(price);
+
+  if (priceValue == null) {
+    showMessage("Invalid price.");
+    return false;
+  }
+
+  // minimum 5 digits
+  if (priceValue < 10000) {
+    showMessage("Price must be at least 5 digits.");
+    return false;
+  }
+
+  setState(() => loading = true);
+
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+      showMessage("User not logged in.");
       return false;
     }
 
-    if (name.length < 3) {
-      showMessage("Name must be at least 3 characters.");
-      return false;
+    final counterRef = FirebaseFirestore.instance
+        .collection('counters')
+        .doc('inquiryCounter');
+
+    final counterSnapshot = await counterRef.get();
+
+    int currentNumber = 0;
+
+    if (counterSnapshot.exists) {
+      currentNumber = counterSnapshot['current'] ?? 0;
     }
 
-    // PHONE VALIDATION
-    if (phone.isEmpty) {
-      showMessage("Please enter phone number.");
-      return false;
-    }
+    final newInquiryNumber = currentNumber + 1;
 
-    // BRAND VALIDATION
-    if (selectedBrand == null || selectedBrand!.isEmpty) {
-      showMessage("Please select vehicle brand.");
-      return false;
-    }
+    await counterRef.set({
+      'current': newInquiryNumber,
+    });
 
-    // MODEL VALIDATION
-    if (selectedModel == null || selectedModel!.isEmpty) {
-      showMessage("Please select vehicle model.");
-      return false;
-    }
+    await FirebaseFirestore.instance.collection('inquiries').add({
+      'inquiryNumber': newInquiryNumber,
+      "name": name,
+      "phone": phone,
+      "brand": brandController.text.trim(),
+      "model": modelController.text.trim(),
+      "variant": variantController.text.trim(),
+      "vehicleId": selectedVehicleId,
+      "vehiclePhotoUrl": selectedVariantPhotoUrl,
+      "price": priceController.text.trim(),
+      "description": descriptionController.text.trim(),
+      "paymentType": paymentType,
+      "otherDescription": otherController.text.trim(),
+      "reference": referenceController.text.trim(),
+      "date": selectedDate,
+      "staffId": user.uid,
+      "createdBy": user.uid,
+      "createdAt": Timestamp.now(),
+      "status": "New Inquiry",
+      "paymentType": paymentType,
+      if (followUpDate != null)
+        "nextFollowUp": Timestamp.fromDate(followUpDate!),
+    });
 
-    // VARIANT VALIDATION
-    if (selectedVariant == null || selectedVariant!.isEmpty) {
-      showMessage("Please select vehicle variant.");
-      return false;
-    }
-
-    if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
-      showMessage("Enter valid 10-digit phone number.");
-      return false;
-    }
-
-    setState(() => loading = true);
-
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        showMessage("Unable to save inquiry: user not signed in.");
-        return false;
-      }
-
-      final counterRef = FirebaseFirestore.instance
-          .collection('counters')
-          .doc('inquiryCounter');
-
-      final counterSnapshot = await counterRef.get();
-
-      int currentNumber = 0;
-
-      if (counterSnapshot.exists) {
-        currentNumber = counterSnapshot['current'] ?? 0;
-      }
-
-      final newInquiryNumber = currentNumber + 1;
-
-      // update counter
-      await counterRef.set({
-        'current': newInquiryNumber,
-      });
-
-      await FirebaseFirestore.instance.collection('inquiries').add({
-        'inquiryNumber': newInquiryNumber,
-        "name": nameController.text.trim(),
-        "phone": phoneController.text.trim(),
-        "brand": brandController.text.trim(),
-        "model": modelController.text.trim(),
-        "variant": variantController.text.trim(),
-        "vehicleId": selectedVehicleId,
-        "vehiclePhotoUrl": selectedVariantPhotoUrl, // Save vehicle photo URL
-        "price": priceController.text.trim(),
-        "description": descriptionController.text.trim(),
-        "paymentType": paymentType,
-        "otherDescription": otherController.text.trim(),
-        "reference": referenceController.text.trim(),
-        "date": selectedDate,
-        "staffId": user.uid,
-        "createdBy": user.uid,
-        "createdAt": Timestamp.now(),
-        "status": paymentType == "Loan"
-            ? "Finance"
-            : "New Inquiry",
-        if (followUpDate != null) "nextFollowUp": Timestamp.fromDate(followUpDate!),
-      });
-
-      if (mounted) {
-        showMessage("Lead generated successfully.");
-        
-      }
-      return true;
-    } catch (e) {
-      if (mounted) {
-        showMessage("Failed to save inquiry. Please try again.");
-      }
-      return false;
-    } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+    return true;
+  } catch (e) {
+    showMessage("Failed to save inquiry.");
+    return false;
+  } finally {
+    if (mounted) {
+      setState(() => loading = false);
     }
   }
+}
 
  Future<String?> saveQuotationPdfToLocalStorage() async {
   try {
@@ -322,41 +342,53 @@ await file.writeAsBytes(bytes, flush: true);
 Future<void> sendPdfToWhatsApp() async {
   final name = nameController.text.trim();
   final phone = phoneController.text.trim();
+  final price = priceController.text.trim();
 
-  // NAME VALIDATION
-  if (name.isEmpty) {
-    showMessage("Please enter customer name.");
+  // VALIDATIONS
+  if (price.isEmpty) {
+    showMessage("Please enter vehicle price.");
     return;
   }
 
-  if (name.length < 3) {
-    showMessage("Name must be at least 3 characters.");
+  // allow decimal values like 33333.0
+  if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(price)) {
+    showMessage("Enter valid price.");
     return;
   }
 
-  // PHONE VALIDATION
-  if (phone.isEmpty) {
-    showMessage("Please enter phone number.");
+  final priceValue = double.tryParse(price);
+
+  if (priceValue == null) {
+    showMessage("Invalid price.");
     return;
   }
 
-  if (!RegExp(r'^[0-9]{10}$').hasMatch(phone)) {
-    showMessage("Enter valid 10-digit phone number.");
+  if (priceValue < 10000) {
+    showMessage("Price must be at least 5 digits.");
+    return;
+  }
+
+  if (selectedBrand == null ||
+      selectedModel == null ||
+      selectedVariant == null) {
+    showMessage("Please select vehicle details.");
     return;
   }
 
   setState(() => loading = true);
 
   try {
-    // 1. Save inquiry first
+    // SAVE INQUIRY FIRST
     final inquirySaved = await saveInquiry();
+
     if (!inquirySaved) {
       setState(() => loading = false);
       return;
     }
 
-    // 2. Generate PDF
+    // CREATE PDF
     final pdf = pw.Document();
+
     final reference = referenceController.text.trim();
     final brand = brandController.text.trim();
     final model = modelController.text.trim();
@@ -373,8 +405,6 @@ Future<void> sendPdfToWhatsApp() async {
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                
-                // Header
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.all(16),
@@ -385,7 +415,7 @@ Future<void> sendPdfToWhatsApp() async {
                     ),
                   ),
                   child: pw.Text(
-                    "🚗 JITEN AUTO\nPremium Vehicle Quotation",
+                    "JITEN AUTO\nPremium Vehicle Quotation",
                     style: pw.TextStyle(
                       fontSize: 20,
                       fontWeight: pw.FontWeight.bold,
@@ -396,12 +426,13 @@ Future<void> sendPdfToWhatsApp() async {
 
                 pw.SizedBox(height: 20),
 
-                // Customer Details
                 pw.Text(
                   "Customer Details",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
+
                 pw.SizedBox(height: 8),
+
                 pw.Text("Name: $name"),
                 pw.Text("Phone: +91 $phone"),
                 pw.Text("Reference: $reference"),
@@ -409,24 +440,24 @@ Future<void> sendPdfToWhatsApp() async {
 
                 pw.SizedBox(height: 20),
 
-                // Vehicle Details
                 pw.Text(
                   "Vehicle Details",
                   style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
                 ),
+
                 pw.SizedBox(height: 8),
+
                 pw.Text("Brand: $brand"),
                 pw.Text("Model: $model"),
                 pw.Text("Variant: $variant"),
 
                 pw.SizedBox(height: 20),
 
-                // 🔥 FIXED GRADIENT SECTION
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.all(16),
                   decoration: pw.BoxDecoration(
-                    gradient: pw.LinearGradient(   // ✅ FIX HERE
+                    gradient: pw.LinearGradient(
                       colors: [
                         PdfColor.fromInt(0xFF7B1F3F),
                         PdfColor.fromInt(0xFF5A1530),
@@ -437,7 +468,6 @@ Future<void> sendPdfToWhatsApp() async {
                     ),
                   ),
                   child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.center,
                     children: [
                       pw.Text(
                         "Quoted Price",
@@ -446,7 +476,9 @@ Future<void> sendPdfToWhatsApp() async {
                           color: PdfColor.fromInt(0xFFF4DBE1),
                         ),
                       ),
+
                       pw.SizedBox(height: 6),
+
                       pw.Text(
                         "₹ $price",
                         style: pw.TextStyle(
@@ -461,14 +493,16 @@ Future<void> sendPdfToWhatsApp() async {
 
                 pw.SizedBox(height: 20),
 
-                // Footer
                 pw.Text(
                   "Thank you for your inquiry 🙏",
                   style: pw.TextStyle(fontSize: 12),
                 ),
+
                 pw.Text(
                   "Regards,\nJiten Auto Team",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                  ),
                 ),
               ],
             ),
@@ -479,41 +513,48 @@ Future<void> sendPdfToWhatsApp() async {
 
     final bytes = await pdf.save();
 
-    // 3. Save to cache
+    // SAVE PDF TO TEMP
     final cacheDir = await getTemporaryDirectory();
+
     final filePath = '${cacheDir.path}/quotation.pdf';
+
     final file = File(filePath);
+
     await file.writeAsBytes(bytes, flush: true);
 
-    // 4. Validate file
+    // VERIFY PDF
     if (!await file.exists() || await file.length() == 0) {
       showMessage('Failed to generate PDF.');
       return;
     }
 
-    // 5. Send to WhatsApp
+    // WHATSAPP MESSAGE
     final message =
         "Hello $name 👋\n\n"
         "Please find the attached quotation.\n\n"
         "Regards,\nJiten Auto Team";
 
+    // SHARE TO WHATSAPP
     await _platform.invokeMethod('shareToWhatsApp', {
       'filePath': filePath,
       'phone': phone,
       'message': message,
     });
+
+    showMessage("PDF sent successfully.");
+
     if (mounted) {
       Navigator.pop(context);
     }
 
   } catch (e) {
-    print("WHATSAPP ERROR => $e");
-    showMessage('Error: ${e.toString()}');
+    showMessage("Error: ${e.toString()}");
   } finally {
-    if (mounted) setState(() => loading = false);
+    if (mounted) {
+      setState(() => loading = false);
+    }
   }
 }
-
   Future<void> sendThankYou() async {
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
