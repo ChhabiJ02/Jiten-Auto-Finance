@@ -7,6 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:pdf/pdf.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:printing/printing.dart';
 // remove share_plus import
 
 class AddInquiryScreen extends StatefulWidget {
@@ -388,6 +390,12 @@ Future<void> sendPdfToWhatsApp() async {
 
     // CREATE PDF
     final pdf = pw.Document();
+    
+    final vehicleImage = selectedVariantPhotoUrl != null
+        ? await networkImage(
+            selectedVariantPhotoUrl!,
+          )
+        : null;
 
     final reference = referenceController.text.trim();
     final brand = brandController.text.trim();
@@ -450,6 +458,31 @@ Future<void> sendPdfToWhatsApp() async {
                 pw.Text("Brand: $brand"),
                 pw.Text("Model: $model"),
                 pw.Text("Variant: $variant"),
+
+                pw.SizedBox(height: 20),
+
+                if (vehicleImage != null)
+                  pw.Center(
+                    child: pw.Container(
+                      height: 180,
+                      width: 300,
+                      decoration: pw.BoxDecoration(
+                        borderRadius: pw.BorderRadius.circular(12),
+                        border: pw.Border.all(
+                          color: PdfColor.fromInt(0xFF7B1F3F),
+                          width: 2,
+                        ),
+                      ),
+                      child: pw.ClipRRect(
+                        horizontalRadius: 12,
+                        verticalRadius: 12,
+                        child: pw.Image(
+                          vehicleImage,
+                          fit: pw.BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                  ),
 
                 pw.SizedBox(height: 20),
 
@@ -767,7 +800,7 @@ Future<void> sendPdfToWhatsApp() async {
                           setState(() {
                             selectedVariant = val ?? '';
                             selectedVariantPhotoUrl = selected['photoUrl']; // Capture photo URL
-
+                            debugPrint("PHOTO URL: $selectedVariantPhotoUrl");
                             brandController.text = selectedBrand!;
                             modelController.text = selectedModel!;
                             variantController.text = val!;

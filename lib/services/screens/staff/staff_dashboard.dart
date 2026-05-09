@@ -1,9 +1,10 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../shared/user_settings_screen.dart';
+//import '../shared/user_settings_screen.dart';
 import 'add_inquiry_screen.dart';
 import 'edit_inquiry_screen.dart';
+import 'staff_profile_screen.dart';
 import 'service_requests_screen.dart';
 
 class StaffDashboard extends StatefulWidget {
@@ -42,7 +43,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
             onPressed: () async {
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const UserSettingsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const StaffProfileScreen(),
+                ),
               );
               await FirebaseAuth.instance.currentUser?.reload();
               if (mounted) {
