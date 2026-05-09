@@ -6,7 +6,7 @@ import 'new_vehicle_booking_screen.dart';
 import 'book_service_screen.dart';
 import 'my_appointments_screen.dart';
 import 'my_service_plan_screen.dart';
-import '../shared/user_settings_screen.dart';
+import 'customer_profile_screen.dart';
 import 'vehicle_detail_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
@@ -571,15 +571,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(searching ? Icons.close : Icons.search),
-            onPressed: toggleSearch,
-          ),
-          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const UserSettingsScreen()),
+                MaterialPageRoute(
+                  builder: (_) => const CustomerProfileScreen(),
+                ),
               );
             },
           ),

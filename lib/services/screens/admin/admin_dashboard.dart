@@ -4,7 +4,7 @@ import 'package:intl/intl.dart';
 
 import 'inquiry_list_screen.dart';
 import 'vehicle_catalog_screen.dart';
-import '../shared/user_settings_screen.dart';
+import 'admin_profile_screen.dart';
 import 'user_management_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -122,7 +122,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => const UserSettingsScreen(),
+                    builder: (_) => const AdminProfileScreen(),
                   ),
                 );
               },

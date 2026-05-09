@@ -199,10 +199,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   Future<void> _addFollowUp() async {
     final comment = followUpCommentController.text.trim();
 
-    if (comment.isEmpty) {
-      showMessage('Please enter a follow-up comment.');
-      return;
-    }
 
     final newFollowUp = {
       'date': Timestamp.fromDate(newFollowUpDate),
@@ -211,8 +207,15 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     };
 
     setState(() {
+
       followUpHistory.add(newFollowUp);
+
+      // IMPORTANT
+      // Update actual next follow-up date
+      selectedDate = newFollowUpDate;
+
       followUpCommentController.clear();
+
       newFollowUpDate = DateTime.now();
     });
   }
