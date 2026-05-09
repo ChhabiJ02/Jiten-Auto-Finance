@@ -2,6 +2,10 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:phone_state/phone_state.dart';
+import 'dart:async';
 
 class EditInquiryScreen extends StatefulWidget {
   final QueryDocumentSnapshot inquiry;
@@ -28,9 +32,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late String paymentType;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
-  late DateTime callDate;
-  late TimeOfDay callStartTime;
-  late TimeOfDay callEndTime;
+  
   bool loading = false;
   bool isClosed = false;
   bool isBooked = false;
@@ -42,6 +44,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   ];
   List<Map<String, dynamic>> followUpHistory = [];
   List<Map<String, dynamic>> callHistory = [];
+
+  DateTime? callStartedAt;
+  PhoneStateStatus? lastStatus;
+
+  StreamSubscription<PhoneState>? callSubscription;
 
   String? selectedBrand;
   String? selectedModel;
@@ -127,11 +134,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         : DateTime.now();
 
     newFollowUpDate = DateTime.now();
-    final now = DateTime.now();
-    callDate = DateTime(now.year, now.month, now.day);
-    callStartTime = TimeOfDay.fromDateTime(now);
-    callEndTime = TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5)));
-
+  
     selectedBrand = data['brand'];
     selectedModel = data['model'];
     selectedVariant = data['variant'];
@@ -194,6 +197,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     followUpCommentController.dispose();
     callDurationController.dispose();
     callNotesController.dispose();
+    callSubscription?.cancel();
     super.dispose();
   }
 
@@ -262,55 +266,111 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   }
 
   Future<void> _addCall() async {
-    final duration = callDurationController.text.trim();
-    final notes = callNotesController.text.trim();
 
-    if (duration.isEmpty) {
-      showMessage('Please enter call duration.');
-      return;
-    }
+  final duration =
+      callDurationController.text.trim();
 
-    final startDateTime = DateTime(
-      callDate.year,
-      callDate.month,
-      callDate.day,
-      callStartTime.hour,
-      callStartTime.minute,
+  final notes =
+      callNotesController.text.trim();
+
+  if (duration.isEmpty) {
+
+    showMessage(
+      'Please make a call first.',
     );
 
-    final endDateTime = DateTime(
-      callDate.year,
-      callDate.month,
-      callDate.day,
-      callEndTime.hour,
-      callEndTime.minute,
-    );
-
-    if (endDateTime.isBefore(startDateTime) ||
-        endDateTime.isAtSameMomentAs(startDateTime)) {
-      showMessage('End time must be after start time.');
-      return;
-    }
-
-    final newCall = {
-      'date': Timestamp.fromDate(DateTime(callDate.year, callDate.month, callDate.day)),
-      'startTime': Timestamp.fromDate(startDateTime),
-      'endTime': Timestamp.fromDate(endDateTime),
-      'duration': duration,
-      'notes': notes,
-      'createdAt': Timestamp.now(),
-    };
-
-    setState(() {
-      callHistory.add(newCall);
-      callDurationController.clear();
-      callNotesController.clear();
-      final now = DateTime.now();
-      callDate = DateTime(now.year, now.month, now.day);
-      callStartTime = TimeOfDay.fromDateTime(now);
-      callEndTime = TimeOfDay.fromDateTime(now.add(const Duration(minutes: 5)));
-    });
+    return;
   }
+
+  final newCall = {
+
+    'date': Timestamp.now(),
+
+    'duration': duration,
+
+    'notes': notes,
+
+    'createdAt': Timestamp.now(),
+  };
+
+  setState(() {
+
+    callHistory.add(newCall);
+
+    callDurationController.clear();
+
+    callNotesController.clear();
+  });
+
+  showMessage(
+    'Call logged successfully.',
+  );
+}
+
+  Future<void> startDirectCall() async {
+
+  final phone =
+      phoneController.text.trim();
+
+  if (phone.isEmpty) {
+
+    showMessage(
+      'Customer phone number missing.',
+    );
+
+    return;
+  }
+
+  // PERMISSION
+  await Permission.phone.request();
+
+  // SAVE START TIME
+  callStartedAt = DateTime.now();
+
+  // LISTEN CALL STATE
+  callSubscription?.cancel();
+
+  callSubscription =
+      PhoneState.stream.listen((event) async {
+
+    final status = event.status;
+
+    // CALL ENDED
+    if (
+      lastStatus == PhoneStateStatus.CALL_STARTED &&
+      status == PhoneStateStatus.CALL_ENDED
+    ) {
+
+      final callEndedAt =
+          DateTime.now();
+
+      final duration =
+          callEndedAt.difference(
+            callStartedAt!,
+          );
+
+      final durationText =
+          '${duration.inMinutes} min ${duration.inSeconds % 60} sec';
+
+      setState(() {
+
+        callDurationController.text =
+            durationText;
+      });
+
+      showMessage(
+        'Call ended. Add notes and click Log Call.',
+      );
+    }
+
+    lastStatus = status;
+  });
+
+  // START DIRECT CALL
+  await FlutterPhoneDirectCaller.callNumber(
+    phone,
+  );
+}
 
   Future<void> _saveChanges() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -1055,27 +1115,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
               return;
             }
 
-            final now = DateTime.now();
-
-            setState(() {
-
-              callDate = DateTime(
-                now.year,
-                now.month,
-                now.day,
-              );
-
-              callStartTime =
-                  TimeOfDay.fromDateTime(now);
-
-              callEndTime =
-                  TimeOfDay.fromDateTime(
-                now.add(
-                  const Duration(minutes: 5),
-                ),
-              );
-            });
-
             final Uri phoneUri = Uri(
               scheme: 'tel',
               path: phone,
@@ -1083,7 +1122,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             try {
 
-              await launchUrl(phoneUri);
+              await startDirectCall();
 
             } catch (e) {
 
@@ -1181,86 +1220,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         ),
                       ),
 
-                    Row(
-                      children: [
-
-                        const Icon(Icons.access_time, size: 20),
-
-                        const SizedBox(width: 8),
-
-                        Expanded(
-                          child: Text(
-                            'Start Time: ${callStartTime.format(context)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                        TextButton(
-                          onPressed: () async {
-
-                            final picked =
-                                await showTimePicker(
-                              context: context,
-                              initialTime: callStartTime,
-                            );
-
-                            if (picked != null) {
-
-                              setState(() {
-                                callStartTime = picked;
-                              });
-                            }
-                          },
-
-                          child: const Text('Change'),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Row(
-                      children: [
-
-                        const Icon(
-                          Icons.access_time_filled,
-                          size: 20,
-                        ),
-
-                        const SizedBox(width: 8),
-
-                        Expanded(
-                          child: Text(
-                            'End Time: ${callEndTime.format(context)}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                        TextButton(
-                          onPressed: () async {
-
-                            final picked =
-                                await showTimePicker(
-                              context: context,
-                              initialTime: callEndTime,
-                            );
-
-                            if (picked != null) {
-
-                              setState(() {
-                                callEndTime = picked;
-                              });
-                            }
-                          },
-
-                          child: const Text('Change'),
-                        ),
-                      ],
-                    ),
+                    
                     const SizedBox(height: 12),
                     TextField(
                       controller: callDurationController,
