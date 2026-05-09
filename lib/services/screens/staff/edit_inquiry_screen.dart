@@ -1,6 +1,7 @@
 ﻿import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class EditInquiryScreen extends StatefulWidget {
   final QueryDocumentSnapshot inquiry;
@@ -197,27 +198,67 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   }
 
   Future<void> _addFollowUp() async {
-    final comment = followUpCommentController.text.trim();
 
+    final comment =
+        followUpCommentController.text.trim();
+
+    // CHECK DUPLICATE DATE
+    final alreadyExists =
+        followUpHistory.any((item) {
+
+      final itemDate =
+          (item['date'] as Timestamp)
+              .toDate();
+
+      return itemDate.year ==
+              newFollowUpDate.year &&
+          itemDate.month ==
+              newFollowUpDate.month &&
+          itemDate.day ==
+              newFollowUpDate.day;
+    });
+
+    if (alreadyExists) {
+
+      showMessage(
+        'You already added follow-up for this date.',
+      );
+
+      return;
+    }
 
     final newFollowUp = {
-      'date': Timestamp.fromDate(newFollowUpDate),
+
+      'date':
+          Timestamp.fromDate(
+        newFollowUpDate,
+      ),
+
       'comment': comment,
-      'createdAt': Timestamp.now(),
+
+      'createdAt':
+          Timestamp.now(),
     };
 
     setState(() {
 
-      followUpHistory.add(newFollowUp);
+      followUpHistory
+          .add(newFollowUp);
 
-      // IMPORTANT
-      // Update actual next follow-up date
-      selectedDate = newFollowUpDate;
+      // UPDATE MAIN FOLLOW-UP DATE
+      selectedDate =
+          newFollowUpDate;
 
-      followUpCommentController.clear();
+      followUpCommentController
+          .clear();
 
-      newFollowUpDate = DateTime.now();
+      newFollowUpDate =
+          DateTime.now();
     });
+
+    showMessage(
+      'Follow-up added successfully.',
+    );
   }
 
   Future<void> _addCall() async {
@@ -401,9 +442,58 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Basic Information',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    Container(
+                      width: double.infinity,
+
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+
+                      decoration: BoxDecoration(
+
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.10),
+
+                        borderRadius:
+                            BorderRadius.circular(12),
+
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.25),
+                        ),
+                      ),
+
+                      child: Row(
+                        children: [
+
+                          Icon(
+                            Icons.person,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          Text(
+                            'Basic Information',
+
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -529,7 +619,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
 
             // Status Section
             Card(
@@ -539,11 +629,57 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Status',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                    Container(
+                      width: double.infinity,
+
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+
+                      decoration: BoxDecoration(
+
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.10),
+
+                        borderRadius:
+                            BorderRadius.circular(12),
+
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.25),
+                        ),
+                      ),
+
+                      child: Row(
+                        children: [
+
+                          Icon(
+                            Icons.person,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          Text(
+                            'Status',
+
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -587,7 +723,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
 
             Card(
               elevation: 2,
@@ -596,9 +732,58 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Add New Follow-up',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                    Container(
+                      width: double.infinity,
+
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+
+                      decoration: BoxDecoration(
+
+                        color: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withOpacity(0.10),
+
+                        borderRadius:
+                            BorderRadius.circular(12),
+
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withOpacity(0.25),
+                        ),
+                      ),
+
+                      child: Row(
+                        children: [
+
+                          Icon(
+                            Icons.person,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary,
+                          ),
+
+                          const SizedBox(width: 10),
+
+                          Text(
+                            'Add New Follow-up',
+
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .primary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -638,7 +823,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
 
             if (followUpHistory.isNotEmpty)
               Card(
@@ -772,40 +957,147 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Log Call',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-                    ),
+                    Container(
+  width: double.infinity,
+
+  padding: const EdgeInsets.symmetric(
+    horizontal: 14,
+    vertical: 12,
+  ),
+
+  decoration: BoxDecoration(
+
+    color: Theme.of(context)
+        .colorScheme
+        .primary
+        .withOpacity(0.10),
+
+    borderRadius:
+        BorderRadius.circular(12),
+
+    border: Border.all(
+      color: Theme.of(context)
+          .colorScheme
+          .primary
+          .withOpacity(0.25),
+    ),
+  ),
+
+  child: Row(
+    mainAxisAlignment:
+        MainAxisAlignment.spaceBetween,
+
+    children: [
+
+      Row(
+        children: [
+
+          Icon(
+            Icons.call,
+            color: Theme.of(context)
+                .colorScheme
+                .primary,
+          ),
+
+          const SizedBox(width: 10),
+
+          Text(
+            'Log Call',
+
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+
+              color: Theme.of(context)
+                  .colorScheme
+                  .primary,
+            ),
+          ),
+        ],
+      ),
+
+      Container(
+
+        height: 40,
+        width: 40,
+
+        decoration: BoxDecoration(
+
+          color: Theme.of(context)
+              .colorScheme
+              .primary,
+
+          borderRadius:
+              BorderRadius.circular(10),
+        ),
+
+        child: IconButton(
+
+          padding: EdgeInsets.zero,
+
+          icon: const Icon(
+            Icons.call,
+            color: Colors.white,
+            size: 18,
+          ),
+
+          onPressed: () async {
+
+            final phone =
+                phoneController.text.trim();
+
+            if (phone.isEmpty) {
+
+              showMessage(
+                'Customer phone number missing.',
+              );
+
+              return;
+            }
+
+            final now = DateTime.now();
+
+            setState(() {
+
+              callDate = DateTime(
+                now.year,
+                now.month,
+                now.day,
+              );
+
+              callStartTime =
+                  TimeOfDay.fromDateTime(now);
+
+              callEndTime =
+                  TimeOfDay.fromDateTime(
+                now.add(
+                  const Duration(minutes: 5),
+                ),
+              );
+            });
+
+            final Uri phoneUri = Uri(
+              scheme: 'tel',
+              path: phone,
+            );
+
+            try {
+
+              await launchUrl(phoneUri);
+
+            } catch (e) {
+
+              showMessage(
+                'Could not open phone dialer.',
+              );
+            }
+          },
+        ),
+      ),
+    ],
+  ),
+),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_month, size: 20),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Date: ${callDate.toString().split(' ')[0]}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: callDate,
-                              firstDate: DateTime(2020),
-                              lastDate: DateTime.now(),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                callDate = picked;
-                              });
-                            }
-                          },
-                          child: const Text('Change'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
 
                     if (callHistory.isNotEmpty)
                       Card(
@@ -891,53 +1183,80 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
                     Row(
                       children: [
+
                         const Icon(Icons.access_time, size: 20),
+
                         const SizedBox(width: 8),
+
                         Expanded(
                           child: Text(
                             'Start Time: ${callStartTime.format(context)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+
                         TextButton(
                           onPressed: () async {
-                            final picked = await showTimePicker(
+
+                            final picked =
+                                await showTimePicker(
                               context: context,
                               initialTime: callStartTime,
                             );
+
                             if (picked != null) {
+
                               setState(() {
                                 callStartTime = picked;
                               });
                             }
                           },
+
                           child: const Text('Change'),
                         ),
                       ],
                     ),
+
                     const SizedBox(height: 8),
+
                     Row(
                       children: [
-                        const Icon(Icons.access_time_filled, size: 20),
+
+                        const Icon(
+                          Icons.access_time_filled,
+                          size: 20,
+                        ),
+
                         const SizedBox(width: 8),
+
                         Expanded(
                           child: Text(
                             'End Time: ${callEndTime.format(context)}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
+
                         TextButton(
                           onPressed: () async {
-                            final picked = await showTimePicker(
+
+                            final picked =
+                                await showTimePicker(
                               context: context,
                               initialTime: callEndTime,
                             );
+
                             if (picked != null) {
+
                               setState(() {
                                 callEndTime = picked;
                               });
                             }
                           },
+
                           child: const Text('Change'),
                         ),
                       ],
@@ -974,7 +1293,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 5),
 
             if (editHistory.isNotEmpty)
               Card(
