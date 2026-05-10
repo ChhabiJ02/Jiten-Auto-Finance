@@ -7,6 +7,8 @@ import 'staff_profile_screen.dart';
 import 'service_requests_screen.dart';
 
 class StaffDashboard extends StatefulWidget {
+  const StaffDashboard({super.key});
+
   @override
   State<StaffDashboard> createState() => _StaffDashboardState();
 }

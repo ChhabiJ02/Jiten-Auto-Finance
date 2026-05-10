@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'services/screens/shared/auth_wrapper.dart';
 import 'services/cloudinary_service.dart';
 import 'services/screens/auth/login_screen.dart';
 import 'services/screens/admin/admin_dashboard.dart';
@@ -27,9 +26,9 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF7B1F3F);
-    const accentColor = Color(0xFFF4DBE1);
-    const backgroundColor = Color(0xFFF9EEF2);
+    // const primaryColor = Color(0xFF7B1F3F);
+    // const accentColor = Color(0xFFF4DBE1);
+    // const backgroundColor = Color(0xFFF9EEF2);
 
   return MaterialApp(
 
@@ -156,7 +155,7 @@ class MyApp extends StatelessWidget {
         StaffDashboard(),
 
     '/customerDashboard': (context) =>
-        const CustomerHomeScreen(),
+         CustomerDashboard(),
   },
 );
   }

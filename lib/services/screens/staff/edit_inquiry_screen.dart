@@ -567,7 +567,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: brands.contains(selectedBrand) ? selectedBrand : null,
+                      initialValue: brands.contains(selectedBrand) ? selectedBrand : null,
                       isExpanded: true,
                       hint: const Text("Select Brand"),
                       items: brands.map((b) {
@@ -592,7 +592,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: models.contains(selectedModel) ? selectedModel : null,
+                      initialValue: models.contains(selectedModel) ? selectedModel : null,
                       isExpanded: true,
                       hint: const Text("Select Model"),
                       items: models.map((m) {
@@ -615,7 +615,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: variants.any((v) => v['Name'] == selectedVariant)
+                      initialValue: variants.any((v) => v['Name'] == selectedVariant)
                           ? selectedVariant
                           : null,
                       isExpanded: true,

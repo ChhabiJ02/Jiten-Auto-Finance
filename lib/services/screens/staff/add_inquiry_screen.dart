@@ -691,7 +691,7 @@ Future<void> sendPdfToWhatsApp() async {
 
                       // 🔵 VARIANT DROPDOWN
                       DropdownButtonFormField<String>(
-                        value: selectedVariant,
+                        initialValue: selectedVariant,
                         isExpanded: true, // ✅ FIX OVERFLOW
                         hint: const Text("Select Variant"),
                         items: variants.map<DropdownMenuItem<String>>((v) {
