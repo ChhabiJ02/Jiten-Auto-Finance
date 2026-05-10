@@ -128,7 +128,12 @@ class _CustomerProfileScreenState
       // UPDATE FIRESTORE
       await FirebaseFirestore.instance
           .collection('users')
-          .doc(user.uid)
+          .doc(
+            FirebaseAuth
+                .instance
+                .currentUser!
+                .uid,
+          )
           .set(
         {
           'name': newName,
@@ -235,6 +240,20 @@ class _CustomerProfileScreenState
 
     final theme = Theme.of(context);
 
+    final user =
+      FirebaseAuth.instance.currentUser;
+
+  if (user == null) {
+
+    return const Scaffold(
+      body: Center(
+        child: Text(
+          'User not logged in.',
+        ),
+      ),
+    );
+  }
+
     return Scaffold(
 
       resizeToAvoidBottomInset: true,
@@ -248,14 +267,9 @@ class _CustomerProfileScreenState
       body: StreamBuilder<DocumentSnapshot>(
 
         stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(
-              FirebaseAuth
-                  .instance
-                  .currentUser!
-                  .uid,
-            )
-            .snapshots(),
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
 
         builder: (context, snapshot) {
 

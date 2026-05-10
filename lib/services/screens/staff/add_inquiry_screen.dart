@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:printing/printing.dart';
+import 'package:permission_handler/permission_handler.dart';
 // remove share_plus import
 
 class AddInquiryScreen extends StatefulWidget {
@@ -245,7 +246,6 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       "vehiclePhotoUrl": selectedVariantPhotoUrl,
       "price": priceController.text.trim(),
       "description": descriptionController.text.trim(),
-      "paymentType": paymentType,
       "otherDescription": otherController.text.trim(),
       "reference": referenceController.text.trim(),
       "date": selectedDate,
@@ -380,7 +380,10 @@ Future<void> sendPdfToWhatsApp() async {
   setState(() => loading = true);
 
   try {
-    // SAVE INQUIRY FIRST
+    // 1. Request permissions
+    await Permission.manageExternalStorage.request();
+    await Permission.storage.request();
+
     final inquirySaved = await saveInquiry();
 
     if (!inquirySaved) {
@@ -406,139 +409,41 @@ Future<void> sendPdfToWhatsApp() async {
 
     pdf.addPage(
       pw.Page(
-        build: (context) => pw.Container(
-          color: PdfColor.fromInt(0xFFF4DBE1),
-          child: pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                    color: PdfColor.fromInt(0xFF7B1F3F),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(12),
-                    ),
-                  ),
-                  child: pw.Text(
-                    "JITEN AUTO\nPremium Vehicle Quotation",
-                    style: pw.TextStyle(
-                      fontSize: 20,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
-                    ),
-                  ),
-                ),
-
-                pw.SizedBox(height: 20),
-
-                pw.Text(
-                  "Customer Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-
-                pw.SizedBox(height: 8),
-
-                pw.Text("Name: $name"),
-                pw.Text("Phone: +91 $phone"),
-                pw.Text("Reference: $reference"),
-                pw.Text("Date: $date"),
-
-                pw.SizedBox(height: 20),
-
-                pw.Text(
-                  "Vehicle Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-
-                pw.SizedBox(height: 8),
-
-                pw.Text("Brand: $brand"),
-                pw.Text("Model: $model"),
-                pw.Text("Variant: $variant"),
-
-                pw.SizedBox(height: 20),
-
-                if (vehicleImage != null)
-                  pw.Center(
-                    child: pw.Container(
-                      height: 180,
-                      width: 300,
-                      decoration: pw.BoxDecoration(
-                        borderRadius: pw.BorderRadius.circular(12),
-                        border: pw.Border.all(
-                          color: PdfColor.fromInt(0xFF7B1F3F),
-                          width: 2,
-                        ),
-                      ),
-                      child: pw.ClipRRect(
-                        horizontalRadius: 12,
-                        verticalRadius: 12,
-                        child: pw.Image(
-                          vehicleImage,
-                          fit: pw.BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                pw.SizedBox(height: 20),
-
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.all(16),
-                  decoration: pw.BoxDecoration(
-                    gradient: pw.LinearGradient(
-                      colors: [
-                        PdfColor.fromInt(0xFF7B1F3F),
-                        PdfColor.fromInt(0xFF5A1530),
-                      ],
-                    ),
-                    borderRadius: const pw.BorderRadius.all(
-                      pw.Radius.circular(8),
-                    ),
-                  ),
-                  child: pw.Column(
-                    children: [
-                      pw.Text(
-                        "Quoted Price",
-                        style: pw.TextStyle(
-                          fontSize: 12,
-                          color: PdfColor.fromInt(0xFFF4DBE1),
-                        ),
-                      ),
-
-                      pw.SizedBox(height: 6),
-
-                      pw.Text(
-                        "₹ $price",
-                        style: pw.TextStyle(
-                          fontSize: 28,
-                          fontWeight: pw.FontWeight.bold,
-                          color: PdfColors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                pw.SizedBox(height: 20),
-
-                pw.Text(
-                  "Thank you for your inquiry 🙏",
-                  style: pw.TextStyle(fontSize: 12),
-                ),
-
-                pw.Text(
-                  "Regards,\nJiten Auto Team",
-                  style: pw.TextStyle(
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
+        build: (context) => pw.Padding(
+          padding: const pw.EdgeInsets.all(24),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text("JITEN AUTO",
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 5),
+              pw.Text("Quotation", style: pw.TextStyle(fontSize: 18)),
+              pw.Divider(),
+              pw.SizedBox(height: 8),
+              pw.Text("Customer Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text("Name: $name"),
+              pw.Text("Mobile: $phone"),
+              pw.Text("Reference: $reference"),
+              pw.Text("Date: $date"),
+              pw.SizedBox(height: 20),
+              pw.Text("Vehicle Details",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 8),
+              pw.Text("Brand: $brand"),
+              pw.Text("Model: $model"),
+              pw.Text("Variant: $variant"),
+              pw.SizedBox(height: 10),
+              pw.Text("Price: ₹$price",
+                  style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 30),
+              pw.Text("Thank you for your inquiry.",
+                  style: pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 10),
+              pw.Text("Regards,\nJiten Auto",
+                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+            ],
           ),
         ),
       ),
@@ -546,22 +451,27 @@ Future<void> sendPdfToWhatsApp() async {
 
     final bytes = await pdf.save();
 
-    // SAVE PDF TO TEMP
-    final cacheDir = await getTemporaryDirectory();
+    // 3. Save to Downloads/JitenAuto/
+    final downloadsDir = Directory('/storage/emulated/0/Download/JitenAuto');
+    if (!await downloadsDir.exists()) {
+      await downloadsDir.create(recursive: true);
+    }
 
-    final filePath = '${cacheDir.path}/quotation.pdf';
+    final nameCleaned = name.replaceAll(' ', '_');
+    final fileName = 'Quotation_$nameCleaned.pdf';
+    final filePath = '${downloadsDir.path}/$fileName';
 
     final file = File(filePath);
 
     await file.writeAsBytes(bytes, flush: true);
 
-    // VERIFY PDF
+    // 4. Verify
     if (!await file.exists() || await file.length() == 0) {
       showMessage('Failed to generate PDF.');
       return;
     }
 
-    // WHATSAPP MESSAGE
+    // 5. Send via native Android intent
     final message =
         "Hello $name 👋\n\n"
         "Please find the attached quotation.\n\n"
