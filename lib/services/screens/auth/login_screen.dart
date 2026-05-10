@@ -96,116 +96,174 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── STEP 1 – Login button ─────────────────────────────────────────────────
   Future<void> _onLoginPressed() async {
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
 
-    if (email.isEmpty && password.isEmpty) {
-      _msg("Please enter your email and password.");
+    final email =
+        _emailCtrl.text.trim();
+
+    final password =
+        _passwordCtrl.text.trim();
+
+    if (email.isEmpty &&
+        password.isEmpty) {
+
+      _msg(
+        "Please enter your email and password.",
+      );
+
       return;
     }
+
     if (email.isEmpty) {
-      _msg("Please enter your email address.");
+
+      _msg(
+        "Please enter your email address.",
+      );
+
       return;
     }
+
     if (password.isEmpty) {
-      _msg("Please enter your password.");
+
+      _msg(
+        "Please enter your password.",
+      );
+
       return;
     }
 
     _setLoading(true);
 
     try {
-      // ── Authenticate with Firebase first ──────────────────────────────
+
+      // LOGIN
       final credential =
-          await FirebaseAuth.instance.signInWithEmailAndPassword(
+          await FirebaseAuth.instance
+              .signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      final uid = credential.user!.uid;
+      final uid =
+          credential.user!.uid;
 
-      // ── Check role in Firestore ───────────────────────────────────────
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(uid)
-          .get();
+      // GET USER DATA
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .get();
 
+      Map<String, dynamic>? data;
+
+      // IF DOC NOT FOUND
       if (!doc.exists) {
-        // Fallback: query by email field if doc keyed differently
-        final snap = await FirebaseFirestore.instance
-            .collection('users')
-            .where('email', isEqualTo: email)
-            .limit(1)
-            .get();
+
+        final snap =
+            await FirebaseFirestore.instance
+                .collection('users')
+                .where(
+                  'email',
+                  isEqualTo: email,
+                )
+                .limit(1)
+                .get();
 
         if (snap.docs.isEmpty) {
-          // No Firestore record → treat as regular user, already signed in
-          _navigateUser();
+
+          _navigateUser(
+            'customer',
+          );
+
           return;
         }
 
-        final data = snap.docs.first.data();
-        final role = (data['role'] ?? '').toString().toLowerCase();
-        _adminPhone = data['phone'];
-        if (role == 'admin') {
-          await _initiateAdminOtp(credential.user!);
-        } else {
-          _navigateUser();
-        }
-        return;
+        data =
+            snap.docs.first.data();
+
+      } else {
+
+        data = doc.data();
       }
 
-      final data = doc.data()!;
-      final role = (data['role'] ?? '').toString().toLowerCase();
-      _adminPhone = data['phone'];
+      final role =
+          (data?['role'] ?? '')
+              .toString()
+              .toLowerCase();
 
+      _adminPhone =
+          data?['phone'];
+
+      // ADMIN
       if (role == 'admin') {
 
-  Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => AdminOtpVerificationScreen(
-        adminPhoneNumber: _adminPhone ?? '',
-      ),
-    ),
-  );
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) =>
+                AdminOtpVerificationScreen(
+              adminPhoneNumber:
+                  _adminPhone ?? '',
+            ),
+          ),
+        );
 
-} else {
+      } else {
 
-  // EMAIL VERIFICATION FOR STAFF/CUSTOMER
+        // EMAIL VERIFICATION
+        await credential.user!
+            .reload();
 
-  await credential.user!.reload();
+        final updatedUser =
+            FirebaseAuth
+                .instance
+                .currentUser;
 
-  final updatedUser =
-      FirebaseAuth.instance.currentUser;
+        if (updatedUser != null &&
+            updatedUser.emailVerified) {
 
-  if (updatedUser != null &&
-      updatedUser.emailVerified) {
+          _navigateUser(role);
 
-    _navigateUser();
+        } else {
 
-  } else {
+          await updatedUser
+              ?.sendEmailVerification();
 
-    await updatedUser?.sendEmailVerification();
+          _msg(
+            "Please verify your email first. Verification link sent.",
+          );
 
-    _msg(
-      "Please verify your email first. Verification link sent.",
-    );
+          await FirebaseAuth.instance
+              .signOut();
+        }
+      }
 
-    await FirebaseAuth.instance.signOut();
-  }
-}
     } on FirebaseAuthException catch (e) {
-      debugPrint("🔥 LOGIN ERROR: ${e.code} | ${e.message}");
-      _msg(_friendlyAuthError(e.code));
+
+      debugPrint(
+        "🔥 LOGIN ERROR: ${e.code} | ${e.message}",
+      );
+
+      _msg(
+        _friendlyAuthError(
+          e.code,
+        ),
+      );
+
     } catch (e) {
-      debugPrint("🔥 UNKNOWN ERROR: $e");
-      _msg("Something went wrong. Please try again.");
+
+      debugPrint(
+        "🔥 UNKNOWN ERROR: $e",
+      );
+
+      _msg(
+        "Something went wrong. Please try again.",
+      );
+
     } finally {
+
       _setLoading(false);
     }
   }
-
   // ── STEP 2 – Send OTP to admin phone ─────────────────────────────────────
   Future<void> _initiateAdminOtp(User user) async {
     if (_adminPhone == null || _adminPhone!.isEmpty) {
@@ -294,9 +352,29 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   // ── Navigation ────────────────────────────────────────────────────────────
-  void _navigateUser() {
-    // Replace with your actual route
-    Navigator.pushReplacementNamed(context, '/customerDashboard');
+  void _navigateUser(String role) {
+
+    if (role == 'staff') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/staffDashboard',
+      );
+
+    } else if (role == 'customer') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/customerDashboard',
+      );
+
+    } else {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/',
+      );
+    }
   }
 
   void _navigateAdmin() {

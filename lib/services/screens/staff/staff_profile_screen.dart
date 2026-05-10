@@ -112,12 +112,24 @@ class _StaffProfileScreenState
 
     try {
 
-      // UPDATE AUTH EMAIL
+      // UPDATE AUTH EMAIL WITH VERIFICATION
       if (newEmail != user.email) {
 
         await user.verifyBeforeUpdateEmail(
           newEmail,
         );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Verification email sent. Please verify new email before it changes.',
+            ),
+          ),
+        );
+
+        setState(() => loading = false);
+
+        return;
       }
 
       // UPDATE DISPLAY NAME
@@ -127,16 +139,15 @@ class _StaffProfileScreenState
 
       // UPDATE FIRESTORE
       await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .set(
-        {
-          'name': newName,
-          'email': newEmail,
-          'phone': newPhone,
-        },
-        SetOptions(merge: true),
-      );
+    .collection('users')
+    .doc(user.uid)
+    .set(
+  {
+    'name': newName,
+    'phone': newPhone,
+  },
+  SetOptions(merge: true),
+);
 
       await user.reload();
 
@@ -222,9 +233,10 @@ class _StaffProfileScreenState
 
       if (mounted) {
 
-        Navigator.popUntil(
+        Navigator.pushNamedAndRemoveUntil(
           context,
-          (route) => route.isFirst,
+          '/',
+          (route) => false,
         );
       }
     }
@@ -233,7 +245,30 @@ class _StaffProfileScreenState
   @override
   Widget build(BuildContext context) {
 
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
+
+    final user =
+        FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) {
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/',
+          (route) => false,
+        );
+      });
+
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
 
@@ -249,12 +284,7 @@ class _StaffProfileScreenState
 
         stream: FirebaseFirestore.instance
             .collection('users')
-            .doc(
-              FirebaseAuth
-                  .instance
-                  .currentUser!
-                  .uid,
-            )
+            .doc(user.uid)
             .snapshots(),
 
         builder: (context, snapshot) {

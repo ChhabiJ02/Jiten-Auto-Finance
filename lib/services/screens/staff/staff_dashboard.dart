@@ -30,8 +30,26 @@ class _StaffDashboardState extends State<StaffDashboard> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) {
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/',
+          (route) => false,
+        );
+      });
+
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
     final staffName = user?.displayName?.trim().isNotEmpty == true
-        ? user!.displayName!.trim()
+        ? user.displayName!.trim()
         : (user?.email?.split('@').first ?? 'Staff');
 
     return Scaffold(
@@ -59,7 +77,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('inquiries')
-            .where('staffId', isEqualTo: user!.uid)
+            .where('staffId', isEqualTo: user.uid)
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
