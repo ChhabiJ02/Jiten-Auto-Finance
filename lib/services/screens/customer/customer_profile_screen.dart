@@ -227,9 +227,10 @@ class _CustomerProfileScreenState
 
       if (mounted) {
 
-        Navigator.popUntil(
+        Navigator.pushNamedAndRemoveUntil(
           context,
-          (route) => route.isFirst,
+          '/',
+          (route) => false,
         );
       }
     }

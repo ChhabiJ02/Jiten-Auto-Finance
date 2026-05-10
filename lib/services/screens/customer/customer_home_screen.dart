@@ -465,7 +465,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: 14,
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
@@ -484,7 +487,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                   title,
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 15,
                   ),
                   textAlign: TextAlign.center,
                   maxLines: 2,
@@ -497,11 +500,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                   subtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurface.withOpacity(0.75),
-                    fontSize: 13,
+                    fontSize: 12,
                   ),
+                  
+                  maxLines: 3,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  
                 ),
               ),
             ],
@@ -560,6 +564,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    final user =
+        FirebaseAuth.instance.currentUser;
+
+    if (user == null) {
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/',
+          (route) => false,
+        );
+      });
+
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -798,7 +823,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                           crossAxisCount: 2,
                           crossAxisSpacing: 10,
                           mainAxisSpacing: 10,
-                          childAspectRatio: 1.1,
+                          childAspectRatio: 0.92,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           children: [
