@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
+import '../auth/login_screen.dart';
+
 class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
 
@@ -26,9 +28,13 @@ class _AdminProfileScreenState
 
   @override
   void dispose() {
+
     displayNameController.dispose();
+
     emailController.dispose();
+
     phoneController.dispose();
+
     super.dispose();
   }
 
@@ -37,7 +43,19 @@ class _AdminProfileScreenState
     final user =
         FirebaseAuth.instance.currentUser;
 
-    if (user == null) return;
+    if (user == null) {
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(
+        const SnackBar(
+          content: Text(
+            'User not logged in.',
+          ),
+        ),
+      );
+
+      return;
+    }
 
     final newName =
         displayNameController.text.trim();
@@ -112,7 +130,7 @@ class _AdminProfileScreenState
 
     try {
 
-      // UPDATE AUTH EMAIL
+      // UPDATE EMAIL
       if (newEmail != user.email) {
 
         await user.verifyBeforeUpdateEmail(
@@ -150,8 +168,6 @@ class _AdminProfileScreenState
             ),
           ),
         );
-
-        setState(() {});
       }
 
     } catch (e) {
@@ -181,6 +197,7 @@ class _AdminProfileScreenState
       builder: (context) {
 
         return AlertDialog(
+
           title: const Text(
             'Confirm Logout',
           ),
@@ -193,22 +210,28 @@ class _AdminProfileScreenState
 
             TextButton(
               onPressed: () {
+
                 Navigator.pop(
                   context,
                   false,
                 );
               },
-              child: const Text('Cancel'),
+              child: const Text(
+                'Cancel',
+              ),
             ),
 
             ElevatedButton(
               onPressed: () {
+
                 Navigator.pop(
                   context,
                   true,
                 );
               },
-              child: const Text('Logout'),
+              child: const Text(
+                'Logout',
+              ),
             ),
           ],
         );
@@ -220,41 +243,52 @@ class _AdminProfileScreenState
       await FirebaseAuth.instance
           .signOut();
 
-      if (mounted) {
+      if (!mounted) return;
 
-        Navigator.popUntil(
-          context,
-          (route) => route.isFirst,
-        );
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) =>
+              const LoginScreen(),
+        ),
+        (route) => false,
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
 
-    final theme = Theme.of(context);
+    final theme =
+        Theme.of(context);
+
+    final currentUser =
+        FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null) {
+
+      return const LoginScreen();
+    }
 
     return Scaffold(
 
       resizeToAvoidBottomInset: true,
 
       appBar: AppBar(
-        title: const Text('Admin Profile'),
+        title: const Text(
+          'Admin Profile',
+        ),
+
         backgroundColor:
             theme.colorScheme.primary,
       ),
 
-      body: StreamBuilder<DocumentSnapshot>(
+      body:
+          StreamBuilder<DocumentSnapshot>(
 
-        stream: FirebaseFirestore.instance
+        stream: FirebaseFirestore
+            .instance
             .collection('users')
-            .doc(
-              FirebaseAuth
-                  .instance
-                  .currentUser!
-                  .uid,
-            )
+            .doc(currentUser.uid)
             .snapshots(),
 
         builder: (context, snapshot) {
@@ -280,7 +314,6 @@ class _AdminProfileScreenState
           final firestorePhone =
               data?['phone'] ?? '';
 
-          // LIVE UPDATE CONTROLLERS
           displayNameController.text =
               firestoreName;
 
@@ -347,13 +380,13 @@ class _AdminProfileScreenState
                         ),
 
                         TextField(
-
                           controller:
                               displayNameController,
 
                           decoration:
                               const InputDecoration(
-                            labelText: 'Admin Name',
+                            labelText:
+                                'Admin Name',
                           ),
                         ),
 
@@ -362,7 +395,6 @@ class _AdminProfileScreenState
                         ),
 
                         TextField(
-
                           controller:
                               emailController,
 
@@ -372,7 +404,8 @@ class _AdminProfileScreenState
 
                           decoration:
                               const InputDecoration(
-                            labelText: 'Admin Email',
+                            labelText:
+                                'Admin Email',
                           ),
                         ),
 
@@ -381,7 +414,6 @@ class _AdminProfileScreenState
                         ),
 
                         TextField(
-
                           controller:
                               phoneController,
 
@@ -390,7 +422,8 @@ class _AdminProfileScreenState
 
                           decoration:
                               const InputDecoration(
-                            labelText: 'Admin Phone',
+                            labelText:
+                                'Admin Phone',
                           ),
                         ),
                       ],
@@ -454,7 +487,9 @@ class _AdminProfileScreenState
                   ),
 
                   child:
-                      const Text('Logout'),
+                      const Text(
+                    'Logout',
+                  ),
                 ),
 
                 const SizedBox(

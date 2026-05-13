@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../auth/login_screen.dart';
 
 class StaffProfileScreen extends StatefulWidget {
   const StaffProfileScreen({super.key});
@@ -228,17 +229,16 @@ class _StaffProfileScreenState
 
     if (shouldLogout == true) {
 
-      await FirebaseAuth.instance
-          .signOut();
+      await FirebaseAuth.instance.signOut();
 
-      if (mounted) {
+      if (!mounted) return;
 
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/',
-          (route) => false,
-        );
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ),
+        (route) => false,
+      );
     }
   }
 

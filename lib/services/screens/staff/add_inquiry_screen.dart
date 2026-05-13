@@ -249,11 +249,16 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       "otherDescription": otherController.text.trim(),
       "reference": referenceController.text.trim(),
       "date": selectedDate,
+
+      // ✅ IMPORTANT FOR STAFF TRANSFER
       "staffId": user.uid,
+      "assignedTo": user.uid,
       "createdBy": user.uid,
+
       "createdAt": Timestamp.now(),
       "status": "New Inquiry",
       "paymentType": paymentType,
+
       if (followUpDate != null)
         "nextFollowUp": Timestamp.fromDate(followUpDate!),
     });
@@ -691,7 +696,7 @@ Future<void> sendPdfToWhatsApp() async {
 
                       // 🔵 VARIANT DROPDOWN
                       DropdownButtonFormField<String>(
-                        value: selectedVariant,
+                        initialValue: selectedVariant,
                         isExpanded: true, // ✅ FIX OVERFLOW
                         hint: const Text("Select Variant"),
                         items: variants.map<DropdownMenuItem<String>>((v) {
