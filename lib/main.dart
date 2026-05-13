@@ -12,10 +12,10 @@ void main() async {
   
   // Initialize Cloudinary with your credentials
   CloudinaryService.initialize(
-    cloudName: 'YOUR_CLOUD_NAME', // Replace with your Cloudinary cloud name
-    uploadPreset: 'YOUR_UPLOAD_PRESET', // Replace with your upload preset
-    apiKey: 'YOUR_API_KEY', // Optional: for deletions
-    apiSecret: 'YOUR_API_SECRET', // Optional: for deletions
+    cloudName: 'dzgudsmu8',
+    uploadPreset: 'showroom_upload',
+    apiKey: '551463428811977',
+    apiSecret: '6V9O6AzisHCDLFeQeRqwTeJJUrQ',
   );
   
   runApp(const MyApp());
@@ -155,7 +155,7 @@ class MyApp extends StatelessWidget {
         StaffDashboard(),
 
     '/customerDashboard': (context) =>
-         CustomerDashboard(),
+         CustomerHomeScreen(),
   },
 );
   }
