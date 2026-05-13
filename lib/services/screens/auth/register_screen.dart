@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'dart:math';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -16,11 +14,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final phoneController = TextEditingController();
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
-  final otpController = TextEditingController();
 
   bool loading = false;
-  bool otpSent = false;
-  String _generatedOtp = '';
+  bool emailVerificationSent = false;
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -28,14 +24,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  // Generate 6-digit OTP
-  String _generateOTP() {
-    final rand = Random();
-    return (100000 + rand.nextInt(900000)).toString();
-  }
-
-  // STEP 1: Send OTP via WhatsApp
-  Future<void> sendOTP() async {
+  // STEP 1: Register and send email verification
+  Future<void> registerAndSendVerification() async {
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
     final email = emailController.text.trim();
@@ -54,77 +44,89 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => loading = true);
 
     try {
-      _generatedOtp = _generateOTP();
-
-      final message =
-          "Hello $name 👋\n\n"
-          "Your OTP for Jiten Auto registration is:\n\n"
-          "🔐 *$_generatedOtp*\n\n"
-          "This OTP is valid for 5 minutes.\n"
-          "Do not share this with anyone.\n\n"
-          "Regards,\nJiten Auto Team";
-
-      final url = Uri.parse(
-        "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
-      );
-
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-
-      setState(() {
-        otpSent = true;
-        loading = false;
-      });
-
-      showMessage('OTP sent via WhatsApp. Enter it below.');
-    } catch (e) {
-      setState(() => loading = false);
-      showMessage('Failed to open WhatsApp.');
-    }
-  }
-
-  // STEP 2: Verify OTP and Register
-  Future<void> verifyAndRegister() async {
-    final enteredOtp = otpController.text.trim();
-
-    if (enteredOtp.isEmpty) {
-      showMessage('Please enter OTP.');
-      return;
-    }
-
-    if (enteredOtp != _generatedOtp) {
-      showMessage('Invalid OTP. Please try again.');
-      return;
-    }
-
-    setState(() => loading = true);
-
-    try {
       // Create Firebase Email/Password account
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
+        email: email,
+        password: password,
       );
 
-      // Save to Firestore
+      // Send email verification
+      await userCredential.user!.sendEmailVerification();
+
+      // Save to Firestore (pending verification)
       await FirebaseFirestore.instance
           .collection('users')
           .doc(userCredential.user!.uid)
           .set({
-        "name": nameController.text.trim(),
-        "phone": phoneController.text.trim(),
-        "email": emailController.text.trim(),
+        "uid": userCredential.user!.uid,
+        "name": name,
+        "phone": phone,
+        "email": email,
         "role": "customer",
+        "emailVerified": false,
         "createdAt": Timestamp.now(),
       });
 
-      if (!mounted) return;
-      showMessage('Registered Successfully!');
-      Navigator.pop(context);
+      setState(() {
+        emailVerificationSent = true;
+        loading = false;
+      });
+
+      showMessage('Verification email sent! Please check your inbox.');
+    } catch (e) {
+      setState(() => loading = false);
+      showMessage(e.toString());
+    }
+  }
+
+  // STEP 2: Check if email is verified
+  Future<void> checkEmailVerified() async {
+    setState(() => loading = true);
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user == null) {
+        showMessage('No user found. Please register again.');
+        setState(() => loading = false);
+        return;
+      }
+
+      // Reload user to get latest verification status
+      await user.reload();
+      final refreshedUser = FirebaseAuth.instance.currentUser;
+
+      if (refreshedUser != null && refreshedUser.emailVerified) {
+        // Update Firestore emailVerified flag
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(refreshedUser.uid)
+            .update({"emailVerified": true});
+
+        if (!mounted) return;
+        showMessage('Email verified! Registration complete.');
+        Navigator.pop(context);
+      } else {
+        showMessage('Email not verified yet. Please check your inbox.');
+      }
     } catch (e) {
       showMessage(e.toString());
     } finally {
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  // Resend verification email
+  Future<void> resendVerificationEmail() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null && !user.emailVerified) {
+        await user.sendEmailVerification();
+        showMessage('Verification email resent!');
+      }
+    } catch (e) {
+      showMessage('Failed to resend: ${e.toString()}');
     }
   }
 
@@ -134,7 +136,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     phoneController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    otpController.dispose();
     super.dispose();
   }
 
@@ -172,114 +173,123 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           style: TextStyle(
                               fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      const Text(
-                        "Verify your phone via WhatsApp OTP",
+                      Text(
+                        emailVerificationSent
+                            ? "A verification link has been sent to your email"
+                            : "Register with your email address",
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54),
+                        style: const TextStyle(color: Colors.black54),
                       ),
                       const SizedBox(height: 28),
 
-                      // Name
-                      TextField(
-                        controller: nameController,
-                        enabled: !otpSent,
-                        decoration: _inputStyle("Full Name", Icons.person_outline),
-                      ),
-                      const SizedBox(height: 16),
+                      if (!emailVerificationSent) ...[
+                        // Name
+                        TextField(
+                          controller: nameController,
+                          decoration:
+                              _inputStyle("Full Name", Icons.person_outline),
+                        ),
+                        const SizedBox(height: 16),
 
-                      // Phone
-                      TextField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        maxLength: 10,
-                        enabled: !otpSent,
-                        decoration: _inputStyle("Phone Number (10 digits)", Icons.phone_outlined),
-                      ),
-                      const SizedBox(height: 16),
+                        // Phone
+                        TextField(
+                          controller: phoneController,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 10,
+                          decoration: _inputStyle(
+                              "Phone Number (10 digits)", Icons.phone_outlined),
+                        ),
+                        const SizedBox(height: 16),
 
-                      // Email
-                      TextField(
-                        controller: emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        enabled: !otpSent,
-                        decoration: _inputStyle("Email", Icons.email_outlined),
-                      ),
-                      const SizedBox(height: 16),
+                        // Email
+                        TextField(
+                          controller: emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          decoration:
+                              _inputStyle("Email", Icons.email_outlined),
+                        ),
+                        const SizedBox(height: 16),
 
-                      // Password
-                      TextField(
-                        controller: passwordController,
-                        obscureText: true,
-                        enabled: !otpSent,
-                        decoration: _inputStyle("Password", Icons.lock_outline),
-                      ),
-                      const SizedBox(height: 16),
+                        // Password
+                        TextField(
+                          controller: passwordController,
+                          obscureText: true,
+                          decoration:
+                              _inputStyle("Password", Icons.lock_outline),
+                        ),
+                        const SizedBox(height: 24),
 
-                      // OTP Field (shown after OTP sent)
-                      if (otpSent) ...[
+                        // Register Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed:
+                                loading ? null : registerAndSendVerification,
+                            style: ElevatedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                            child: loading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text("Register"),
+                          ),
+                        ),
+                      ] else ...[
+                        // Email verification pending UI
                         Container(
-                          padding: const EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: Colors.blue.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.shade200),
+                            border: Border.all(color: Colors.blue.shade200),
                           ),
                           child: Row(
                             children: const [
-                              Icon(Icons.chat, color: Colors.green),
-                              SizedBox(width: 8),
+                              Icon(Icons.mark_email_unread_outlined,
+                                  color: Colors.blue),
+                              SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'OTP sent via WhatsApp. Check your messages.',
-                                  style: TextStyle(color: Colors.green, fontSize: 13),
+                                  'Check your inbox and click the verification link, then tap "I have Verified" below.',
+                                  style: TextStyle(
+                                      color: Colors.blue, fontSize: 13),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: otpController,
-                          keyboardType: TextInputType.number,
-                          maxLength: 6,
-                          decoration: _inputStyle("Enter 6-digit OTP", Icons.lock_clock_outlined),
+                        const SizedBox(height: 20),
+
+                        // I've Verified Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: loading ? null : checkEmailVerified,
+                            icon: const Icon(Icons.verified_outlined),
+                            label: loading
+                                ? const CircularProgressIndicator(
+                                    color: Colors.white)
+                                : const Text("I've Verified My Email"),
+                            style: ElevatedButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                            ),
+                          ),
                         ),
                         const SizedBox(height: 8),
-                        // Resend OTP
+
+                        // Resend email
                         TextButton.icon(
-                          onPressed: () {
-                            setState(() => otpSent = false);
-                            otpController.clear();
-                          },
+                          onPressed: resendVerificationEmail,
                           icon: const Icon(Icons.refresh),
-                          label: const Text("Resend OTP"),
+                          label: const Text("Resend Verification Email"),
                         ),
                       ],
-
-                      const SizedBox(height: 16),
-
-                      // Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: loading
-                              ? null
-                              : otpSent
-                                  ? verifyAndRegister
-                                  : sendOTP,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
-                          ),
-                          child: loading
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white)
-                              : Text(otpSent
-                                  ? "Verify & Register"
-                                  : "Send OTP via WhatsApp"),
-                        ),
-                      ),
                     ],
                   ),
                 ),
