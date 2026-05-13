@@ -11,21 +11,23 @@ class UserManagementScreen extends StatefulWidget {
 class _UserManagementScreenState extends State<UserManagementScreen> {
   final roles = ['customer', 'staff', 'admin', 'workshop'];
 
+  // Temporary selected roles
+  final Map<String, String> selectedRoles = {};
+
   Future<void> updateRole(String userId, String newRole) async {
     await FirebaseFirestore.instance.collection('users').doc(userId).update({
       'role': newRole,
-      // 🔑 Triggers auto-logout on user's device via their session listener
       'roleUpdatedAt': Timestamp.now(),
     });
   }
 
   Future<void> deleteUser(String userId) async {
-    // 🔑 Mark as disabled first — user's device detects this and logs out
     await FirebaseFirestore.instance.collection('users').doc(userId).update({
       'isDisabled': true,
     });
-    // Small delay to allow the user's listener to trigger before doc is gone
+
     await Future.delayed(const Duration(seconds: 2));
+
     await FirebaseFirestore.instance.collection('users').doc(userId).delete();
   }
 
@@ -35,6 +37,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
+
       final staffId = data['staffId'];
       final createdBy = data['createdBy'];
       final assignedTo = data['assignedTo'];
@@ -47,6 +50,85 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         });
       }
     }
+  }
+
+  void confirmRoleChange({
+    required String userId,
+    required String userName,
+    required String oldRole,
+    required String newRole,
+  }) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Confirm Role Change"),
+
+        content: RichText(
+          text: TextSpan(
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 16,
+            ),
+            children: [
+              const TextSpan(text: "Are you sure you want to change "),
+              TextSpan(
+                text: userName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const TextSpan(text: "'s role from "),
+              TextSpan(
+                text: oldRole.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.red,
+                ),
+              ),
+              const TextSpan(text: " to "),
+              TextSpan(
+                text: newRole.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+              const TextSpan(text: "?"),
+            ],
+          ),
+        ),
+
+        actions: [
+          TextButton(
+            onPressed: () {
+              setState(() {
+                selectedRoles[userId] = oldRole;
+              });
+
+              Navigator.pop(context);
+            },
+            child: const Text("Cancel"),
+          ),
+
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+
+              await updateRole(userId, newRole);
+
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    "$userName role updated to ${newRole.toUpperCase()}",
+                  ),
+                ),
+              );
+            },
+            child: const Text("Save"),
+          ),
+        ],
+      ),
+    );
   }
 
   void confirmDelete(String userId, String name, String role) async {
@@ -63,13 +145,20 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
               onPressed: () async {
                 Navigator.pop(context);
+
                 await deleteUser(userId);
+
                 if (!mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("User deleted")),
+                  const SnackBar(
+                    content: Text("User deleted"),
+                  ),
                 );
               },
               child: const Text("Delete"),
@@ -77,125 +166,339 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ],
         ),
       );
+
       return;
     }
 
-    // STAFF/ADMIN/WORKSHOP — fetch other staff for transfer
-    final staffSnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('role', whereIn: ['staff', 'admin', 'workshop'])
-        .get();
+    // =========================
+    // STAFF DELETE
+    // =========================
+    if (role == 'staff' || role == 'workshop') {
+      final staffSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', whereIn: ['staff', 'workshop'])
+          .get();
 
-    final staffList =
-        staffSnapshot.docs.where((doc) => doc.id != userId).toList();
+      final staffList =
+          staffSnapshot.docs.where((doc) => doc.id != userId).toList();
 
-    String? selectedStaffId;
+      if (staffList.isEmpty) {
+        if (!mounted) return;
 
-    if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("No Staff Available"),
+            content: const Text(
+              "There is no other staff/workshop account available to transfer leads.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
 
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Reassign & Delete"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text("Transfer all leads of $name to:"),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              hint: const Text("Select Staff"),
-              items: staffList.map((doc) {
-                final data = doc.data();
-                return DropdownMenuItem(
-                  value: doc.id,
-                  child: Text(data['name'] ?? 'No Name'),
+        return;
+      }
+
+      String? selectedStaffId;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Transfer Leads & Delete"),
+
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Transfer all leads of $name to:"),
+
+              const SizedBox(height: 10),
+
+              DropdownButtonFormField<String>(
+                hint: const Text("Select Staff"),
+
+                items: staffList.map((doc) {
+                  final data = doc.data();
+
+                  return DropdownMenuItem(
+                    value: doc.id,
+                    child: Text(data['name'] ?? 'No Name'),
+                  );
+                }).toList(),
+
+                onChanged: (value) => selectedStaffId = value,
+              ),
+            ],
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: () async {
+                if (selectedStaffId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Select a staff first"),
+                    ),
+                  );
+
+                  return;
+                }
+
+                Navigator.pop(context);
+
+                await transferInquiries(userId, selectedStaffId!);
+
+                await deleteUser(userId);
+
+                if (!mounted) return;
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      "User deleted & leads transferred",
+                    ),
+                  ),
                 );
-              }).toList(),
-              onChanged: (value) => selectedStaffId = value,
+              },
+              child: const Text("Confirm"),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+      );
+
+      return;
+    }
+
+    // =========================
+    // ADMIN DELETE
+    // =========================
+    if (role == 'admin') {
+      final adminSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'admin')
+          .get();
+
+      final adminList =
+          adminSnapshot.docs.where((doc) => doc.id != userId).toList();
+
+      // No other admin
+      if (adminList.isEmpty) {
+        if (!mounted) return;
+
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text("No Admin Available"),
+            content: const Text(
+              "This admin account cannot be deleted because no other admin account exists.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () async {
-              if (selectedStaffId == null) {
+        );
+
+        return;
+      }
+
+      String? selectedAdminId;
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text("Transfer Leads To Another Admin"),
+
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text("Transfer all leads of $name to:"),
+
+              const SizedBox(height: 10),
+
+              DropdownButtonFormField<String>(
+                hint: const Text("Select Admin"),
+
+                items: adminList.map((doc) {
+                  final data = doc.data();
+
+                  return DropdownMenuItem(
+                    value: doc.id,
+                    child: Text(data['name'] ?? 'No Name'),
+                  );
+                }).toList(),
+
+                onChanged: (value) => selectedAdminId = value,
+              ),
+            ],
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+              ),
+              onPressed: () async {
+                if (selectedAdminId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Select an admin first"),
+                    ),
+                  );
+
+                  return;
+                }
+
+                Navigator.pop(context);
+
+                await transferInquiries(userId, selectedAdminId!);
+
+                await deleteUser(userId);
+
+                if (!mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Select a staff first")),
+                  const SnackBar(
+                    content: Text(
+                      "Admin deleted & leads transferred",
+                    ),
+                  ),
                 );
-                return;
-              }
-              Navigator.pop(context);
-              await transferInquiries(userId, selectedStaffId!);
-              await deleteUser(userId);
-              if (!mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("User deleted & leads reassigned"),
-                ),
-              );
-            },
-            child: const Text("Confirm"),
-          ),
-        ],
-      ),
-    );
+              },
+              child: const Text("Confirm"),
+            ),
+          ],
+        ),
+      );
+
+      return;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Users")),
+      appBar: AppBar(
+        title: const Text("Manage Users"),
+      ),
+
       body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('users').snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .snapshots(),
+
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
           }
 
           final users = snapshot.data!.docs;
 
           return ListView.builder(
             itemCount: users.length,
+
             itemBuilder: (context, index) {
               final doc = users[index];
+
               final data = doc.data() as Map<String, dynamic>;
+
               final name = data['name'] ?? 'No Name';
               final email = data['email'] ?? '';
-              String role = data['role'] ?? 'customer';
+
+              final currentRole = data['role'] ?? 'customer';
+
+              selectedRoles.putIfAbsent(
+                doc.id,
+                () => currentRole,
+              );
 
               return Card(
                 margin: const EdgeInsets.all(10),
+
                 child: ListTile(
-                  title: Text(name),
+                  contentPadding: const EdgeInsets.all(12),
+
+                  title: Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      const SizedBox(height: 5),
+
                       Text(email),
-                      const SizedBox(height: 6),
+
+                      const SizedBox(height: 10),
+
                       DropdownButton<String>(
-                        value: role,
-                        items: roles.map((r) {
+                        isExpanded: true,
+                        value: selectedRoles[doc.id],
+
+                        items: roles.map((role) {
                           return DropdownMenuItem(
-                            value: r,
-                            child: Text(r.toUpperCase()),
+                            value: role,
+                            child: Text(role.toUpperCase()),
                           );
                         }).toList(),
-                        onChanged: (value) async {
-                          if (value != null) {
-                            await updateRole(doc.id, value);
+
+                        onChanged: (value) {
+                          if (value != null &&
+                              value != currentRole) {
+                            setState(() {
+                              selectedRoles[doc.id] = value;
+                            });
+
+                            confirmRoleChange(
+                              userId: doc.id,
+                              userName: name,
+                              oldRole: currentRole,
+                              newRole: value,
+                            );
                           }
                         },
                       ),
                     ],
                   ),
+
                   trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => confirmDelete(doc.id, name, role),
+                    icon: const Icon(
+                      Icons.delete,
+                      color: Colors.red,
+                    ),
+                    onPressed: () => confirmDelete(
+                      doc.id,
+                      name,
+                      currentRole,
+                    ),
                   ),
                 ),
               );
