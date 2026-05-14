@@ -2,28 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+// import 'dart:async';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
 import 'register_screen.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FLOW OVERVIEW
-//
-//  1. User enters email + password → taps Login
-//  2. Check Firestore: users/{uid} or users collection where email == input
-//     • If doc has  role == "admin"  →  trigger SMS OTP panel
-//       - signInWithEmailAndPassword first (to verify password via Firebase)
-//       - Then send OTP to admin's phone (stored in Firestore doc)
-//       - Verify OTP panel shown
-//       - On success → navigate to AdminDashboard (replace route name below)
-//     • Otherwise → normal Firebase email/password sign-in
-//       - On success → navigate to HomeScreen (replace route name below)
-//
-//  Firestore user document shape expected:
-//  {
-//    "email": "admin@example.com",
-//    "role": "admin",           // "admin" | "user"
-//    "phone": "+919876543210"   // required for admin SMS OTP
-//  }
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Cloudflare Worker Config ──────────────────────────────────────────────────
+// Step 1: Replace with your Worker URL after Cloudflare deployment
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -46,11 +31,6 @@ class _LoginScreenState extends State<LoginScreen>
   // ── state ────────────────────────────────────────────────────────────────
   bool _loading = false;
   bool _obscurePassword = true;
-  bool _showOtpPanel = false;
-
-  String? _verificationId;
-  String? _adminPhone;
-  int? _resendToken;
 
   late AnimationController _slideCtrl;
   late Animation<Offset> _slideAnim;
@@ -101,222 +81,148 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _setLoading(bool v) => setState(() => _loading = v);
 
-  // ── STEP 1 – Login button ─────────────────────────────────────────────────
+  // ── Login Button ──────────────────────────────────────────────────────────
   Future<void> _onLoginPressed() async {
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
 
-    if (email.isEmpty && password.isEmpty) {
-      _msg("Please enter your email and password.");
-      return;
-    }
-    if (email.isEmpty) {
-      _msg("Please enter your email address.");
-      return;
-    }
-    if (password.isEmpty) {
-      _msg("Please enter your password.");
-      return;
-    }
+  final email = _emailCtrl.text.trim();
+  final password = _passwordCtrl.text.trim();
 
-    _setLoading(true);
+  if (email.isEmpty && password.isEmpty) {
+    _msg("Please enter your email and password.");
+    return;
+  }
 
-    try {
-      // ── Authenticate with Firebase first ──────────────────────────────
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+  if (email.isEmpty) {
+    _msg("Please enter your email address.");
+    return;
+  }
 
-      final uid = credential.user!.uid;
+  if (password.isEmpty) {
+    _msg("Please enter your password.");
+    return;
+  }
 
-      // ── Check role in Firestore ───────────────────────────────────────
-      final doc = await FirebaseFirestore.instance
+  _setLoading(true);
+
+  try {
+
+    final credential =
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final uid = credential.user!.uid;
+
+    Map<String, dynamic>? data;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    if (doc.exists) {
+
+      data = doc.data();
+
+    } else {
+
+      final snap = await FirebaseFirestore.instance
           .collection('users')
-          .doc(uid)
+          .where('email', isEqualTo: email)
+          .limit(1)
           .get();
 
-      if (!doc.exists) {
-        // Fallback: query by email field if doc keyed differently
-        final snap = await FirebaseFirestore.instance
-            .collection('users')
-            .where('email', isEqualTo: email)
-            .limit(1)
-            .get();
-
-        if (snap.docs.isEmpty) {
-          // No Firestore record → treat as regular user, already signed in
-          _navigateUser();
-          return;
-        }
-
-        final data = snap.docs.first.data();
-        final role = (data['role'] ?? '').toString().toLowerCase();
-        _adminPhone = data['phone'];
-        if (role == 'admin') {
-          await _initiateAdminOtp(credential.user!);
-        } else {
-          _navigateUser();
-        }
-        return;
+      if (snap.docs.isNotEmpty) {
+        data = snap.docs.first.data();
       }
-
-      final data = doc.data()!;
-      final role = (data['role'] ?? '').toString().toLowerCase();
-      _adminPhone = data['phone'];
-
-      // if (role == 'admin') {
-      //   Navigator.push(
-      //     context,
-      //     MaterialPageRoute(
-      //       builder: (_) =>
-      //           AdminOtpVerificationScreen(adminPhoneNumber: _adminPhone ?? ''),
-      //     ),
-      //   );
-      // }
-      if (role == 'admin') {
-        await _initiateAdminOtp(credential.user!);
-      }
-      else {
-        // EMAIL VERIFICATION FOR STAFF/CUSTOMER
-
-        await credential.user!.reload();
-
-        final updatedUser = FirebaseAuth.instance.currentUser;
-
-        if (updatedUser != null && updatedUser.emailVerified) {
-          _navigateUser();
-        } else {
-          await updatedUser?.sendEmailVerification();
-
-          _msg("Please verify your email first. Verification link sent.");
-
-          await FirebaseAuth.instance.signOut();
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      debugPrint("🔥 LOGIN ERROR: ${e.code} | ${e.message}");
-      _msg(_friendlyAuthError(e.code));
-    } catch (e) {
-      debugPrint("🔥 UNKNOWN ERROR: $e");
-      _msg("Something went wrong. Please try again.");
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // ── STEP 2 – Send OTP to admin phone ─────────────────────────────────────
-  Future<void> _initiateAdminOtp(User user) async {
-    if (_adminPhone == null || _adminPhone!.isEmpty) {
-      _msg("Admin phone number not configured in database.");
-      await FirebaseAuth.instance.signOut();
-      return;
     }
 
-    _setLoading(true);
+    final role =
+        (data?['role'] ?? '')
+            .toString()
+            .toLowerCase();
 
-    await FirebaseAuth.instance.verifyPhoneNumber(
-      phoneNumber: _adminPhone!,
-      forceResendingToken: _resendToken,
-      timeout: const Duration(seconds: 60),
-      verificationCompleted: (PhoneAuthCredential cred) async {
-        // Auto-retrieval on Android
-        await _completeAdminLogin(cred);
-      },
-      verificationFailed: (FirebaseAuthException e) {
-        debugPrint("📵 OTP send failed: ${e.code} | ${e.message}");
-        _msg("Failed to send OTP: ${e.message ?? e.code}");
-        _setLoading(false);
-      },
-      codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _verificationId = verificationId;
-          _resendToken = resendToken;
-          _showOtpPanel = true;
-          _loading = false;
-        });
+    // ADMIN LOGIN
+    if (role == 'admin') {
+
+      _navigateAdmin();
+
+    } else {
+
+      await credential.user!.reload();
+
+      final updatedUser =
+          FirebaseAuth.instance.currentUser;
+
+      if (updatedUser != null &&
+          updatedUser.emailVerified) {
+
+        _navigateUser(role);
+
+      } else {
+
+        await updatedUser?.sendEmailVerification();
+
         _msg(
-          "OTP sent to ${_adminPhone!.replaceRange(3, _adminPhone!.length - 2, '••••••')}",
-          error: false,
+          "Please verify your email first. Verification link sent.",
         );
-      },
-      codeAutoRetrievalTimeout: (String verificationId) {
-        _verificationId = verificationId;
-      },
-    );
-  }
 
-  // ── STEP 3 – Verify OTP ───────────────────────────────────────────────────
-  Future<void> _onVerifyOtp() async {
-    final otp = _otpCtrls.map((c) => c.text).join();
-    if (otp.length < 6) {
-      _msg("Please enter the complete 6-digit OTP.");
-      return;
-    }
-    if (_verificationId == null) {
-      _msg("Verification session expired. Please try again.");
-      return;
-    }
-
-    _setLoading(true);
-
-    try {
-      final cred = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: otp,
-      );
-      await _completeAdminLogin(cred);
-    } on FirebaseAuthException catch (e) {
-      debugPrint("📵 OTP verify error: ${e.code}");
-      _msg(
-        e.code == 'invalid-verification-code'
-            ? "Invalid OTP. Please check and try again."
-            : (e.message ?? "OTP verification failed."),
-      );
-    } catch (e) {
-      _msg("Something went wrong.");
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  Future<void> _completeAdminLogin(PhoneAuthCredential cred) async {
-    // Link phone credential to the already-signed-in admin account
-    try {
-      await FirebaseAuth.instance.currentUser?.linkWithCredential(cred);
-    } on FirebaseAuthException catch (e) {
-      // credential-already-in-use is fine – already linked
-      if (e.code != 'credential-already-in-use' &&
-          e.code != 'provider-already-linked') {
-        rethrow;
+        await FirebaseAuth.instance.signOut();
       }
     }
-    _navigateAdmin();
-  }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-  void _navigateUser() {
-    // Replace with your actual route
-    Navigator.pushReplacementNamed(context, '/home');
+  } on FirebaseAuthException catch (e) {
+
+    _msg(_friendlyAuthError(e.code));
+
+  } catch (e) {
+
+    debugPrint("LOGIN ERROR: $e");
+
+    _msg(
+      "Something went wrong. Please try again.",
+    );
+
+  } finally {
+
+    _setLoading(false);
+  }
+}
+
+  void _navigateUser(String role) {
+
+    if (role == 'staff') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/staffDashboard',
+      );
+
+    } else if (role == 'customer') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/customerDashboard',
+      );
+
+    } else {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/',
+      );
+    }
   }
 
   void _navigateAdmin() {
-    // Replace with your actual admin route
-    Navigator.pushReplacementNamed(context, '/admin');
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/adminDashboard',
+    );
   }
 
-  // ── Resend OTP ────────────────────────────────────────────────────────────
-  Future<void> _resendOtp() async {
-    if (FirebaseAuth.instance.currentUser == null) return;
-    setState(() {
-      for (final c in _otpCtrls) {
-        c.clear();
-      }
-    });
-    await _initiateAdminOtp(FirebaseAuth.instance.currentUser!);
-  }
-
-  // ── Auth error → human text ───────────────────────────────────────────────
   String _friendlyAuthError(String code) {
     switch (code) {
       case 'user-not-found':
@@ -379,37 +285,17 @@ class _LoginScreenState extends State<LoginScreen>
                             child: child,
                           ),
                         ),
-                        child: _showOtpPanel
-                            ? _OtpPanel(
-                                key: const ValueKey('otp'),
-                                phone: _adminPhone ?? '',
-                                otpCtrls: _otpCtrls,
-                                otpFocus: _otpFocus,
-                                loading: _loading,
-                                onVerify: _onVerifyOtp,
-                                onResend: _resendOtp,
-                                onBack: () async {
-                                  await FirebaseAuth.instance.signOut();
-                                  setState(() {
-                                    _showOtpPanel = false;
-                                    for (final c in _otpCtrls) {
-                                      c.clear();
-                                    }
-                                  });
-                                },
-                              )
-                            : _LoginPanel(
-                                key: const ValueKey('login'),
-                                emailCtrl: _emailCtrl,
-                                passwordCtrl: _passwordCtrl,
-                                loading: _loading,
-                                obscurePassword: _obscurePassword,
-                                onToggleObscure: () => setState(
-                                  () => _obscurePassword = !_obscurePassword,
-                                ),
-                                onLogin: _onLoginPressed,
-                                theme: theme,
-                              ),
+                        child: _LoginPanel(
+                          key: const ValueKey('login'),
+                          emailCtrl: _emailCtrl,
+                          passwordCtrl: _passwordCtrl,
+                          loading: _loading,
+                          obscurePassword: _obscurePassword,
+                          onToggleObscure: () => setState(() =>
+                              _obscurePassword = !_obscurePassword),
+                          onLogin: _onLoginPressed,
+                          theme: theme,
+                        ),
                       ),
                     ),
                   ),
@@ -566,209 +452,6 @@ Wrap(
     ),
   ],
 ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// OTP PANEL WIDGET
-// ─────────────────────────────────────────────────────────────────────────────
-class _OtpPanel extends StatelessWidget {
-  const _OtpPanel({
-    super.key,
-    required this.phone,
-    required this.otpCtrls,
-    required this.otpFocus,
-    required this.loading,
-    required this.onVerify,
-    required this.onResend,
-    required this.onBack,
-  });
-
-  final String phone;
-  final List<TextEditingController> otpCtrls;
-  final List<FocusNode> otpFocus;
-  final bool loading;
-  final VoidCallback onVerify;
-  final VoidCallback onResend;
-  final VoidCallback onBack;
-
-  String get _maskedPhone {
-    if (phone.length < 5) return phone;
-    return '${phone.substring(0, 3)}••••${phone.substring(phone.length - 2)}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // ── Back button ───────────────────────────────────────────────────
-        Align(
-          alignment: Alignment.centerLeft,
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            onPressed: onBack,
-            tooltip: "Back to login",
-          ),
-        ),
-        const SizedBox(height: 4),
-
-        // ── Admin badge ───────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFF7B1F3F).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFF7B1F3F).withOpacity(0.3)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.admin_panel_settings_outlined,
-                size: 16,
-                color: const Color(0xFF7B1F3F),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                "Admin Verification",
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF7B1F3F),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // ── Shield icon ───────────────────────────────────────────────────
-        Container(
-          height: 72,
-          width: 72,
-          decoration: BoxDecoration(
-            color: const Color(0xFF7B1F3F).withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.shield_outlined,
-            color: Color(0xFF7B1F3F),
-            size: 36,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        Text(
-          "Enter OTP",
-          style: theme.textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          "A 6-digit code was sent to\n$_maskedPhone",
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: Colors.black54,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 28),
-
-        // ── OTP boxes ─────────────────────────────────────────────────────
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (i) {
-            return SizedBox(
-              width: 44,
-              child: TextField(
-                controller: otpCtrls[i],
-                focusNode: otpFocus[i],
-                keyboardType: TextInputType.number,
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                ),
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                      color: Color(0xFF7B1F3F),
-                      width: 2,
-                    ),
-                  ),
-                ),
-                onChanged: (val) {
-                  if (val.isNotEmpty && i < 5) {
-                    otpFocus[i + 1].requestFocus();
-                  }
-                  if (val.isEmpty && i > 0) {
-                    otpFocus[i - 1].requestFocus();
-                  }
-                  // Auto-submit when last digit filled
-                  if (i == 5 && val.isNotEmpty) {
-                    final full = otpCtrls.map((c) => c.text).join();
-                    if (full.length == 6) onVerify();
-                  }
-                },
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 28),
-
-        // ── Verify button ─────────────────────────────────────────────────
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: loading ? null : onVerify,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              backgroundColor: const Color(0xFF7B1F3F),
-              foregroundColor: Colors.white,
-            ),
-            child: loading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Text(
-                    "Verify & Continue",
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        // ── Resend ────────────────────────────────────────────────────────
-        TextButton.icon(
-          onPressed: loading ? null : onResend,
-          icon: const Icon(Icons.refresh_rounded, size: 16),
-          label: const Text("Resend OTP"),
-        ),
       ],
     );
   }
