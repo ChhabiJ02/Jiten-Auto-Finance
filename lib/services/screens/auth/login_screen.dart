@@ -9,9 +9,6 @@ import 'register_screen.dart';
 
 // ── Cloudflare Worker Config ──────────────────────────────────────────────────
 // Step 1: Replace with your Worker URL after Cloudflare deployment
-const String _workerUrl = "https://jiten-otp-worker.YOUR_SUBDOMAIN.workers.dev";
-// Step 2: Set same value in Cloudflare → Worker → Environment Variables → APP_SECRET
-const String _appSecret = "jiten-auto-otp-2024-secure";
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,10 +26,15 @@ class _LoginScreenState extends State<LoginScreen>
 
   bool _loading = false;
   bool _obscurePassword = true;
-  bool _showOtpPanel = false;
+
   String? _adminPhone;
+
   String? _otpSessionId;
-  int _resendTimer = 30;
+
+  bool _showOtpPanel = false;
+
+  int _resendTimer = 0;
+
   Timer? _timer;
 
   late AnimationController _slideCtrl;
@@ -55,8 +57,8 @@ class _LoginScreenState extends State<LoginScreen>
     _passwordCtrl.dispose();
     for (final c in _otpCtrls) c.dispose();
     for (final f in _otpFocus) f.dispose();
-    _slideCtrl.dispose();
     _timer?.cancel();
+    _slideCtrl.dispose();
     super.dispose();
   }
 
@@ -72,282 +74,206 @@ class _LoginScreenState extends State<LoginScreen>
 
   void _setLoading(bool v) => setState(() => _loading = v);
 
-  void _startResendTimer() {
-    _resendTimer = 30;
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) { t.cancel(); return; }
-      if (_resendTimer == 0) { t.cancel(); }
-      else { setState(() => _resendTimer--); }
-    });
+  Future<Map<String, dynamic>> _callWorker(
+    Map<String, dynamic> body,
+  ) async {
+
+    // PUT YOUR CLOUDFLARE WORKER URL HERE
+    const workerUrl =
+        'https://jiten-auto.chhabickp02.workers.dev/';
+
+    final response = await http.post(
+      Uri.parse(workerUrl),
+
+      headers: {
+        'Content-Type': 'application/json',
+      },
+
+      body: jsonEncode(body),
+    );
+
+    return jsonDecode(response.body);
   }
 
-  // ── Call Cloudflare Worker ────────────────────────────────────────────────
-  Future<Map<String, dynamic>> _callWorker(Map<String, dynamic> body) async {
-    try {
-      final response = await http.post(
-        Uri.parse(_workerUrl),
-        headers: {
-          "Content-Type": "application/json",
-          "X-App-Secret": _appSecret,
-        },
-        body: jsonEncode(body),
-      ).timeout(const Duration(seconds: 15));
-      return jsonDecode(response.body);
-    } on TimeoutException {
-      return {"success": false, "message": "Request timed out. Try again."};
-    } catch (e) {
-      return {"success": false, "message": "Network error. Check connection."};
-    }
+  void _startResendTimer() {
+
+    _resendTimer = 30;
+
+    _timer?.cancel();
+
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (timer) {
+
+        if (_resendTimer == 0) {
+
+          timer.cancel();
+
+        } else {
+
+          setState(() {
+            _resendTimer--;
+          });
+        }
+      },
+    );
   }
 
   // ── Login Button ──────────────────────────────────────────────────────────
-  Future<void> _onLoginPressed() async {
-<<<<<<< HEAD
+Future<void> _onLoginPressed() async {
+  final email = _emailCtrl.text.trim();
+  final password = _passwordCtrl.text.trim();
 
-    final email =
-        _emailCtrl.text.trim();
+  if (email.isEmpty && password.isEmpty) {
+    _msg("Please enter your email and password.");
+    return;
+  }
 
-    final password =
-        _passwordCtrl.text.trim();
+  if (email.isEmpty) {
+    _msg("Please enter your email address.");
+    return;
+  }
 
-    if (email.isEmpty &&
-        password.isEmpty) {
+  if (password.isEmpty) {
+    _msg("Please enter your password.");
+    return;
+  }
 
-      _msg(
-        "Please enter your email and password.",
-      );
+  _setLoading(true);
 
-      return;
+  try {
+    final credential =
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+
+    final uid = credential.user!.uid;
+
+    Map<String, dynamic>? data;
+
+    final doc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
+        .get();
+
+    if (doc.exists) {
+      data = doc.data();
+    } else {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+
+      if (snap.docs.isNotEmpty) {
+        data = snap.docs.first.data();
+      }
     }
 
-    if (email.isEmpty) {
+    final role =
+        (data?['role'] ?? '').toString().toLowerCase();
 
-      _msg(
-        "Please enter your email address.",
-      );
+    _adminPhone = data?['phone'];
 
-      return;
-    }
+    // ADMIN LOGIN
+    if (role == 'admin') {
+      await _sendAdminOtp();
+    } else {
+      await credential.user!.reload();
 
-    if (password.isEmpty) {
+      final updatedUser =
+          FirebaseAuth.instance.currentUser;
 
-      _msg(
-        "Please enter your password.",
-      );
+      if (updatedUser != null &&
+          updatedUser.emailVerified) {
 
-      return;
-    }
-=======
-    final email = _emailCtrl.text.trim();
-    final password = _passwordCtrl.text.trim();
-    if (email.isEmpty && password.isEmpty) { _msg("Please enter your email and password."); return; }
-    if (email.isEmpty) { _msg("Please enter your email address."); return; }
-    if (password.isEmpty) { _msg("Please enter your password."); return; }
->>>>>>> e06f1bff613f8e5bc6f8b97e2edce5fa19a2997a
-
-    _setLoading(true);
-    try {
-<<<<<<< HEAD
-
-      // LOGIN
-      final credential =
-          await FirebaseAuth.instance
-              .signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-
-      final uid =
-          credential.user!.uid;
-
-      // GET USER DATA
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(uid)
-              .get();
-
-      Map<String, dynamic>? data;
-
-      // IF DOC NOT FOUND
-      if (!doc.exists) {
-
-        final snap =
-            await FirebaseFirestore.instance
-                .collection('users')
-                .where(
-                  'email',
-                  isEqualTo: email,
-                )
-                .limit(1)
-                .get();
-
-        if (snap.docs.isEmpty) {
-
-          _navigateUser(
-            'customer',
-          );
-
-          return;
-        }
-
-        data =
-            snap.docs.first.data();
+        _navigateUser(role);
 
       } else {
 
-        data = doc.data();
-      }
+        await updatedUser?.sendEmailVerification();
 
-      final role =
-          (data?['role'] ?? '')
-              .toString()
-              .toLowerCase();
-=======
-      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email, password: password);
-      final uid = credential.user!.uid;
-
-      Map<String, dynamic>? data;
-      final doc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      if (doc.exists) {
-        data = doc.data();
-      } else {
-        final snap = await FirebaseFirestore.instance
-            .collection('users').where('email', isEqualTo: email).limit(1).get();
-        if (snap.docs.isNotEmpty) data = snap.docs.first.data();
-      }
-
-      final role = (data?['role'] ?? '').toString().toLowerCase();
-      _adminPhone = data?['phone'];
->>>>>>> e06f1bff613f8e5bc6f8b97e2edce5fa19a2997a
-
-      _adminPhone =
-          data?['phone'];
-
-      // ADMIN
-      if (role == 'admin') {
-<<<<<<< HEAD
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) =>
-                AdminOtpVerificationScreen(
-              adminPhoneNumber:
-                  _adminPhone ?? '',
-            ),
-          ),
+        _msg(
+          "Please verify your email first. Verification link sent.",
         );
 
-      } else {
-
-        // EMAIL VERIFICATION
-        await credential.user!
-            .reload();
-
-        final updatedUser =
-            FirebaseAuth
-                .instance
-                .currentUser;
-
-        if (updatedUser != null &&
-            updatedUser.emailVerified) {
-
-          _navigateUser(role);
-
-        } else {
-
-          await updatedUser
-              ?.sendEmailVerification();
-
-          _msg(
-            "Please verify your email first. Verification link sent.",
-          );
-
-          await FirebaseAuth.instance
-              .signOut();
-        }
-      }
-
-    } on FirebaseAuthException catch (e) {
-
-      debugPrint(
-        "🔥 LOGIN ERROR: ${e.code} | ${e.message}",
-      );
-
-      _msg(
-        _friendlyAuthError(
-          e.code,
-        ),
-      );
-
-    } catch (e) {
-
-      debugPrint(
-        "🔥 UNKNOWN ERROR: $e",
-      );
-
-      _msg(
-        "Something went wrong. Please try again.",
-      );
-
-=======
-        await _sendAdminOtp();
-      } else {
-        await credential.user!.reload();
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null && user.emailVerified) {
-          _navigateUser();
-        } else {
-          await user?.sendEmailVerification();
-          _msg("Please verify your email first. Verification link sent.");
-          await FirebaseAuth.instance.signOut();
-        }
-      }
-    } on FirebaseAuthException catch (e) {
-      _msg(_friendlyAuthError(e.code));
-    } catch (e) {
-      _msg("Something went wrong. Please try again.");
->>>>>>> e06f1bff613f8e5bc6f8b97e2edce5fa19a2997a
-    } finally {
-
-      _setLoading(false);
-    }
-  }
-<<<<<<< HEAD
-  // ── STEP 2 – Send OTP to admin phone ─────────────────────────────────────
-  Future<void> _initiateAdminOtp(User user) async {
-=======
-
-  // ── Send OTP ──────────────────────────────────────────────────────────────
-  Future<void> _sendAdminOtp() async {
->>>>>>> e06f1bff613f8e5bc6f8b97e2edce5fa19a2997a
-    if (_adminPhone == null || _adminPhone!.isEmpty) {
-      _msg("Admin phone number not configured in database.");
-      await FirebaseAuth.instance.signOut();
-      return;
-    }
-    _setLoading(true);
-    try {
-      String phone = _adminPhone!.replaceAll('+', '').replaceAll(' ', '');
-      final result = await _callWorker({"action": "send", "phone": phone});
-      if (result['success'] == true) {
-        setState(() { _otpSessionId = result['sessionId']; _showOtpPanel = true; });
-        _startResendTimer();
-        _msg("OTP sent to ${_adminPhone!.replaceRange(3, _adminPhone!.length - 2, '••••••')}", error: false);
-      } else {
-        _msg(result['message'] ?? "Failed to send OTP.");
         await FirebaseAuth.instance.signOut();
       }
-    } catch (e) {
-      _msg("Failed to send OTP. Please try again.");
-      await FirebaseAuth.instance.signOut();
-    } finally {
-      _setLoading(false);
     }
+
+  } on FirebaseAuthException catch (e) {
+
+    _msg(_friendlyAuthError(e.code));
+
+  } catch (e) {
+
+    debugPrint("LOGIN ERROR: $e");
+
+    _msg(
+      "Something went wrong. Please try again.",
+    );
+
+  } finally {
+
+    _setLoading(false);
   }
+}
+
+Future<void> _sendAdminOtp() async {
+  if (_adminPhone == null || _adminPhone!.isEmpty) {
+    _msg("Admin phone number not configured in database.");
+    await FirebaseAuth.instance.signOut();
+    return;
+  }
+
+  _setLoading(true);
+
+  try {
+    String phone =
+        _adminPhone!.replaceAll('+', '').replaceAll(' ', '');
+
+    final result = await _callWorker({
+      "action": "send",
+      "phone": phone,
+    });
+
+    if (result['success'] == true) {
+
+      setState(() {
+        _otpSessionId = result['sessionId'];
+        _showOtpPanel = true;
+      });
+
+      _startResendTimer();
+
+      _msg(
+        "OTP sent successfully.",
+        error: false,
+      );
+
+    } else {
+
+      _msg(
+        result['message'] ?? "Failed to send OTP.",
+      );
+
+      await FirebaseAuth.instance.signOut();
+    }
+
+  } catch (e) {
+
+    _msg(
+      "Failed to send OTP. Please try again.",
+    );
+
+    await FirebaseAuth.instance.signOut();
+
+  } finally {
+
+    _setLoading(false);
+  }
+}
 
   // ── Verify OTP ────────────────────────────────────────────────────────────
   Future<void> _onVerifyOtp() async {
@@ -370,54 +296,40 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-<<<<<<< HEAD
-  Future<void> _completeAdminLogin(PhoneAuthCredential cred) async {
-    // Link phone credential to the already-signed-in admin account
-    try {
-      await FirebaseAuth.instance.currentUser?.linkWithCredential(cred);
-    } on FirebaseAuthException catch (e) {
-      // credential-already-in-use is fine – already linked
-      if (e.code != 'credential-already-in-use' &&
-          e.code != 'provider-already-linked') {
-        rethrow;
-      }
-    }
-    _navigateAdmin();
+// ── Navigation ────────────────────────────────────────────────────────────
+void _navigateUser(String role) {
+
+  if (role == 'staff') {
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/staffDashboard',
+    );
+
+  } else if (role == 'customer') {
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/customerDashboard',
+    );
+
+  } else {
+
+    Navigator.pushReplacementNamed(
+      context,
+      '/',
+    );
   }
+}
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-  void _navigateUser(String role) {
+void _navigateAdmin() {
 
-    if (role == 'staff') {
+  Navigator.pushReplacementNamed(
+    context,
+    '/adminDashboard',
+  );
+}
 
-      Navigator.pushReplacementNamed(
-        context,
-        '/staffDashboard',
-      );
-
-    } else if (role == 'customer') {
-
-      Navigator.pushReplacementNamed(
-        context,
-        '/customerDashboard',
-      );
-
-    } else {
-
-      Navigator.pushReplacementNamed(
-        context,
-        '/',
-      );
-    }
-  }
-
-  void _navigateAdmin() {
-    // Replace with your actual admin route
-    Navigator.pushReplacementNamed(context, '/adminDashboard');
-  }
-
-=======
->>>>>>> e06f1bff613f8e5bc6f8b97e2edce5fa19a2997a
   // ── Resend OTP ────────────────────────────────────────────────────────────
   Future<void> _resendOtp() async {
     if (_resendTimer > 0) return;
@@ -441,8 +353,7 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  void _navigateUser() => Navigator.pushReplacementNamed(context, '/home');
-  void _navigateAdmin() => Navigator.pushReplacementNamed(context, '/admin');
+  
 
   String _friendlyAuthError(String code) {
     switch (code) {
@@ -492,36 +403,17 @@ class _LoginScreenState extends State<LoginScreen>
                             child: child,
                           ),
                         ),
-                        child: _showOtpPanel
-                            ? _OtpPanel(
-                                key: const ValueKey('otp'),
-                                phone: _adminPhone ?? '',
-                                otpCtrls: _otpCtrls,
-                                otpFocus: _otpFocus,
-                                loading: _loading,
-                                resendTimer: _resendTimer,
-                                onVerify: _onVerifyOtp,
-                                onResend: _resendOtp,
-                                onBack: () async {
-                                  _timer?.cancel();
-                                  await FirebaseAuth.instance.signOut();
-                                  setState(() {
-                                    _showOtpPanel = false;
-                                    _otpSessionId = null;
-                                    for (final c in _otpCtrls) c.clear();
-                                  });
-                                },
-                              )
-                            : _LoginPanel(
-                                key: const ValueKey('login'),
-                                emailCtrl: _emailCtrl,
-                                passwordCtrl: _passwordCtrl,
-                                loading: _loading,
-                                obscurePassword: _obscurePassword,
-                                onToggleObscure: () => setState(() => _obscurePassword = !_obscurePassword),
-                                onLogin: _onLoginPressed,
-                                theme: theme,
-                              ),
+                        child: _LoginPanel(
+                          key: const ValueKey('login'),
+                          emailCtrl: _emailCtrl,
+                          passwordCtrl: _passwordCtrl,
+                          loading: _loading,
+                          obscurePassword: _obscurePassword,
+                          onToggleObscure: () => setState(() =>
+                              _obscurePassword = !_obscurePassword),
+                          onLogin: _onLoginPressed,
+                          theme: theme,
+                        ),
                       ),
                     ),
                   ),
@@ -590,98 +482,6 @@ class _LoginPanel extends StatelessWidget {
           TextButton(onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => RegisterScreen())),
               child: const Text("Create Account")),
         ]),
-      ],
-    );
-  }
-}
-
-class _OtpPanel extends StatelessWidget {
-  const _OtpPanel({super.key, required this.phone, required this.otpCtrls, required this.otpFocus,
-      required this.loading, required this.resendTimer, required this.onVerify,
-      required this.onResend, required this.onBack});
-  final String phone;
-  final List<TextEditingController> otpCtrls;
-  final List<FocusNode> otpFocus;
-  final bool loading;
-  final int resendTimer;
-  final VoidCallback onVerify, onResend, onBack;
-
-  String get _maskedPhone {
-    if (phone.length < 5) return phone;
-    return '${phone.substring(0, 3)}••••${phone.substring(phone.length - 2)}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Align(alignment: Alignment.centerLeft,
-            child: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18), onPressed: onBack)),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-          decoration: BoxDecoration(color: const Color(0xFF7B1F3F).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF7B1F3F).withOpacity(0.3))),
-          child: const Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.admin_panel_settings_outlined, size: 16, color: Color(0xFF7B1F3F)),
-            SizedBox(width: 6),
-            Text("Admin Verification", style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF7B1F3F))),
-          ]),
-        ),
-        const SizedBox(height: 18),
-        Container(height: 72, width: 72,
-            decoration: BoxDecoration(color: const Color(0xFF7B1F3F).withOpacity(0.1), shape: BoxShape.circle),
-            child: const Icon(Icons.shield_outlined, color: Color(0xFF7B1F3F), size: 36)),
-        const SizedBox(height: 16),
-        Text("Enter OTP", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
-        Text("A 6-digit code was sent to\n$_maskedPhone", textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.black54, height: 1.5)),
-        const SizedBox(height: 28),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(6, (i) => SizedBox(
-            width: 44,
-            child: TextField(
-              controller: otpCtrls[i], focusNode: otpFocus[i],
-              keyboardType: TextInputType.number, textAlign: TextAlign.center,
-              maxLength: 1, inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              decoration: InputDecoration(counterText: '', filled: true, fillColor: Colors.grey.shade100,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Color(0xFF7B1F3F), width: 2))),
-              onChanged: (val) {
-                if (val.isNotEmpty && i < 5) otpFocus[i + 1].requestFocus();
-                if (val.isEmpty && i > 0) otpFocus[i - 1].requestFocus();
-                if (i == 5 && val.isNotEmpty) {
-                  final full = otpCtrls.map((c) => c.text).join();
-                  if (full.length == 6) onVerify();
-                }
-              },
-            ),
-          )),
-        ),
-        const SizedBox(height: 28),
-        SizedBox(width: double.infinity,
-            child: ElevatedButton(
-              onPressed: loading ? null : onVerify,
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  backgroundColor: const Color(0xFF7B1F3F), foregroundColor: Colors.white),
-              child: loading ? const SizedBox(height: 20, width: 20,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text("Verify & Continue", style: TextStyle(fontWeight: FontWeight.w600)),
-            )),
-        const SizedBox(height: 16),
-        resendTimer > 0
-            ? Text("Resend OTP in $resendTimer seconds", style: TextStyle(color: Colors.grey.shade500))
-            : TextButton.icon(onPressed: loading ? null : onResend,
-                icon: const Icon(Icons.refresh_rounded, size: 16), label: const Text("Resend OTP")),
       ],
     );
   }

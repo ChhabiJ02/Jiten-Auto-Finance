@@ -249,11 +249,16 @@ static const _platform = MethodChannel('whatsapp_pdf_share');
       "otherDescription": otherController.text.trim(),
       "reference": referenceController.text.trim(),
       "date": selectedDate,
+
+      // ✅ IMPORTANT FOR STAFF TRANSFER
       "staffId": user.uid,
+      "assignedTo": user.uid,
       "createdBy": user.uid,
+
       "createdAt": Timestamp.now(),
       "status": "New Inquiry",
       "paymentType": paymentType,
+
       if (followUpDate != null)
         "nextFollowUp": Timestamp.fromDate(followUpDate!),
     });

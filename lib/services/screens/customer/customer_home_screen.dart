@@ -103,352 +103,490 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
   }
 
   Widget buildVehicleSection(
-    BuildContext context,
-    String title,
-    List<Map<String, dynamic>> items,
-  ) {
-    final theme = Theme.of(context);
+  BuildContext context,
+  String title,
+  List<Map<String, dynamic>> items,
+) {
+  final theme = Theme.of(context);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: Row(
-            children: [
-              Text(
-                title,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 22,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                "${items.length} Models",
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+
+      Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 10,
         ),
 
-        SizedBox(
-          height: 340,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
-            itemCount: items.length,
-            itemBuilder: (context, index) {
-              final item = items[index];
-
-              final photos =
-                  (item['photos'] as List<dynamic>?)
-                      ?.whereType<String>()
-                      .toList() ??
-                  [];
-
-              final imageUrl = photos.isNotEmpty ? photos.first : null;
-
-              final brand = item['brand'] ?? '';
-              final model = item['model'] ?? '';
-              final variant = item['variant'] ?? '';
-              final price = item['price'] ?? '';
-              final colors =
-                  (item['colors'] as List<dynamic>?)
-                      ?.whereType<String>()
-                      .toList() ??
-                  ["Black", "White", "Blue"];
-
-              return GestureDetector(
-
-  onTap: () {
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => VehicleDetailScreen(
-          vehicle: item,
-        ),
-      ),
-    );
-  },
-
-  child: Container(
-    width: 250,
-    margin: const EdgeInsets.only(
-      right: 16,
-      bottom: 8,
-    ),
-
-    child: Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(24),
-      shadowColor:
-          theme.colorScheme.primary.withOpacity(0.2),
-
-      child: Container(
-
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          color: theme.colorScheme.surface,
-        ),
-
-        child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start,
-
+        child: Row(
           children: [
 
-            // IMAGE
-            Stack(
-              children: [
+            Text(
+              title,
 
-                ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(
-                    top: Radius.circular(24),
-                  ),
-
-                  child: imageUrl != null
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          height: 170,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-
-                          placeholder:
-                              (context, url) => Container(
-                            height: 170,
-                            color: theme.colorScheme
-                                .surfaceContainerHighest,
-
-                            child: const Center(
-                              child:
-                                  CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
-                            ),
-                          ),
-
-                          errorWidget:
-                              (context, url, error) =>
-                                  Container(
-                            height: 170,
-                            color: theme.colorScheme
-                                .surfaceContainerHighest,
-
-                            child: const Icon(
-                              Icons.directions_bike,
-                              size: 60,
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 170,
-                          color: theme.colorScheme
-                              .surfaceContainerHighest,
-
-                          child: const Center(
-                            child: Icon(
-                              Icons.directions_bike,
-                              size: 60,
-                            ),
-                          ),
-                        ),
-                ),
-
-                Positioned(
-                  top: 12,
-                  left: 12,
-
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius:
-                          BorderRadius.circular(20),
-                    ),
-
-                    child: Text(
-                      brand,
-
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 24,
+              ),
             ),
 
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
+            const Spacer(),
 
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.start,
+            Text(
+              "${items.length} Models",
 
-                  children: [
-
-                    Text(
-                      model,
-
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                      ),
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    Text(
-                      variant,
-
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 14,
-                      ),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Row(
-                      children: [
-
-                        const Icon(
-                          Icons.currency_rupee,
-                          size: 18,
-                          color: Colors.green,
-                        ),
-
-                        Text(
-                          price.toString(),
-
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 22,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    Text(
-                      "Available Colors",
-
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-
-                    const SizedBox(height: 8),
-
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-
-                      children: colors.map((color) {
-
-                        return Container(
-                          padding:
-                              const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 5,
-                          ),
-
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme
-                                .primary
-                                .withOpacity(0.08),
-
-                            borderRadius:
-                                BorderRadius.circular(14),
-                          ),
-
-                          child: Text(
-                            color,
-
-                            style: TextStyle(
-                              color:
-                                  theme.colorScheme.primary,
-
-                              fontWeight:
-                                  FontWeight.w600,
-
-                              fontSize: 12,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-
-                    const Spacer(),
-
-                    Container(
-                      padding:
-                          const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.primary
-                            .withOpacity(0.1),
-
-                        borderRadius:
-                            BorderRadius.circular(8),
-                      ),
-
-                      child: Text(
-                        '₹$price',
-
-                        style: theme.textTheme.titleSmall
-                            ?.copyWith(
-                          color:
-                              theme.colorScheme.primary,
-
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
               ),
             ),
           ],
         ),
       ),
-    ),
-  ),
-);
-              },
-            ),
+
+      SizedBox(
+        height: 420,
+
+        child: ListView.builder(
+
+          scrollDirection: Axis.horizontal,
+
+          padding: const EdgeInsets.symmetric(
+            horizontal: 14,
           ),
-        ],
-      );                      
-    }
+
+          itemCount: items.length,
+
+          itemBuilder: (context, index) {
+
+            final item = items[index];
+
+            final photos =
+                (item['photos'] as List<dynamic>?)
+                        ?.whereType<String>()
+                        .toList() ??
+                    [];
+
+            final imageUrl =
+                photos.isNotEmpty
+                    ? photos.first
+                    : null;
+
+            final brand =
+                item['brand'] ?? '';
+
+            final model =
+                item['model'] ?? '';
+
+            final variant =
+                item['variant'] ?? '';
+
+            final price =
+                item['price'] ?? '';
+
+            final colors =
+                (item['colors']
+                            as List<dynamic>?)
+                        ?.whereType<String>()
+                        .toList() ??
+                    [
+                      "Black",
+                      "White",
+                      "Blue",
+                    ];
+
+            return GestureDetector(
+
+              onTap: () {
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        VehicleDetailScreen(
+                      vehicle: item,
+                    ),
+                  ),
+                );
+              },
+
+              child: Container(
+
+                width: 250,
+
+                margin:
+                    const EdgeInsets.only(
+                  right: 16,
+                  bottom: 8,
+                ),
+
+                child: Material(
+
+                  elevation: 8,
+
+                  borderRadius:
+                      BorderRadius.circular(
+                    24,
+                  ),
+
+                  shadowColor:
+                      theme.colorScheme.primary
+                          .withOpacity(0.2),
+
+                  child: Container(
+
+                    decoration: BoxDecoration(
+                      borderRadius:
+                          BorderRadius.circular(
+                        24,
+                      ),
+
+                      color: theme
+                          .colorScheme.surface,
+                    ),
+
+                    child: Column(
+
+                      crossAxisAlignment:
+                          CrossAxisAlignment
+                              .start,
+
+                      children: [
+
+                        // IMAGE
+                        Stack(
+                          children: [
+
+                            ClipRRect(
+
+                              borderRadius:
+                                  const BorderRadius
+                                      .vertical(
+                                top: Radius.circular(
+                                  24,
+                                ),
+                              ),
+
+                              child: imageUrl !=
+                                      null
+                                  ? CachedNetworkImage(
+
+                                      imageUrl:
+                                          imageUrl,
+
+                                      height: 190,
+
+                                      width: double
+                                          .infinity,
+
+                                      fit: BoxFit
+                                          .contain,
+
+                                      placeholder:
+                                          (
+                                        context,
+                                        url,
+                                      ) =>
+                                              Container(
+                                        height:
+                                            190,
+
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+
+                                        child:
+                                            const Center(
+                                          child:
+                                              CircularProgressIndicator(
+                                            strokeWidth:
+                                                2,
+                                          ),
+                                        ),
+                                      ),
+
+                                      errorWidget:
+                                          (
+                                        context,
+                                        url,
+                                        error,
+                                      ) =>
+                                              Container(
+                                        height:
+                                            190,
+
+                                        color: theme
+                                            .colorScheme
+                                            .surfaceContainerHighest,
+
+                                        child:
+                                            const Icon(
+                                          Icons
+                                              .directions_bike,
+
+                                          size: 70,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+
+                                      height: 190,
+
+                                      color: theme
+                                          .colorScheme
+                                          .surfaceContainerHighest,
+
+                                      child:
+                                          const Center(
+                                        child: Icon(
+                                          Icons
+                                              .directions_bike,
+
+                                          size: 70,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+
+                            Positioned(
+                              top: 12,
+                              left: 12,
+
+                              child: Container(
+
+                                padding:
+                                    const EdgeInsets
+                                        .symmetric(
+                                  horizontal: 14,
+                                  vertical: 7,
+                                ),
+
+                                decoration:
+                                    BoxDecoration(
+                                  color: theme
+                                      .colorScheme
+                                      .primary,
+
+                                  borderRadius:
+                                      BorderRadius
+                                          .circular(
+                                    20,
+                                  ),
+                                ),
+
+                                child: Text(
+                                  brand,
+
+                                  style:
+                                      const TextStyle(
+                                    color:
+                                        Colors.white,
+
+                                    fontWeight:
+                                        FontWeight
+                                            .bold,
+
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        Padding(
+
+                          padding:
+                              const EdgeInsets.all(
+                            14,
+                          ),
+
+                          child: Column(
+
+                            crossAxisAlignment:
+                                CrossAxisAlignment
+                                    .start,
+
+                            children: [
+
+                              Text(
+                                model,
+
+                                maxLines: 1,
+
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis,
+
+                                style: theme
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                  fontWeight:
+                                      FontWeight
+                                          .bold,
+
+                                  fontSize: 22,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 4,
+                              ),
+
+                              Text(
+                                variant,
+
+                                maxLines: 1,
+
+                                overflow:
+                                    TextOverflow
+                                        .ellipsis,
+
+                                style: TextStyle(
+                                  color: Colors
+                                      .grey.shade700,
+
+                                  fontSize: 15,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 14,
+                              ),
+
+                              Row(
+                                children: [
+
+                                  const Icon(
+                                    Icons
+                                        .currency_rupee,
+
+                                    size: 20,
+
+                                    color:
+                                        Colors.green,
+                                  ),
+
+                                  Expanded(
+                                    child: Text(
+                                      price
+                                          .toString(),
+
+                                      overflow:
+                                          TextOverflow
+                                              .ellipsis,
+
+                                      style:
+                                          const TextStyle(
+                                        fontWeight:
+                                            FontWeight
+                                                .bold,
+
+                                        fontSize:
+                                            28,
+
+                                        color:
+                                            Colors
+                                                .green,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(
+                                height: 16,
+                              ),
+
+                              Text(
+                                "Available Colors",
+
+                                style: TextStyle(
+                                  fontWeight:
+                                      FontWeight
+                                          .w600,
+
+                                  color: Colors
+                                      .grey.shade800,
+                                ),
+                              ),
+
+                              const SizedBox(
+                                height: 8,
+                              ),
+
+                              Wrap(
+
+                                spacing: 8,
+
+                                runSpacing: 8,
+
+                                children: colors
+                                    .map((color) {
+
+                                  return Container(
+
+                                    padding:
+                                        const EdgeInsets
+                                            .symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+
+                                    decoration:
+                                        BoxDecoration(
+                                      color: theme
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(
+                                            0.08,
+                                          ),
+
+                                      borderRadius:
+                                          BorderRadius
+                                              .circular(
+                                        14,
+                                      ),
+                                    ),
+
+                                    child: Text(
+                                      color,
+
+                                      style:
+                                          TextStyle(
+                                        color: theme
+                                            .colorScheme
+                                            .primary,
+
+                                        fontWeight:
+                                            FontWeight
+                                                .w600,
+
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ],
+  );
+}
 
   Widget buildActionCard(
     BuildContext context,
