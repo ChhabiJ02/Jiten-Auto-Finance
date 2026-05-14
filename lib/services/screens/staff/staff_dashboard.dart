@@ -86,15 +86,45 @@ class _StaffDashboardState extends State<StaffDashboard> {
     }
 
     final staffName =
-        user.displayName
-                    ?.trim()
-                    .isNotEmpty ==
-                true
-            ? user.displayName!.trim()
-            : (user.email
-                    ?.split('@')
-                    .first ??
-                'Staff');
+    (user.displayName != null &&
+            user.displayName!.trim().isNotEmpty)
+        ? user.displayName!.trim()
+        : 'Staff';
+
+        if ((user.displayName == null ||
+                user.displayName!.trim().isEmpty)) {
+
+          FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get()
+              .then((doc) async {
+
+            if (doc.exists) {
+
+              final data =
+                  doc.data() as Map<String, dynamic>;
+
+              final firestoreName =
+                  (data['name'] ?? '')
+                      .toString()
+                      .trim();
+
+              if (firestoreName.isNotEmpty) {
+
+                await user.updateDisplayName(
+                  firestoreName,
+                );
+
+                await user.reload();
+
+                if (mounted) {
+                  setState(() {});
+                }
+              }
+            }
+          });
+        }
 
     return Scaffold(
 
