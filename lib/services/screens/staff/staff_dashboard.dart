@@ -16,6 +16,9 @@ class StaffDashboard extends StatefulWidget {
 class _StaffDashboardState extends State<StaffDashboard> {
 
   String selectedFilter = 'All';
+  bool selectionMode = false;
+
+  Set<String> selectedInquiryIds = {};
 
   final filters = [
     'All',
@@ -131,36 +134,144 @@ class _StaffDashboardState extends State<StaffDashboard> {
       appBar: AppBar(
 
         title: Text(
-          "Staff Dashboard - $staffName",
+          selectionMode
+              ? "${selectedInquiryIds.length} Selected"
+              : "Staff Dashboard - $staffName",
         ),
 
         actions: [
 
-          IconButton(
+          if (selectionMode)
 
-            onPressed: () async {
+            IconButton(
 
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const StaffProfileScreen(),
-                ),
-              );
+              icon: const Icon(Icons.delete),
 
-              await FirebaseAuth.instance
-                  .currentUser
-                  ?.reload();
+              onPressed: () async {
 
-              if (mounted) {
-                setState(() {});
-              }
-            },
+                final confirm =
+                    await showDialog<bool>(
 
-            icon: const Icon(
-              Icons.settings,
+                  context: context,
+
+                  builder: (context) {
+
+                    return AlertDialog(
+
+                      title: const Text(
+                        "Delete Leads",
+                      ),
+
+                      content: Text(
+                        "Delete ${selectedInquiryIds.length} selected lead(s)?",
+                      ),
+
+                      actions: [
+
+                        TextButton(
+
+                          onPressed: () {
+
+                            Navigator.pop(
+                              context,
+                              false,
+                            );
+                          },
+
+                          child: const Text(
+                            "Cancel",
+                          ),
+                        ),
+
+                        ElevatedButton(
+
+                          style:
+                              ElevatedButton.styleFrom(
+                            backgroundColor:
+                                Colors.red,
+                          ),
+
+                          onPressed: () {
+
+                            Navigator.pop(
+                              context,
+                              true,
+                            );
+                          },
+
+                          child: const Text(
+                            "Delete",
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (confirm == true) {
+
+                  for (final id
+                      in selectedInquiryIds) {
+
+                    await FirebaseFirestore
+                        .instance
+                        .collection('inquiries')
+                        .doc(id)
+                        .delete();
+                  }
+
+                  setState(() {
+
+                    selectedInquiryIds
+                        .clear();
+
+                    selectionMode = false;
+                  });
+
+                  if (mounted) {
+
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(
+
+                      const SnackBar(
+                        content: Text(
+                          "Leads deleted successfully",
+                        ),
+                      ),
+                    );
+                  }
+                }
+              },
             ),
-          ),
+
+          if (!selectionMode)
+
+            IconButton(
+
+              onPressed: () async {
+
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const StaffProfileScreen(),
+                  ),
+                );
+
+                await FirebaseAuth.instance
+                    .currentUser
+                    ?.reload();
+
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+
+              icon: const Icon(
+                Icons.settings,
+              ),
+            ),
         ],
       ),
 
@@ -756,9 +867,80 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
                                 child: ListTile(
 
+                                  selected:
+                                      selectedInquiryIds.contains(
+                                    item.id,
+                                  ),
+
+                                  selectedTileColor:
+                                      Colors.red.withOpacity(0.08),
+
+                                  onLongPress: () {
+
+                                    setState(() {
+
+                                      selectionMode = true;
+
+                                      if (selectedInquiryIds
+                                          .contains(item.id)) {
+
+                                        selectedInquiryIds
+                                            .remove(item.id);
+
+                                      } else {
+
+                                        selectedInquiryIds
+                                            .add(item.id);
+                                      }
+
+                                      if (selectedInquiryIds
+                                          .isEmpty) {
+
+                                        selectionMode = false;
+                                      }
+                                    });
+                                  },
+
+                                  leading: selectionMode
+                                      ? Checkbox(
+
+                                          value:
+                                              selectedInquiryIds.contains(
+                                            item.id,
+                                          ),
+
+                                          activeColor:
+                                              Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+
+                                          onChanged: (value) {
+
+                                            setState(() {
+
+                                              if (value == true) {
+
+                                                selectedInquiryIds
+                                                    .add(item.id);
+
+                                              } else {
+
+                                                selectedInquiryIds
+                                                    .remove(item.id);
+                                              }
+
+                                              if (selectedInquiryIds
+                                                  .isEmpty) {
+
+                                                selectionMode = false;
+                                              }
+                                            });
+                                          },
+                                        )
+                                      : null,
+
                                   title: Text(
-                                    itemData['name'] ??
-                                        '',
+                                    itemData['name'] ?? '',
                                   ),
 
                                   subtitle: Column(
@@ -844,13 +1026,38 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
                                   onTap: () {
 
+                                    if (selectionMode) {
+
+                                      setState(() {
+
+                                        if (selectedInquiryIds
+                                            .contains(item.id)) {
+
+                                          selectedInquiryIds
+                                              .remove(item.id);
+
+                                        } else {
+
+                                          selectedInquiryIds
+                                              .add(item.id);
+                                        }
+
+                                        if (selectedInquiryIds
+                                            .isEmpty) {
+
+                                          selectionMode = false;
+                                        }
+                                      });
+
+                                      return;
+                                    }
+
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (_) =>
                                             EditInquiryScreen(
-                                          inquiry:
-                                              item,
+                                          inquiry: item,
                                         ),
                                       ),
                                     );

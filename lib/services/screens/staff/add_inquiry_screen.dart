@@ -41,6 +41,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   bool loading = false;
   bool lookupLoading = false;
   bool brandsLoading = true;
+  bool inquiryAlreadySaved = false;
 
   String? selectedBrand;
   String? selectedModel;
@@ -443,10 +444,19 @@ Future<void> fetchVariants(String model) async {
       await Permission.manageExternalStorage.request();
       await Permission.storage.request();
 
-      final inquirySaved = await saveInquiry();
-      if (!inquirySaved) {
-        setState(() => loading = false);
-        return;
+      if (!inquiryAlreadySaved) {
+
+        final inquirySaved =
+            await saveInquiry();
+
+        if (!inquirySaved) {
+
+          setState(() => loading = false);
+
+          return;
+        }
+
+        inquiryAlreadySaved = true;
       }
 
       final pdf = pw.Document();
@@ -474,138 +484,343 @@ Future<void> fetchVariants(String model) async {
       final date = DateTime.now().toString().split(' ')[0];
 
       pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            build: (context) => pw.Padding(
-              padding: const pw.EdgeInsets.all(24),
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(0),
+          build: (context) {
 
-                  // HEADER
-                  pw.Center(
-                    child: pw.Text(
-                      "JITEN AUTO",
-                      style: pw.TextStyle(
-                        fontSize: 28,
-                        fontWeight: pw.FontWeight.bold,
-                      ),
-                    ),
+            return pw.Column(
+              children: [
+
+                // TOP HEADER
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.symmetric(
+                    horizontal: 30,
+                    vertical: 28,
+                  ),
+                  decoration: const pw.BoxDecoration(
+                    color: PdfColor.fromInt(0xFF7B1F3F),
                   ),
 
-                  pw.SizedBox(height: 6),
+                  child: pw.Column(
+                    crossAxisAlignment:
+                        pw.CrossAxisAlignment.start,
+                    children: [
 
-                  pw.Center(
-                    child: pw.Text(
-                      "Vehicle Quotation",
-                      style: const pw.TextStyle(fontSize: 18),
-                    ),
-                  ),
-
-                  pw.SizedBox(height: 12),
-
-                  pw.Divider(),
-
-                  pw.SizedBox(height: 20),
-
-                  // CUSTOMER DETAILS
-                  pw.Text(
-                    "Customer Details",
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-
-                  pw.SizedBox(height: 10),
-
-                  pw.Text("Name: $name"),
-                  pw.Text("Mobile: $phone"),
-                  pw.Text("Reference: $reference"),
-                  pw.Text("Date: $date"),
-
-                  pw.SizedBox(height: 25),
-
-                  // VEHICLE DETAILS
-                  pw.Text(
-                    "Vehicle Details",
-                    style: pw.TextStyle(
-                      fontSize: 18,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-
-                  pw.SizedBox(height: 10),
-
-                  pw.Text("Brand: $brand"),
-                  pw.Text("Model: $model"),
-                  pw.Text("Variant: $variant"),
-
-                  pw.SizedBox(height: 20),
-
-                  // VEHICLE IMAGE
-                  if (vehicleImage != null)
-                    pw.Center(
-                      child: pw.Container(
-                        height: 180,
-                        width: 250,
-                        decoration: pw.BoxDecoration(
-                          border: pw.Border.all(
-                            color: PdfColors.grey400,
-                          ),
-                          borderRadius: pw.BorderRadius.circular(12),
-                        ),
-                        child: pw.ClipRRect(
-                          horizontalRadius: 12,
-                          verticalRadius: 12,
-                          child: pw.Image(
-                            vehicleImage,
-                            fit: pw.BoxFit.cover,
-                          ),
+                      pw.Text(
+                        "JITEN AUTO",
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 30,
+                          fontWeight:
+                              pw.FontWeight.bold,
                         ),
                       ),
-                    ),
 
-                  pw.SizedBox(height: 25),
+                      pw.SizedBox(height: 8),
 
-                  // PRICE BOX
-                  pw.Container(
+                      pw.Text(
+                        "Vehicle Quotation",
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // BODY
+                pw.Expanded(
+                  child: pw.Container(
                     width: double.infinity,
-                    padding: const pw.EdgeInsets.all(16),
-                    decoration: pw.BoxDecoration(
-                      color: PdfColors.grey200,
-                      borderRadius: pw.BorderRadius.circular(10),
+                    color: PdfColor.fromInt(
+                      0xFFF7EEF1,
                     ),
-                    child: pw.Text(
-                      "Price: Rs. $priceFinal",
-                      style: pw.TextStyle(
-                        fontSize: 22,
-                        fontWeight: pw.FontWeight.bold,
+
+                    child: pw.Padding(
+                      padding:
+                          const pw.EdgeInsets.all(24),
+
+                      child: pw.Column(
+                        crossAxisAlignment:
+                            pw.CrossAxisAlignment.start,
+
+                        children: [
+
+                          // CUSTOMER CARD
+                          pw.Container(
+                            width: double.infinity,
+                            padding:
+                                const pw.EdgeInsets.all(
+                              18,
+                            ),
+
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.white,
+                              borderRadius:
+                                  pw.BorderRadius.circular(
+                                18,
+                              ),
+                            ),
+
+                            child: pw.Column(
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment
+                                      .start,
+
+                              children: [
+
+                                pw.Text(
+                                  "Customer Details",
+                                  style: pw.TextStyle(
+                                    fontSize: 18,
+                                    fontWeight:
+                                        pw.FontWeight.bold,
+                                    color:
+                                        PdfColor.fromInt(
+                                      0xFF7B1F3F,
+                                    ),
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 14),
+
+                                pw.Text(
+                                  "Name: $name",
+                                  style:
+                                      const pw.TextStyle(
+                                    fontSize: 14,
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 6),
+
+                                pw.Text(
+                                  "Phone: $phone",
+                                  style:
+                                      const pw.TextStyle(
+                                    fontSize: 14,
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 6),
+
+                                pw.Text(
+                                  "Reference: $reference",
+                                  style:
+                                      const pw.TextStyle(
+                                    fontSize: 14,
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 6),
+
+                                pw.Text(
+                                  "Date: $date",
+                                  style:
+                                      const pw.TextStyle(
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          pw.SizedBox(height: 20),
+
+                          // VEHICLE CARD
+                          pw.Container(
+                            width: double.infinity,
+                            padding:
+                                const pw.EdgeInsets.all(
+                              18,
+                            ),
+
+                            decoration: pw.BoxDecoration(
+                              color: PdfColors.white,
+                              borderRadius:
+                                  pw.BorderRadius.circular(
+                                18,
+                              ),
+                            ),
+
+                            child: pw.Column(
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment
+                                      .start,
+
+                              children: [
+
+                                pw.Text(
+                                  "Vehicle Details",
+                                  style: pw.TextStyle(
+                                    fontSize: 18,
+                                    fontWeight:
+                                        pw.FontWeight.bold,
+                                    color:
+                                        PdfColor.fromInt(
+                                      0xFF7B1F3F,
+                                    ),
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 14),
+
+                                pw.Text(
+                                  "Brand: $brand",
+                                ),
+
+                                pw.SizedBox(height: 6),
+
+                                pw.Text(
+                                  "Model: $model",
+                                ),
+
+                                pw.SizedBox(height: 6),
+
+                                pw.Text(
+                                  "Variant: $variant",
+                                ),
+
+                                if (vehicleImage != null)
+                                  pw.Padding(
+                                    padding:
+                                        const pw.EdgeInsets.only(
+                                      top: 18,
+                                    ),
+
+                                    child: pw.Center(
+                                      child: pw.Container(
+                                        height: 180,
+                                        width: 260,
+
+                                        decoration:
+                                            pw.BoxDecoration(
+                                          borderRadius:
+                                              pw.BorderRadius.circular(
+                                            18,
+                                          ),
+                                        ),
+
+                                        child: pw.ClipRRect(
+                                          horizontalRadius:
+                                              18,
+                                          verticalRadius:
+                                              18,
+
+                                          child: pw.Image(
+                                            vehicleImage,
+                                            fit:
+                                                pw.BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+
+                          pw.SizedBox(height: 22),
+
+                          // PRICE CARD
+                          pw.Container(
+                            width: double.infinity,
+
+                            padding:
+                                const pw.EdgeInsets.symmetric(
+                              vertical: 20,
+                              horizontal: 20,
+                            ),
+
+                            decoration: pw.BoxDecoration(
+                              color: PdfColor.fromInt(
+                                0xFF7B1F3F,
+                              ),
+
+                              borderRadius:
+                                  pw.BorderRadius.circular(
+                                20,
+                              ),
+                            ),
+
+                            child: pw.Column(
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment
+                                      .start,
+
+                              children: [
+
+                                pw.Text(
+                                  "Quotation Price",
+                                  style: pw.TextStyle(
+                                    color:
+                                        PdfColors.white,
+                                    fontSize: 15,
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 8),
+
+                                pw.Text(
+                                  "Rs. $priceFinal",
+                                  style: pw.TextStyle(
+                                    color:
+                                        PdfColors.white,
+                                    fontSize: 28,
+                                    fontWeight:
+                                        pw.FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          pw.Spacer(),
+
+                          // FOOTER
+                          pw.Center(
+                            child: pw.Column(
+                              children: [
+
+                                pw.Text(
+                                  "Thank you for choosing Jiten Auto",
+                                  style: pw.TextStyle(
+                                    color:
+                                        PdfColor.fromInt(
+                                      0xFF7B1F3F,
+                                    ),
+                                    fontSize: 14,
+                                    fontWeight:
+                                        pw.FontWeight.bold,
+                                  ),
+                                ),
+
+                                pw.SizedBox(height: 8),
+
+                                pw.Text(
+                                  "We appreciate your inquiry.",
+                                  style:
+                                      const pw.TextStyle(
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ),
+              ],
+            );
+          },
+        ),
+      );
 
-                  pw.SizedBox(height: 30),
-
-                  // FOOTER
-                  pw.Text(
-                    "Thank you for your inquiry.",
-                    style: const pw.TextStyle(fontSize: 14),
-                  ),
-
-                  pw.SizedBox(height: 12),
-
-                  pw.Text(
-                    "Regards,\nJiten Auto",
-                    style: pw.TextStyle(
-                      fontWeight: pw.FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
       final bytes = await pdf.save();                           
       final cacheDir = await getTemporaryDirectory();
       final filePath = '${cacheDir.path}/quotation.pdf';
@@ -627,6 +842,14 @@ Future<void> fetchVariants(String model) async {
         'phone': phone,
         'message': message,
       });
+      if (mounted) {
+
+        showMessage(
+          "Quotation sent successfully",
+        );
+
+        Navigator.pop(context);
+      }
     } catch (e) {
       showMessage('Failed to send PDF: ${e.toString()}');
     } finally {
@@ -687,35 +910,42 @@ Future<void> fetchVariants(String model) async {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+Widget build(BuildContext context) {
+  final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text("New Inquiry")),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF7B1F3F), Color(0xFFF4DBE1)],
-          ),
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text("Add Inquiry"),
+    ),
+
+    body: Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 20,
+          vertical: 40,
         ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Card(
-                elevation: 16,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28)),
-                color: Colors.white,
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: 520,
+          ),
+
+          child: Card(
+            elevation: 16,
+
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
+
+            color: Colors.white,
+
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+
+                children: [
                       Container(
                         height: 80,
                         width: 80,
@@ -1124,7 +1354,6 @@ Future<void> fetchVariants(String model) async {
             ),
           ),
         ),
-      ),
     );
   }
 }
