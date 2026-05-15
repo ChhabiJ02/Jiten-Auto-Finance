@@ -346,7 +346,7 @@ class _LoginPanel extends StatelessWidget {
           ),
           padding: const EdgeInsets.all(12),
           child: Image.asset(
-            'assets/applogo/jitenlogo.jpeg',
+            'assets/appLogo/applogo.jpeg',
             fit: BoxFit.contain,
           ),
         ),

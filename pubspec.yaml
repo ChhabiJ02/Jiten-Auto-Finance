@@ -55,12 +55,12 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/applogo/jitenlogo.jpeg"
+  image_path: "assets/appLogo/applogo.jpeg"
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/applogo/jitenlogo.jpeg
+    - assets/appLogo/applogo.jpeg
 
 flutter_native_splash:
   color: "#7B1F3F"

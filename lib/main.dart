@@ -17,7 +17,6 @@ void main() async {
     uploadPreset: 'showroom_upload',
     apiKey: '551463428811977',
     apiSecret: '6V9O6AzisHCDLFeQeRqwTeJJUrQ',
-
   );
   runApp(const MyApp());
 }
@@ -175,7 +174,7 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   padding: const EdgeInsets.all(20),
                   child: Image.asset(
-                    'assets/applogo/jitenlogo.jpeg',
+                    'assets/appLogo/applogo.jpeg',
                     fit: BoxFit.contain,
                   ),
                 ),
