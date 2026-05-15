@@ -339,16 +339,15 @@ class _LoginPanel extends StatelessWidget {
       children: [
         // ── Logo ──────────────────────────────────────────────────────────
         Container(
-          height: 80,
-          width: 80,
+          height: 100, width: 100,
           decoration: BoxDecoration(
             color: theme.colorScheme.primary.withOpacity(0.12),
             shape: BoxShape.circle,
           ),
-          child: Icon(
-            Icons.electric_car_outlined,
-            color: theme.colorScheme.primary,
-            size: 40,
+          padding: const EdgeInsets.all(12),
+          child: Image.asset(
+            'assets/applogo/jitenlogo.jpeg',
+            fit: BoxFit.contain,
           ),
         ),
         const SizedBox(height: 18),
