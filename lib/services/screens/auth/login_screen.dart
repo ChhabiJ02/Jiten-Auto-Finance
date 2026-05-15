@@ -45,8 +45,12 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
-    for (final c in _otpCtrls) c.dispose();
-    for (final f in _otpFocus) f.dispose();
+    for (final c in _otpCtrls) {
+      c.dispose();
+    }
+    for (final f in _otpFocus) {
+      f.dispose();
+    }
     _slideCtrl.dispose();
     super.dispose();
   }
@@ -292,9 +296,16 @@ class _LoginPanel extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          height: 80, width: 80,
-          decoration: BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.12), shape: BoxShape.circle),
-          child: Icon(Icons.electric_car_outlined, color: theme.colorScheme.primary, size: 40),
+          height: 100, width: 100,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primary.withOpacity(0.12),
+            shape: BoxShape.circle,
+          ),
+          padding: const EdgeInsets.all(12),
+          child: Image.asset(
+            'assets/applogo/jitenlogo.jpeg',
+            fit: BoxFit.contain,
+          ),
         ),
         const SizedBox(height: 18),
         Text("JitenAuto", style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),

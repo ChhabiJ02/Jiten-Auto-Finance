@@ -48,8 +48,20 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0 
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/applogo/jitenlogo.jpeg"
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/applogo/jitenlogo.jpeg
+
+flutter_native_splash:
+  color: "#7B1F3F"
+  # image: assets/applogo/jitenlogo.jpeg
