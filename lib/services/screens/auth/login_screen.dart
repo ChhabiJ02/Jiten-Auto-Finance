@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-// import 'dart:async';
-// import 'dart:convert';
-// import 'package:http/http.dart' as http;
+import 'package:showroom_app/services/auth_service.dart';
 import 'register_screen.dart';
+import 'password_reset_screen.dart';
 
 // ── Cloudflare Worker Config ──────────────────────────────────────────────────
 // Step 1: Replace with your Worker URL after Cloudflare deployment
@@ -21,6 +19,8 @@ class _LoginScreenState extends State<LoginScreen>
   // ── controllers ──────────────────────────────────────────────────────────
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+
+  final AuthService _authService = AuthService();
 
   // ── state ────────────────────────────────────────────────────────────────
   bool _loading = false;
@@ -89,120 +89,89 @@ class _LoginScreenState extends State<LoginScreen>
 
   // ── Login Button ──────────────────────────────────────────────────────────
   Future<void> _onLoginPressed() async {
-  final email = _emailCtrl.text.trim();
-  final password = _passwordCtrl.text.trim();
+    final email = _emailCtrl.text.trim();
+    final password = _passwordCtrl.text.trim();
 
-  if (email.isEmpty && password.isEmpty) {
-    _msg("Please enter your email and password.");
-    return;
-  }
-
-  if (email.isEmpty) {
-    _msg("Please enter your email address.");
-    return;
-  }
-
-  if (password.isEmpty) {
-    _msg("Please enter your password.");
-    return;
-  }
-
-  _setLoading(true);
-
-  try {
-    final credential =
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-      email: email,
-      password: password,
-    );
-
-    final uid = credential.user!.uid;
-
-    Map<String, dynamic>? data;
-
-    final doc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(uid)
-        .get();
-
-    if (doc.exists) {
-      data = doc.data();
-    } else {
-      final snap = await FirebaseFirestore.instance
-          .collection('users')
-          .where('email', isEqualTo: email)
-          .limit(1)
-          .get();
-
-      if (snap.docs.isNotEmpty) {
-        data = snap.docs.first.data();
-      }
+    if (email.isEmpty && password.isEmpty) {
+      _msg("Please enter your email and password.");
+      return;
     }
 
-    final role = _normalizeRole(
-      (data?['role'] ?? '').toString(),
-    );
+    if (email.isEmpty) {
+      _msg("Please enter your email address.");
+      return;
+    }
 
-    // _adminPhone = data?['phone'];
+    if (password.isEmpty) {
+      _msg("Please enter your password.");
+      return;
+    }
 
-    // ADMIN LOGIN
-    if (role == 'admin') {
+    _setLoading(true);
 
-      _navigateAdmin();
+    try {
+      // Use AuthService to sign in
+      final credential = await _authService.signInWithEmail(
+        email: email,
+        password: password,
+      );
 
-    } else {
+      final uid = credential.user!.uid;
 
+      // Get user data from Firestore
+      Map<String, dynamic>? data = await _authService.getUserData(uid);
+      final role = (data?['role'] ?? 'customer').toString().toLowerCase();
+
+      // Check email verification for all users
       await credential.user!.reload();
+      final updatedUser = _authService.currentUser;
 
-      final updatedUser =
-          FirebaseAuth.instance.currentUser;
-
-      if (updatedUser != null &&
-          updatedUser.emailVerified) {
-
+      if (updatedUser != null && updatedUser.emailVerified) {
         _navigateUser(role);
-
       } else {
-
         await updatedUser?.sendEmailVerification();
-
         _msg(
           "Please verify your email first. Verification link sent.",
         );
-
-        await FirebaseAuth.instance.signOut();
+        await _authService.signOut();
       }
+    } on FirebaseAuthException catch (e) {
+      _msg(AuthService.getFriendlyAuthErrorMessage(e));
+    } catch (e) {
+      debugPrint("LOGIN ERROR: $e");
+      _msg("Something went wrong. Please try again.");
+    } finally {
+      _setLoading(false);
     }
-
-  } on FirebaseAuthException catch (e) {
-
-    _msg(_friendlyAuthError(e.code));
-
-  } catch (e) {
-
-    debugPrint("LOGIN ERROR: $e");
-
-    _msg(
-      "Something went wrong. Please try again.",
-    );
-
-  } finally {
-
-    _setLoading(false);
   }
-}
 
 // ── Navigation ────────────────────────────────────────────────────────────
 void _navigateUser(String role) {
 
-  if (role == 'staff') {
-    Navigator.pushReplacementNamed(
-      context,
-      '/staffDashboard',
-    );
+    if (role == 'admin') {
+      Navigator.pushReplacementNamed(
+        context,
+        '/adminDashboard',
+      );
+    } else if (role == 'staff') {
+      Navigator.pushReplacementNamed(
+        context,
+        '/staffDashboard',
+      );
+    } else if (role == 'customer') {
+      Navigator.pushReplacementNamed(
+        context,
+        '/customerDashboard',
+      );
+    } else {
+      Navigator.pushReplacementNamed(
+        context,
+        '/',
+      );
+    }
+  }
 
-  } else if (role == 'customer') {
-
+  void _navigateAdmin() {
     Navigator.pushReplacementNamed(
       context,
       '/customerDashboard',
@@ -224,25 +193,6 @@ void _navigateAdmin() {
     '/adminDashboard',
   );
 } 
-
-  String _friendlyAuthError(String code) {
-    switch (code) {
-      case 'user-not-found':
-        return "No account found with this email.";
-      case 'wrong-password':
-        return "Incorrect password. Please try again.";
-      case 'invalid-email':
-        return "Please enter a valid email address.";
-      case 'user-disabled':
-        return "This account has been disabled.";
-      case 'too-many-requests':
-        return "Too many attempts. Please wait and try again.";
-      case 'network-request-failed':
-        return "Network error. Check your connection.";
-      default:
-        return "Login failed. Please try again.";
-    }
-  }
 
   // ── BUILD ─────────────────────────────────────────────────────────────────
   @override
@@ -416,7 +366,20 @@ class _LoginPanel extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 12),
+
+        // ── Forgot Password link ───────────────────────────────────────────
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PasswordResetScreen()),
+            ),
+            child: const Text("Forgot Password?"),
+          ),
+        ),
+        const SizedBox(height: 16),
 
         // ── Login button ──────────────────────────────────────────────────
         SizedBox(
