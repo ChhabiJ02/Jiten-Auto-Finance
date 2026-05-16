@@ -76,7 +76,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SplashScreen(), // ← changed
+      home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
         '/adminDashboard': (context) => UserSessionWrapper(child: AdminDashboard()),
@@ -212,8 +212,14 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                   padding: const EdgeInsets.all(20),
                   child: Image.asset(
-                      'assets/appLogo/applogo.png',
+                    'assets/appLogo/applogo.png',
                     fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'assets/appLogo/applogo.jpeg',
+                        fit: BoxFit.contain,
+                      );
+                    },
                   ),
                 ),
 
