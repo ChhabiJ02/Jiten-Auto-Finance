@@ -148,7 +148,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
       ),
 
       SizedBox(
-        height: 420,
+        height: 380,
 
         child: ListView.builder(
 
@@ -215,11 +215,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
 
               child: Container(
 
-                width: 250,
+                width: 230,
 
                 margin:
                     const EdgeInsets.only(
-                  right: 16,
+                  right: 14,
                   bottom: 8,
                 ),
 
@@ -277,7 +277,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                       imageUrl:
                                           imageUrl,
 
-                                      height: 190,
+                                      height: 170,
 
                                       width: double
                                           .infinity,
@@ -292,7 +292,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                       ) =>
                                               Container(
                                         height:
-                                            190,
+                                            170,
 
                                         color: theme
                                             .colorScheme
@@ -333,7 +333,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                     )
                                   : Container(
 
-                                      height: 190,
+                                      height: 170,
 
                                       color: theme
                                           .colorScheme
@@ -345,7 +345,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                           Icons
                                               .directions_bike,
 
-                                          size: 70,
+                                          size: 64,
                                         ),
                                       ),
                                     ),
@@ -429,7 +429,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                       FontWeight
                                           .bold,
 
-                                  fontSize: 22,
+                                  fontSize: 20,
                                 ),
                               ),
 
@@ -487,7 +487,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                                 .bold,
 
                                         fontSize:
-                                            28,
+                                            24,
 
                                         color:
                                             Colors

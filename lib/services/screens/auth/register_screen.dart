@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:showroom_app/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,12 +15,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
 
+  final AuthService _authService = AuthService();
+
   bool loading = false;
   bool emailVerificationSent = false;
 
-  void showMessage(String message) {
+  void showMessage(String message, {bool isError = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
     );
   }
 
@@ -31,52 +38,33 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (name.isEmpty || phone.isEmpty || email.isEmpty || password.isEmpty) {
-      showMessage('Please fill all fields.');
-      return;
-    }
-
-    if (phone.length != 10) {
-      showMessage('Enter valid 10-digit phone number.');
-      return;
-    }
-
     setState(() => loading = true);
 
     try {
-      // Create Firebase Email/Password account
-      final userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
+      // Use AuthService to register
+      await _authService.registerWithEmail(
         email: email,
         password: password,
+        name: name,
+        phone: phone,
+        role: 'customer',
       );
-
-      // Send email verification
-      await userCredential.user!.sendEmailVerification();
-
-      // Save to Firestore (pending verification)
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userCredential.user!.uid)
-          .set({
-        "uid": userCredential.user!.uid,
-        "name": name,
-        "phone": phone,
-        "email": email,
-        "role": "customer",
-        "emailVerified": false,
-        "createdAt": Timestamp.now(),
-      });
 
       setState(() {
         emailVerificationSent = true;
         loading = false;
       });
 
-      showMessage('Verification email sent! Please check your inbox.');
+      showMessage(
+        'Verification email sent! Please check your inbox.',
+        isError: false,
+      );
+    } on FirebaseAuthException catch (e) {
+      setState(() => loading = false);
+      showMessage(AuthService.getFriendlyAuthErrorMessage(e));
     } catch (e) {
       setState(() => loading = false);
-      showMessage(e.toString());
+      showMessage('Registration failed: ${e.toString()}');
     }
   }
 
@@ -85,33 +73,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => loading = true);
 
     try {
-      final user = FirebaseAuth.instance.currentUser;
+      final isVerified = await _authService.checkEmailVerified();
 
-      if (user == null) {
-        showMessage('No user found. Please register again.');
-        setState(() => loading = false);
-        return;
-      }
+      if (!mounted) return;
 
-      // Reload user to get latest verification status
-      await user.reload();
-      final refreshedUser = FirebaseAuth.instance.currentUser;
-
-      if (refreshedUser != null && refreshedUser.emailVerified) {
-        // Update Firestore emailVerified flag
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(refreshedUser.uid)
-            .update({"emailVerified": true});
-
-        if (!mounted) return;
-        showMessage('Email verified! Registration complete.');
+      if (isVerified) {
+        showMessage('Email verified! Registration complete.', isError: false);
         Navigator.pop(context);
       } else {
         showMessage('Email not verified yet. Please check your inbox.');
       }
+    } on FirebaseAuthException catch (e) {
+      showMessage(AuthService.getFriendlyAuthErrorMessage(e));
     } catch (e) {
-      showMessage(e.toString());
+      showMessage('Verification check failed: ${e.toString()}');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -120,11 +95,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // Resend verification email
   Future<void> resendVerificationEmail() async {
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null && !user.emailVerified) {
-        await user.sendEmailVerification();
-        showMessage('Verification email resent!');
-      }
+      await _authService.resendVerificationEmail();
+      showMessage('Verification email resent!', isError: false);
+    } on FirebaseAuthException catch (e) {
+      showMessage(AuthService.getFriendlyAuthErrorMessage(e));
     } catch (e) {
       showMessage('Failed to resend: ${e.toString()}');
     }
