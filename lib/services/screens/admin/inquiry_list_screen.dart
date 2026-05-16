@@ -15,6 +15,7 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
   List<Map<String, dynamic>> staffList = [];
   Set<String> selectedInquiries = {};
   bool isSelectionMode = false;
+  bool isAssigningLeads = false;
 
   String _normalizeRole(String? role) {
     final normalizedRole =
@@ -59,6 +60,18 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     }
 
     return '';
+  }
+
+  String _getStaffNameById(String staffId) {
+    final staffMember = staffList.firstWhere(
+      (staff) => staff['id'] == staffId,
+      orElse: () => {
+        'id': staffId,
+        'name': 'Selected Staff',
+      },
+    );
+
+    return (staffMember['name'] ?? 'Selected Staff').toString();
   }
 
   @override
@@ -197,6 +210,165 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     }
   }
 
+  Future<void> _showAssignSelectedLeadsDialog() async {
+    if (selectedInquiries.isEmpty) {
+      return;
+    }
+
+    if (staffList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No staff members available for assignment'),
+        ),
+      );
+      return;
+    }
+
+    String? selectedAssigneeId;
+
+    final assignedStaffId = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Assign Selected Leads'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Assign ${selectedInquiries.length} selected lead(s) to:',
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: selectedAssigneeId,
+                hint: const Text('Select Staff'),
+                items: staffList.map((staff) {
+                  return DropdownMenuItem<String>(
+                    value: staff['id'] as String,
+                    child: Text(
+                      (staff['name'] ?? 'Unknown Staff').toString(),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedAssigneeId = value;
+                  });
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                if (selectedAssigneeId == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Select a staff member first'),
+                    ),
+                  );
+                  return;
+                }
+
+                Navigator.pop(
+                  dialogContext,
+                  selectedAssigneeId,
+                );
+              },
+              child: const Text('Assign'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (assignedStaffId == null) {
+      return;
+    }
+
+    await _assignSelectedLeads(assignedStaffId);
+  }
+
+  Future<void> _assignSelectedLeads(String newStaffId) async {
+    if (selectedInquiries.isEmpty) {
+      return;
+    }
+
+    final inquiryIds = selectedInquiries.toList(growable: false);
+    final assignedAt = Timestamp.now();
+
+    setState(() {
+      isAssigningLeads = true;
+    });
+
+    try {
+      final firestore = FirebaseFirestore.instance;
+      WriteBatch batch = firestore.batch();
+      int pendingWrites = 0;
+
+      for (final inquiryId in inquiryIds) {
+        final inquiryRef =
+            firestore.collection('inquiries').doc(inquiryId);
+
+        batch.update(inquiryRef, {
+          'staffId': newStaffId,
+          'assignedTo': newStaffId,
+          'createdBy': newStaffId,
+          'lastAssignedAt': assignedAt,
+          'lastAssignedTo': newStaffId,
+        });
+
+        pendingWrites++;
+
+        if (pendingWrites == 400) {
+          await batch.commit();
+          batch = firestore.batch();
+          pendingWrites = 0;
+        }
+      }
+
+      if (pendingWrites > 0) {
+        await batch.commit();
+      }
+
+      if (!mounted) return;
+
+      final assignedStaffName = _getStaffNameById(newStaffId);
+
+      setState(() {
+        isAssigningLeads = false;
+        isSelectionMode = false;
+        selectedInquiries.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${inquiryIds.length} lead(s) assigned to $assignedStaffName',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isAssigningLeads = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to assign selected leads: $e',
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -205,13 +377,32 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
         actions: [
           if (isSelectionMode)
             IconButton(
+              icon: isAssigningLeads
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.assignment_ind_outlined),
+              onPressed: selectedInquiries.isNotEmpty && !isAssigningLeads
+                  ? _showAssignSelectedLeadsDialog
+                  : null,
+              tooltip: 'Assign selected leads',
+            ),
+          if (isSelectionMode)
+            IconButton(
               icon: const Icon(Icons.send),
-              onPressed: selectedInquiries.isNotEmpty ? _sendBulkWhatsApp : null,
+              onPressed: selectedInquiries.isNotEmpty && !isAssigningLeads
+                  ? _sendBulkWhatsApp
+                  : null,
               tooltip: 'Send WhatsApp to selected',
             ),
           IconButton(
             icon: Icon(isSelectionMode ? Icons.cancel : Icons.checklist),
-            onPressed: _toggleSelectionMode,
+            onPressed: isAssigningLeads ? null : _toggleSelectionMode,
             tooltip: isSelectionMode ? 'Cancel selection' : 'Select multiple',
           ),
         ],
