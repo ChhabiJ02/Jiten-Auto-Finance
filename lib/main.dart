@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'services/cloudinary_service.dart';
 import 'widgets/user_session_wrapper.dart';
-
 import 'services/screens/auth/login_screen.dart';
 import 'services/screens/admin/admin_dashboard.dart';
 import 'services/screens/staff/staff_dashboard.dart';
 import 'services/screens/customer/customer_home_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+  ));
   CloudinaryService.initialize(
     cloudName: 'dzgudsmu8',
     uploadPreset: 'showroom_upload',
@@ -79,15 +82,18 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
-        '/adminDashboard': (context) => UserSessionWrapper(child: AdminDashboard()),
-        '/staffDashboard': (context) => UserSessionWrapper(child: StaffDashboard()),
-        '/customerDashboard': (context) => UserSessionWrapper(child: const CustomerHomeScreen()),
+        '/adminDashboard': (context) =>
+            UserSessionWrapper(child: AdminDashboard()),
+        '/staffDashboard': (context) =>
+            UserSessionWrapper(child: StaffDashboard()),
+        '/customerDashboard': (context) =>
+            UserSessionWrapper(child: const CustomerHomeScreen()),
       },
     );
   }
 }
 
-// ─── Splash Screen ───────────────────────────────────────────
+// ─── ONE Splash Screen — no native splash, no duplicate ──────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -107,61 +113,36 @@ class _SplashScreenState extends State<SplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
     );
-
     _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeIn),
     );
-
-    _scaleAnim = Tween<double>(begin: 0.7, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    _scaleAnim = Tween<double>(begin: 0.8, end: 1).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
     );
-
     _controller.forward();
     _startApp();
   }
 
   Future<void> _startApp() async {
     if (mounted && _startupError != null) {
-      setState(() {
-        _startupError = null;
-      });
+      setState(() => _startupError = null);
     }
-
     final startedAt = DateTime.now();
-
     try {
       await Firebase.initializeApp();
-
-      const minimumSplashDuration =
-          Duration(seconds: 3);
-
-      final elapsed =
-          DateTime.now().difference(
-        startedAt,
-      );
-
-      if (elapsed <
-          minimumSplashDuration) {
-        await Future.delayed(
-          minimumSplashDuration -
-              elapsed,
-        );
+      final elapsed = DateTime.now().difference(startedAt);
+      const minDuration = Duration(seconds: 2);
+      if (elapsed < minDuration) {
+        await Future.delayed(minDuration - elapsed);
       }
-
       if (!mounted) return;
-
-      Navigator.pushReplacementNamed(
-        context,
-        '/login',
-      );
+      Navigator.pushReplacementNamed(context, '/login');
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
-        _startupError =
-            'Unable to start the app. Please try again.';
+        _startupError = 'Unable to start the app. Please try again.';
       });
     }
   }
@@ -180,12 +161,9 @@ class _SplashScreenState extends State<SplashScreen>
         height: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFF7B1F3F), // dark maroon
-              Color(0xFF4A0E24), // deeper maroon
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+            colors: [Color(0xFF7B1F3F), Color(0xFF4A0E24)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
         ),
         child: FadeTransition(
@@ -195,56 +173,50 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Logo with white circular background
+                // Logo in rounded square (matches native splash style)
                 Container(
                   width: 150,
                   height: 150,
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    shape: BoxShape.circle,
+                    borderRadius: BorderRadius.circular(32),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 20,
+                        color: Colors.black.withOpacity(0.25),
+                        blurRadius: 24,
                         offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
                   child: Image.asset(
-                    'assets/appLogo/applogo.png',
+                    'assets/appLogo/applogo.png', // exact path, capital L
                     fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        'assets/appLogo/applogo.jpeg',
-                        fit: BoxFit.contain,
-                      );
-                    },
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: 28),
 
-                // App Name
+                // App name
                 const Text(
                   'Jiten Auto Finance',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1.2,
+                    letterSpacing: 1.0,
                   ),
                 ),
 
                 const SizedBox(height: 8),
 
                 // Tagline
-                Text(
-                  'Your Trusted Auto Partner',
+                const Text(
+                  'Multi brand 2 wh. showroom & workshop',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.75),
-                    fontSize: 14,
-                    letterSpacing: 0.5,
+                    color: Color(0xFFE8B4C4),
+                    fontSize: 13,
+                    letterSpacing: 0.4,
                   ),
                 ),
 
@@ -252,8 +224,8 @@ class _SplashScreenState extends State<SplashScreen>
 
                 if (_startupError == null)
                   SizedBox(
-                    width: 30,
-                    height: 30,
+                    width: 26,
+                    height: 26,
                     child: CircularProgressIndicator(
                       color: Colors.white.withOpacity(0.7),
                       strokeWidth: 2.5,
@@ -261,18 +233,14 @@ class _SplashScreenState extends State<SplashScreen>
                   )
                 else
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Column(
                       children: [
                         Text(
                           _startupError!,
                           textAlign: TextAlign.center,
                           style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
+                              color: Colors.white, fontSize: 14),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
@@ -281,9 +249,7 @@ class _SplashScreenState extends State<SplashScreen>
                             backgroundColor: Colors.white,
                             foregroundColor: const Color(0xFF7B1F3F),
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 12,
-                            ),
+                                horizontal: 22, vertical: 12),
                           ),
                           child: const Text('Retry'),
                         ),

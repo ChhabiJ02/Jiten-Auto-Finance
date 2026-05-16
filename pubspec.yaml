@@ -41,12 +41,12 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.3
-  flutter_native_splash: ^2.4.7
+  # flutter_native_splash line DELETED
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/
+    - assets/appLogo/applogo.png
 
 flutter_launcher_icons:
   android: true
@@ -54,5 +54,4 @@ flutter_launcher_icons:
   image_path: "assets/appLogo/applogo.png"
   adaptive_icon_background: "#FFFFFF"
 
-flutter_native_splash:
-  color: "#7B1F3F"
+# flutter_native_splash block DELETED entirely

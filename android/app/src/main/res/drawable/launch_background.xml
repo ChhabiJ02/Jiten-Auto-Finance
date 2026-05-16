@@ -1,10 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/transparent" />
-
     <item>
-        <shape android:shape="rectangle">
-            <solid android:color="#7B1F3F" />
-        </shape>
+        <color android:color="#7B1F3F"/>
     </item>
 </layer-list>
