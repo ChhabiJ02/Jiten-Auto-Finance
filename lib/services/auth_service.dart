@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
@@ -192,6 +193,86 @@ class AuthService {
       throw FirebaseAuthException(
         code: 'password-reset-failed',
         message: 'Failed to send password reset email: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Send admin OTP for email-based admin login
+  /// Note: This implementation stores the OTP in Firestore for verification.
+  /// In production, a backend email service should send the OTP to the admin email.
+  Future<void> sendAdminEmailOtp({required String email}) async {
+    try {
+      final normalizedEmail = email.trim();
+      if (normalizedEmail.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'invalid-email',
+          message: 'Email cannot be empty',
+        );
+      }
+
+      final otp = _generateOtp();
+      final now = Timestamp.now();
+      final expiresAt = Timestamp.fromDate(
+        now.toDate().add(const Duration(minutes: 10)),
+      );
+
+      await _firestore.collection('adminOtps').doc(normalizedEmail).set({
+        'otp': otp,
+        'createdAt': now,
+        'expiresAt': expiresAt,
+      });
+
+      // In a real app, send this OTP to the admin email via a backend service.
+      debugPrint('Admin OTP for $normalizedEmail: $otp');
+    } catch (e) {
+      if (e is FirebaseAuthException) rethrow;
+      throw FirebaseAuthException(
+        code: 'admin-email-otp-failed',
+        message: 'Failed to send admin email OTP: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Verify the admin OTP stored in Firestore
+  Future<void> verifyAdminEmailOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final normalizedEmail = email.trim();
+      final trimmedOtp = otp.trim();
+
+      if (normalizedEmail.isEmpty || trimmedOtp.length != 6) {
+        throw FirebaseAuthException(
+          code: 'invalid-input',
+          message: 'Email and OTP must be provided',
+        );
+      }
+
+      final doc = await _firestore.collection('adminOtps').doc(normalizedEmail).get();
+      final data = doc.data();
+
+      if (data == null || data['otp'] != trimmedOtp) {
+        throw FirebaseAuthException(
+          code: 'invalid-otp',
+          message: 'The OTP is invalid or does not match',
+        );
+      }
+
+      final expiresAt = data['expiresAt'] as Timestamp?;
+      if (expiresAt == null || Timestamp.now().toDate().isAfter(expiresAt.toDate())) {
+        throw FirebaseAuthException(
+          code: 'expired-otp',
+          message: 'The OTP has expired',
+        );
+      }
+
+      await _firestore.collection('adminOtps').doc(normalizedEmail).delete();
+    } catch (e) {
+      if (e is FirebaseAuthException) rethrow;
+      throw FirebaseAuthException(
+        code: 'otp-verification-failed',
+        message: 'Failed to verify admin OTP: ${e.toString()}',
       );
     }
   }
@@ -416,6 +497,12 @@ class AuthService {
   /// Check if string is numeric
   bool _isNumeric(String str) {
     return int.tryParse(str) != null;
+  }
+
+  /// Generate a 6 digit OTP
+  String _generateOtp() {
+    final random = DateTime.now().millisecondsSinceEpoch % 1000000;
+    return random.toString().padLeft(6, '0');
   }
 
   /// Convert FirebaseAuthException to user-friendly message
