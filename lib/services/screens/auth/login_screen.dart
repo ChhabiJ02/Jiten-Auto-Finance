@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// import 'dart:async';
+// import 'dart:convert';
+// import 'package:http/http.dart' as http;
 import 'register_screen.dart';
 
 // ── Cloudflare Worker Config ──────────────────────────────────────────────────
@@ -20,22 +20,9 @@ class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  final List<TextEditingController> _otpCtrls =
-      List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _otpFocus = List.generate(6, (_) => FocusNode());
 
   bool _loading = false;
   bool _obscurePassword = true;
-
-  String? _adminPhone;
-
-  String? _otpSessionId;
-
-  bool _showOtpPanel = false;
-
-  int _resendTimer = 0;
-
-  Timer? _timer;
 
   late AnimationController _slideCtrl;
   late Animation<Offset> _slideAnim;
@@ -55,9 +42,7 @@ class _LoginScreenState extends State<LoginScreen>
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
-    for (final c in _otpCtrls) c.dispose();
-    for (final f in _otpFocus) f.dispose();
-    _timer?.cancel();
+    
     _slideCtrl.dispose();
     super.dispose();
   }
@@ -72,51 +57,24 @@ class _LoginScreenState extends State<LoginScreen>
     ));
   }
 
-  void _setLoading(bool v) => setState(() => _loading = v);
+  void _setLoading(bool value) {
 
-  Future<Map<String, dynamic>> _callWorker(
-    Map<String, dynamic> body,
-  ) async {
+    if (!mounted) return;
 
-    // PUT YOUR CLOUDFLARE WORKER URL HERE
-    const workerUrl =
-        'https://jiten-auto.chhabickp02.workers.dev/';
-
-    final response = await http.post(
-      Uri.parse(workerUrl),
-
-      headers: {
-        'Content-Type': 'application/json',
-      },
-
-      body: jsonEncode(body),
-    );
-
-    return jsonDecode(response.body);
+    setState(() {
+      _loading = value;
+    });
   }
 
-  void _startResendTimer() {
+  String _normalizeRole(String role) {
+    final normalizedRole =
+        role.trim().toLowerCase();
 
-    _resendTimer = 30;
+    if (normalizedRole == 'workshop') {
+      return 'staff';
+    }
 
-    _timer?.cancel();
-
-    _timer = Timer.periodic(
-      const Duration(seconds: 1),
-      (timer) {
-
-        if (_resendTimer == 0) {
-
-          timer.cancel();
-
-        } else {
-
-          setState(() {
-            _resendTimer--;
-          });
-        }
-      },
-    );
+    return normalizedRole;
   }
 
   // ── Login Button ──────────────────────────────────────────────────────────
@@ -171,15 +129,19 @@ Future<void> _onLoginPressed() async {
       }
     }
 
-    final role =
-        (data?['role'] ?? '').toString().toLowerCase();
+    final role = _normalizeRole(
+      (data?['role'] ?? '').toString(),
+    );
 
-    _adminPhone = data?['phone'];
+    // _adminPhone = data?['phone'];
 
     // ADMIN LOGIN
     if (role == 'admin') {
-      await _sendAdminOtp();
+
+      _navigateAdmin();
+
     } else {
+
       await credential.user!.reload();
 
       final updatedUser =
@@ -220,82 +182,6 @@ Future<void> _onLoginPressed() async {
   }
 }
 
-Future<void> _sendAdminOtp() async {
-  if (_adminPhone == null || _adminPhone!.isEmpty) {
-    _msg("Admin phone number not configured in database.");
-    await FirebaseAuth.instance.signOut();
-    return;
-  }
-
-  _setLoading(true);
-
-  try {
-    String phone =
-        _adminPhone!.replaceAll('+', '').replaceAll(' ', '');
-
-    final result = await _callWorker({
-      "action": "send",
-      "phone": phone,
-    });
-
-    if (result['success'] == true) {
-
-      setState(() {
-        _otpSessionId = result['sessionId'];
-        _showOtpPanel = true;
-      });
-
-      _startResendTimer();
-
-      _msg(
-        "OTP sent successfully.",
-        error: false,
-      );
-
-    } else {
-
-      _msg(
-        result['message'] ?? "Failed to send OTP.",
-      );
-
-      await FirebaseAuth.instance.signOut();
-    }
-
-  } catch (e) {
-
-    _msg(
-      "Failed to send OTP. Please try again.",
-    );
-
-    await FirebaseAuth.instance.signOut();
-
-  } finally {
-
-    _setLoading(false);
-  }
-}
-
-  // ── Verify OTP ────────────────────────────────────────────────────────────
-  Future<void> _onVerifyOtp() async {
-    final otp = _otpCtrls.map((c) => c.text).join();
-    if (otp.length < 6) { _msg("Please enter the complete 6-digit OTP."); return; }
-    if (_otpSessionId == null) { _msg("Session expired. Please login again."); return; }
-    _setLoading(true);
-    try {
-      final result = await _callWorker({"action": "verify", "sessionId": _otpSessionId, "otp": otp});
-      if (result['success'] == true) {
-        _timer?.cancel();
-        _navigateAdmin();
-      } else {
-        _msg(result['message'] ?? "Invalid OTP. Please try again.");
-      }
-    } catch (e) {
-      _msg("Something went wrong.");
-    } finally {
-      _setLoading(false);
-    }
-  }
-
 // ── Navigation ────────────────────────────────────────────────────────────
 void _navigateUser(String role) {
 
@@ -328,32 +214,7 @@ void _navigateAdmin() {
     context,
     '/adminDashboard',
   );
-}
-
-  // ── Resend OTP ────────────────────────────────────────────────────────────
-  Future<void> _resendOtp() async {
-    if (_resendTimer > 0) return;
-    for (final c in _otpCtrls) c.clear();
-    _otpFocus[0].requestFocus();
-    _setLoading(true);
-    try {
-      String phone = (_adminPhone ?? '').replaceAll('+', '').replaceAll(' ', '');
-      final result = await _callWorker({"action": "resend", "phone": phone});
-      if (result['success'] == true) {
-        setState(() => _otpSessionId = result['sessionId']);
-        _startResendTimer();
-        _msg("OTP resent successfully.", error: false);
-      } else {
-        _msg(result['message'] ?? "Failed to resend OTP.");
-      }
-    } catch (e) {
-      _msg("Something went wrong.");
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  
+} 
 
   String _friendlyAuthError(String code) {
     switch (code) {

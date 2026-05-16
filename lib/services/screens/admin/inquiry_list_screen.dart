@@ -16,6 +16,51 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
   Set<String> selectedInquiries = {};
   bool isSelectionMode = false;
 
+  String _normalizeRole(String? role) {
+    final normalizedRole =
+        role?.trim().toLowerCase() ?? '';
+
+    if (normalizedRole == 'workshop') {
+      return 'staff';
+    }
+
+    return normalizedRole;
+  }
+
+  bool _matchesStaffLead(
+    Map<String, dynamic> data,
+    String staffId,
+  ) {
+    final ownerValues = [
+      data['staffId'],
+      data['assignedTo'],
+      data['createdBy'],
+    ];
+
+    return ownerValues.any(
+      (value) => value?.toString().trim() == staffId,
+    );
+  }
+
+  String _resolveStaffOwnerId(
+    Map<String, dynamic> data,
+  ) {
+    final candidateValues = [
+      data['assignedTo'],
+      data['staffId'],
+      data['createdBy'],
+    ];
+
+    for (final value in candidateValues) {
+      final normalized = value?.toString().trim();
+      if (normalized != null && normalized.isNotEmpty) {
+        return normalized;
+      }
+    }
+
+    return '';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -48,12 +93,18 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
       final uniqueStaff = <String, Map<String, dynamic>>{};
       for (final doc in snapshot.docs) {
         final data = doc.data();
-        final role = data['role']?.toString().toLowerCase();
-        if (role == 'staff') {
+        final role = _normalizeRole(
+          data['role']?.toString(),
+        );
+        final isDisabled = data['isDisabled'] == true;
+        if (role == 'staff' && !isDisabled) {
           final name = data['name'] ?? 'Unknown Staff';
-          // Use name as key to avoid duplicates
-          uniqueStaff[name] = {
-            'id': doc.id,
+          final uid = data['uid']?.toString().trim();
+          final resolvedId =
+              uid != null && uid.isNotEmpty ? uid : doc.id;
+
+          uniqueStaff[resolvedId] = {
+            'id': resolvedId,
             'name': name,
           };
         }
@@ -235,7 +286,10 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                     ? allInquiries
                     : allInquiries.where((doc) {
                         final data = doc.data() as Map<String, dynamic>;
-                        return data['staffId'] == selectedStaffId;
+                        return _matchesStaffLead(
+                          data,
+                          selectedStaffId!,
+                        );
                       }).toList();
 
                 if (inquiries.isEmpty) {
@@ -317,10 +371,14 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
 
                     // Get staff name from loaded staffList
                     String staffName = 'Unassigned';
-                    if (data['staffId'] != null) {
+                    final ownerId = _resolveStaffOwnerId(data);
+                    if (ownerId.isNotEmpty) {
                       final staffMember = staffList.firstWhere(
-                        (staff) => staff['id'] == data['staffId'],
-                        orElse: () => {'id': data['staffId'], 'name': 'Unknown Staff'},
+                        (staff) => staff['id'] == ownerId,
+                        orElse: () => {
+                          'id': ownerId,
+                          'name': 'Unknown Staff',
+                        },
                       );
                       staffName = staffMember['name'] ?? 'Unknown Staff';
                     }
@@ -473,9 +531,12 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     try {
       final snapshot = await FirebaseFirestore.instance
           .collection('inquiries')
-          .where('staffId', isEqualTo: staffId)
           .get();
-      return snapshot.docs.length;
+
+      return snapshot.docs.where((doc) {
+        final data = doc.data();
+        return _matchesStaffLead(data, staffId);
+      }).length;
     } catch (e) {
       return 0;
     }

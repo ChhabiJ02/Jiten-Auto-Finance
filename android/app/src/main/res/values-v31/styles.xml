@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+
+        <!-- Background -->
+        <item name="android:windowSplashScreenBackground">
+            #7B1F3F
+        </item>
+
+        <item name="android:windowSplashScreenAnimatedIcon">
+            @android:color/transparent
+        </item>
+
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
+
+        <!-- REMOVE BRANDING -->
+        <item name="android:windowSplashScreenBrandingImage">
+            @null
+        </item>
+
+        <item name="android:windowDrawsSystemBarBackgrounds">
+            true
+        </item>
+
+    </style>
+
+    <style name="NormalTheme"
+        parent="@android:style/Theme.Light.NoTitleBar">
+
+        <item name="android:windowBackground">
+            @android:color/white
+        </item>
+
+    </style>
+
+</resources>

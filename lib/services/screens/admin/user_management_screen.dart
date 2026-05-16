@@ -9,31 +9,120 @@ class UserManagementScreen extends StatefulWidget {
 }
 
 class _UserManagementScreenState extends State<UserManagementScreen> {
-  final roles = ['customer', 'staff', 'admin', 'workshop'];
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final roles = ['customer', 'staff', 'admin'];
 
   // Temporary selected roles
   final Map<String, String> selectedRoles = {};
 
+  String _resolveUserUid(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final rawUid = data?['uid']?.toString().trim();
+
+    if (rawUid != null && rawUid.isNotEmpty) {
+      return rawUid;
+    }
+
+    return doc.id;
+  }
+
+  String _normalizeRole(String? role) {
+    final normalizedRole =
+        role?.trim().toLowerCase() ?? 'customer';
+
+    if (normalizedRole == 'workshop') {
+      return 'staff';
+    }
+
+    return normalizedRole;
+  }
+
+  Set<String> _buildUserIdentifiers(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    return {
+      doc.id,
+      _resolveUserUid(doc),
+    }.where((value) => value.trim().isNotEmpty).toSet();
+  }
+
+  bool _matchesUserIdentifier(
+    dynamic fieldValue,
+    Set<String> identifiers,
+  ) {
+    final normalizedValue = fieldValue?.toString().trim();
+
+    return normalizedValue != null &&
+        normalizedValue.isNotEmpty &&
+        identifiers.contains(normalizedValue);
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      _loadTransferCandidates({
+    required String deletedUserDocId,
+    required List<String> roles,
+  }) async {
+    final snapshot = await _firestore.collection('users').get();
+
+    return snapshot.docs.where((doc) {
+      final data = doc.data();
+      final role = _normalizeRole(
+        data['role']?.toString(),
+      );
+      final isDisabled = data['isDisabled'] == true;
+      final identifiers = _buildUserIdentifiers(doc);
+
+      if (isDisabled || !roles.contains(role)) {
+        return false;
+      }
+
+      return !identifiers.contains(deletedUserDocId);
+    }).toList();
+  }
+
   Future<void> updateRole(String userId, String newRole) async {
-    await FirebaseFirestore.instance.collection('users').doc(userId).update({
+    await _firestore.collection('users').doc(userId).update({
       'role': newRole,
       'roleUpdatedAt': Timestamp.now(),
     });
   }
 
   Future<void> deleteUser(String userId) async {
-    await FirebaseFirestore.instance.collection('users').doc(userId).update({
+    await _firestore.collection('users').doc(userId).update({
       'isDisabled': true,
     });
 
     await Future.delayed(const Duration(seconds: 2));
 
-    await FirebaseFirestore.instance.collection('users').doc(userId).delete();
+    await _firestore.collection('users').doc(userId).delete();
   }
 
-  Future<void> transferInquiries(String oldId, String newId) async {
+  Future<int> transferInquiries(String oldUserDocId, String newUserDocId) async {
+    final oldUserDoc =
+        await _firestore.collection('users').doc(oldUserDocId).get();
+    final newUserDoc =
+        await _firestore.collection('users').doc(newUserDocId).get();
+
+    if (!oldUserDoc.exists || !newUserDoc.exists) {
+      return 0;
+    }
+
+    final sourceIdentifiers =
+        _buildUserIdentifiers(oldUserDoc);
+    final targetUserUid =
+        _resolveUserUid(newUserDoc);
+
     final snapshot =
-        await FirebaseFirestore.instance.collection('inquiries').get();
+        await _firestore.collection('inquiries').get();
+
+    final transferredAt = Timestamp.now();
+    final transferredFrom =
+        _resolveUserUid(oldUserDoc);
+    int transferredCount = 0;
+    int pendingWrites = 0;
+    WriteBatch batch = _firestore.batch();
 
     for (var doc in snapshot.docs) {
       final data = doc.data();
@@ -42,14 +131,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       final createdBy = data['createdBy'];
       final assignedTo = data['assignedTo'];
 
-      if (staffId == oldId || createdBy == oldId || assignedTo == oldId) {
-        await doc.reference.update({
-          'staffId': newId,
-          'assignedTo': newId,
-          'createdBy': newId,
+      if (_matchesUserIdentifier(staffId, sourceIdentifiers) ||
+          _matchesUserIdentifier(createdBy, sourceIdentifiers) ||
+          _matchesUserIdentifier(assignedTo, sourceIdentifiers)) {
+        batch.update(doc.reference, {
+          'staffId': targetUserUid,
+          'assignedTo': targetUserUid,
+          'createdBy': targetUserUid,
+          'lastTransferredAt': transferredAt,
+          'lastTransferredFrom': transferredFrom,
+          'lastTransferredTo': targetUserUid,
         });
+
+        transferredCount++;
+        pendingWrites++;
+
+        if (pendingWrites == 400) {
+          await batch.commit();
+          batch = _firestore.batch();
+          pendingWrites = 0;
+        }
       }
     }
+
+    if (pendingWrites > 0) {
+      await batch.commit();
+    }
+
+    return transferredCount;
   }
 
   void confirmRoleChange({
@@ -173,14 +282,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     // =========================
     // STAFF DELETE
     // =========================
-    if (role == 'staff' || role == 'workshop') {
-      final staffSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', whereIn: ['staff', 'workshop'])
-          .get();
-
+    if (role == 'staff') {
       final staffList =
-          staffSnapshot.docs.where((doc) => doc.id != userId).toList();
+          await _loadTransferCandidates(
+        deletedUserDocId: userId,
+        roles: ['staff'],
+      );
 
       if (staffList.isEmpty) {
         if (!mounted) return;
@@ -190,7 +297,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           builder: (_) => AlertDialog(
             title: const Text("No Staff Available"),
             content: const Text(
-              "There is no other staff/workshop account available to transfer leads.",
+              "There is no other staff account available to transfer leads.",
             ),
             actions: [
               TextButton(
@@ -225,10 +332,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                 items: staffList.map((doc) {
                   final data = doc.data();
+                  final displayName =
+                      (data['name'] ?? 'No Name').toString();
 
                   return DropdownMenuItem(
                     value: doc.id,
-                    child: Text(data['name'] ?? 'No Name'),
+                    child: Text(displayName),
                   );
                 }).toList(),
 
@@ -260,19 +369,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                 Navigator.pop(context);
 
-                await transferInquiries(userId, selectedStaffId!);
+                try {
+                  final transferredCount =
+                      await transferInquiries(userId, selectedStaffId!);
 
-                await deleteUser(userId);
+                  await deleteUser(userId);
 
-                if (!mounted) return;
+                  if (!mounted) return;
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      "User deleted & leads transferred",
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        transferredCount > 0
+                            ? "User deleted & $transferredCount lead(s) transferred"
+                            : "User deleted. No matching leads were found to transfer.",
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Failed to transfer leads: $e",
+                      ),
+                    ),
+                  );
+                }
               },
               child: const Text("Confirm"),
             ),
@@ -287,13 +411,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     // ADMIN DELETE
     // =========================
     if (role == 'admin') {
-      final adminSnapshot = await FirebaseFirestore.instance
-          .collection('users')
-          .where('role', isEqualTo: 'admin')
-          .get();
-
       final adminList =
-          adminSnapshot.docs.where((doc) => doc.id != userId).toList();
+          await _loadTransferCandidates(
+        deletedUserDocId: userId,
+        roles: ['admin'],
+      );
 
       // No other admin
       if (adminList.isEmpty) {
@@ -374,19 +496,34 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                 Navigator.pop(context);
 
-                await transferInquiries(userId, selectedAdminId!);
+                try {
+                  final transferredCount =
+                      await transferInquiries(userId, selectedAdminId!);
 
-                await deleteUser(userId);
+                  await deleteUser(userId);
 
-                if (!mounted) return;
+                  if (!mounted) return;
 
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      "Admin deleted & leads transferred",
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        transferredCount > 0
+                            ? "Admin deleted & $transferredCount lead(s) transferred"
+                            : "Admin deleted. No matching leads were found to transfer.",
+                      ),
                     ),
-                  ),
-                );
+                  );
+                } catch (e) {
+                  if (!mounted) return;
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "Failed to transfer leads: $e",
+                      ),
+                    ),
+                  );
+                }
               },
               child: const Text("Confirm"),
             ),
@@ -430,7 +567,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               final name = data['name'] ?? 'No Name';
               final email = data['email'] ?? '';
 
-              final currentRole = data['role'] ?? 'customer';
+              final currentRole = _normalizeRole(
+                data['role']?.toString(),
+              );
 
               selectedRoles.putIfAbsent(
                 doc.id,

@@ -30,6 +30,21 @@ class _StaffDashboardState extends State<StaffDashboard> {
     'Closed',
   ];
 
+  bool _matchesCurrentUserLead(
+    Map<String, dynamic> itemData,
+    User user,
+  ) {
+    final ownerValues = [
+      itemData['staffId'],
+      itemData['createdBy'],
+      itemData['assignedTo'],
+    ];
+
+    return ownerValues.any(
+      (value) => value?.toString().trim() == user.uid,
+    );
+  }
+
   bool _isCreatedToday(
     Map<String, dynamic> itemData,
   ) {
@@ -302,18 +317,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
                 item.data()
                     as Map<String, dynamic>;
 
-            final staffId =
-              itemData['staffId'];
-
-          final createdBy =
-              itemData['createdBy'];
-
-          final assignedTo =
-              itemData['assignedTo'];
-
-          return staffId == user.uid ||
-              createdBy == user.uid ||
-              assignedTo == user.uid;
+            return _matchesCurrentUserLead(
+              itemData,
+              user,
+            );
 
           }).toList();
 
