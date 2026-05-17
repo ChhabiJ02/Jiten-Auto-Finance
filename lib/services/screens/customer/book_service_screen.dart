@@ -22,6 +22,15 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
   bool boughtFromUs = false;
   DateTime preferredDate = DateTime.now().add(const Duration(days: 1));
   bool loading = false;
+  bool brandsLoading = true;
+
+  String? selectedBrand;
+  String? selectedModel;
+  String? selectedVariant;
+
+  List<String> brands = [];
+  List<String> models = [];
+  List<Map<String, dynamic>> variants = [];
 
   void showMessage(String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -86,6 +95,67 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     }
   }
 
+    Future<void> fetchBrands() async {
+    try {
+      setState(() => brandsLoading = true);
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Brand')
+          .get();
+      setState(() {
+        brands = snapshot.docs
+            .map((doc) => doc['Name'].toString())
+            .toList();
+        brandsLoading = false;
+      });
+    } catch (e) {
+      setState(() => brandsLoading = false);
+      showMessage("Failed to load brands");
+    }
+  }
+
+ Future<void> fetchModels(String brand) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('Model')
+      .where('ParentBrand', isEqualTo: brand)
+      .get();
+
+  setState(() {
+    models = snapshot.docs
+        .map((doc) => doc['Name'].toString())
+        .toList();
+
+    selectedModel = null;
+    selectedVariant = null;
+    variants = [];
+
+    modelController.clear();
+    variantController.clear();
+  });
+}
+
+  Future<void> fetchVariants(String model) async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('Variant')
+      .where('ParentModel', isEqualTo: model)
+      .get();
+
+  setState(() {
+    variants = snapshot.docs
+        .map((doc) => doc.data())
+        .toList();
+
+    selectedVariant = null;
+
+    variantController.clear();
+  });
+}
+
+  @override
+  void initState() {
+    super.initState();
+    fetchBrands();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -101,19 +171,82 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 20),
-            TextField(
-              controller: brandController,
-              decoration: const InputDecoration(labelText: 'Vehicle Brand'),
+            DropdownButtonFormField<String>(
+              value: selectedBrand,
+              hint: brandsLoading
+                  ? const Text("Loading brands...")
+                  : const Text("Select Brand"),
+              items: brands
+                  .map(
+                    (brand) => DropdownMenuItem(
+                      value: brand,
+                      child: Text(brand),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedBrand = value;
+                  brandController.text = value ?? '';
+                });
+
+                if (value != null) {
+                  fetchModels(value);
+                }
+              },
+              decoration: const InputDecoration(
+                labelText: "Vehicle Brand",
+              ),
             ),
+
             const SizedBox(height: 12),
-            TextField(
-              controller: modelController,
-              decoration: const InputDecoration(labelText: 'Vehicle Model'),
+
+            DropdownButtonFormField<String>(
+              value: selectedModel,
+              hint: const Text("Select Model"),
+              items: models
+                  .map(
+                    (model) => DropdownMenuItem(
+                      value: model,
+                      child: Text(model),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedModel = value;
+                  modelController.text = value ?? '';
+                });
+
+                if (value != null) {
+                  fetchVariants(value);
+                }
+              },
+              decoration: const InputDecoration(
+                labelText: "Vehicle Model",
+              ),
             ),
+
             const SizedBox(height: 12),
-            TextField(
-              controller: variantController,
-              decoration: const InputDecoration(labelText: 'Variant'),
+
+            DropdownButtonFormField<String>(
+              value: selectedVariant,
+              hint: const Text("Select Variant"),
+              items: variants.map((variant) {
+                return DropdownMenuItem<String>(
+                  value: variant['Name'].toString(),
+                  child: Text(variant['Name'].toString()),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedVariant = value;
+                  variantController.text = value ?? '';
+                });
+              },
+              decoration: const InputDecoration(
+                labelText: "Variant",
+              ),
             ),
             const SizedBox(height: 12),
             TextField(

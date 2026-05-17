@@ -40,8 +40,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   bool loading = false;
   bool lookupLoading = false;
-  bool brandsLoading = true;
   bool inquiryAlreadySaved = false;
+  bool brandsLoading = true;
 
   String? selectedBrand;
   String? selectedModel;

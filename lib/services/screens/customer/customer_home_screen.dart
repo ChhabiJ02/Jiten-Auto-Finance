@@ -883,12 +883,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                   try {
                     final data = doc.data() as Map<String, dynamic>;
 
-                    final brandRaw = data['ParentBrand'];
                     final brand =
-                        (brandRaw != null &&
-                            brandRaw.toString().trim().isNotEmpty)
-                        ? brandRaw.toString().trim()
-                        : 'Unknown';
+                      (data['ParentBrand'] ?? '').toString().trim();
+
+                  if (brand.isEmpty) continue;
 
                     if (selectedBrand != 'All' && brand != selectedBrand) {
                       continue;
@@ -930,7 +928,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                       'model': model,
                       'variant': variant,
                       'price': price,
-                      'displayName': model,
+                      'displayName': '$brand $model',
                       'photos': resolvedPhotos.isNotEmpty
                           ? resolvedPhotos
                           : (data['photos'] is List ? data['photos'] : []),
