@@ -11,6 +11,37 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+// ─── Model for a single vehicle quotation block ──────────────
+class VehicleQuotation {
+  String? selectedBrand;
+  String? selectedModel;
+  String? selectedVariant;
+  List<String> brands = [];
+  List<String> models = [];
+  List<Map<String, dynamic>> variants = [];
+  bool brandsLoading = true;
+  String? selectedVariantPhotoUrl;
+  List<String> selectedVariantPhotoUrls = [];
+  String? selectedVehicleId;
+  final TextEditingController brandController = TextEditingController();
+  final TextEditingController modelController = TextEditingController();
+  final TextEditingController variantController = TextEditingController();
+  final TextEditingController onRoadPriceController = TextEditingController();
+  final TextEditingController offerPriceController = TextEditingController();
+  final TextEditingController descriptionController = TextEditingController();
+  final TextEditingController otherController = TextEditingController();
+
+  void dispose() {
+    brandController.dispose();
+    modelController.dispose();
+    variantController.dispose();
+    onRoadPriceController.dispose();
+    offerPriceController.dispose();
+    descriptionController.dispose();
+    otherController.dispose();
+  }
+}
+
 class AddInquiryScreen extends StatefulWidget {
   const AddInquiryScreen({super.key});
 
@@ -23,81 +54,95 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
-  final brandController = TextEditingController();
-  final modelController = TextEditingController();
-  final variantController = TextEditingController();
-  final priceController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final referenceController = TextEditingController();
-  final otherController = TextEditingController();
+  final referenceNameController = TextEditingController();
+  final referencePhoneController = TextEditingController();
 
-  String? selectedVehicleId;
+  // Exchange vehicle controllers
+  final exchangeBrandModelController = TextEditingController();
+  final exchangeRegController = TextEditingController();
+  final exchangeExpectedPriceController = TextEditingController();
+  final exchangeOfferPriceController = TextEditingController();
+
   String paymentType = 'Loan';
   DateTime selectedDate = DateTime.now();
   DateTime? followUpDate;
-  String? selectedVariantPhotoUrl;
-  List<String> selectedVariantPhotoUrls = [];
 
   bool loading = false;
-  bool lookupLoading = false;
   bool inquiryAlreadySaved = false;
-  bool brandsLoading = true;
 
-  String? selectedBrand;
-  String? selectedModel;
-  String? selectedVariant;
+  // Eagerness
+  String? selectedEagerness;
 
-  List<String> brands = [];
-  List<String> models = [];
-  List<Map<String, dynamic>> variants = [];
+  // Source
+  String? selectedSource;
+  final List<String> sourceOptions = [
+    'Google',
+    'Facebook / Instagram',
+    'Sticker',
+    'BikeWale',
+    'Just Dial',
+    'Walking',
+    'Reference',
+  ];
+
+  // Exchange
+  String exchangeOption = 'No';
+
+  // Multiple vehicle quotations
+  final List<VehicleQuotation> quotations = [];
 
   @override
   void initState() {
     super.initState();
-    fetchBrands();
+    _addQuotation();
   }
 
-  Future<void> fetchBrands() async {
+  void _addQuotation() {
+    final q = VehicleQuotation();
+    quotations.add(q);
+    _fetchBrandsForQuotation(q);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _fetchBrandsForQuotation(VehicleQuotation q) async {
     try {
-      setState(() => brandsLoading = true);
-      final snapshot = await FirebaseFirestore.instance
-          .collection('Brand')
-          .get();
-      setState(() {
-        brands = snapshot.docs
-            .map((doc) => doc['Name'].toString())
-            .toList();
-        brandsLoading = false;
-      });
-    } catch (e) {
-      setState(() => brandsLoading = false);
-      showMessage("Failed to load brands");
+      final snapshot =
+          await FirebaseFirestore.instance.collection('Brand').get();
+      if (mounted) {
+        setState(() {
+          q.brands =
+              snapshot.docs.map((doc) => doc['Name'].toString()).toList();
+          q.brandsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => q.brandsLoading = false);
     }
   }
 
-  Future<void> fetchModels(String brand) async {
+  Future<void> _fetchModels(VehicleQuotation q, String brand) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('Model')
         .where('ParentBrand', isEqualTo: brand)
         .get();
-
-    setState(() {
-      models = snapshot.docs
-          .map((doc) => doc['Name'].toString())
-          .toList();
-      selectedModel = null;
-      selectedVariant = null;
-      variants = [];
-      modelController.clear();
-      variantController.clear();
-      priceController.clear();
-      selectedVariantPhotoUrl = null;
-      selectedVariantPhotoUrls = [];
-      selectedVehicleId = null;
-    });
+    if (mounted) {
+      setState(() {
+        q.models =
+            snapshot.docs.map((doc) => doc['Name'].toString()).toList();
+        q.selectedModel = null;
+        q.selectedVariant = null;
+        q.variants = [];
+        q.modelController.clear();
+        q.variantController.clear();
+        q.onRoadPriceController.clear();
+        q.selectedVariantPhotoUrl = null;
+        q.selectedVariantPhotoUrls = [];
+        q.selectedVehicleId = null;
+      });
+    }
   }
 
-  Future<void> fetchVariants(String model) async {
+  Future<void> _fetchVariants(VehicleQuotation q, String model) async {
     final snapshot = await FirebaseFirestore.instance
         .collection('Variant')
         .where('ParentModel', isEqualTo: model)
@@ -114,7 +159,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
       try {
         QuerySnapshot<Map<String, dynamic>>? imagesSnap;
-
         if (docId.isNotEmpty) {
           imagesSnap = await FirebaseFirestore.instance
               .collection('VehicleImages')
@@ -122,21 +166,18 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
               .collection('images')
               .get();
         }
-
         if (imagesSnap == null || imagesSnap.docs.isEmpty) {
           final imageSearch = await FirebaseFirestore.instance
               .collection('VehicleImages')
               .where('name', isEqualTo: variantName)
               .limit(1)
               .get();
-
           if (imageSearch.docs.isNotEmpty) {
             imagesSnap = await imageSearch.docs.first.reference
                 .collection('images')
                 .get();
           }
         }
-
         if (imagesSnap == null || imagesSnap.docs.isEmpty) {
           imagesSnap = await FirebaseFirestore.instance
               .collection('VehicleImages')
@@ -144,7 +185,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
               .collection('images')
               .get();
         }
-
         for (final imageDoc in imagesSnap.docs) {
           final url = imageDoc.data()['url']?.toString();
           if (url != null && url.isNotEmpty && !photoUrls.contains(url)) {
@@ -156,7 +196,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       }
 
       final fallbackUrl = variantData['photoUrl']?.toString();
-      if (photoUrls.isEmpty && fallbackUrl != null && fallbackUrl.isNotEmpty) {
+      if (photoUrls.isEmpty &&
+          fallbackUrl != null &&
+          fallbackUrl.isNotEmpty) {
         photoUrls.add(fallbackUrl);
       }
 
@@ -166,62 +208,22 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       fetchedVariants.add(variantData);
     }
 
-    setState(() {
-      variants = fetchedVariants;
-      selectedVariant = null;
-      variantController.clear();
-      priceController.clear();
-      selectedVariantPhotoUrl = null;
-      selectedVariantPhotoUrls = [];
-      selectedVehicleId = null;
-    });
+    if (mounted) {
+      setState(() {
+        q.variants = fetchedVariants;
+        q.selectedVariant = null;
+        q.variantController.clear();
+        q.onRoadPriceController.clear();
+        q.selectedVariantPhotoUrl = null;
+        q.selectedVariantPhotoUrls = [];
+        q.selectedVehicleId = null;
+      });
+    }
   }
 
   void showMessage(String msg) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  Future<void> _lookupVehicle() async {
-    final brand = brandController.text.trim();
-    final model = modelController.text.trim();
-    final variant = variantController.text.trim();
-
-    if (brand.isEmpty || model.isEmpty || variant.isEmpty) {
-      showMessage('Enter brand, model and variant to fetch vehicle details.');
-      return;
-    }
-
-    setState(() => lookupLoading = true);
-
-    try {
-      final query = await FirebaseFirestore.instance
-          .collection('vehicles')
-          .where('brand', isEqualTo: brand)
-          .where('model', isEqualTo: model)
-          .where('variant', isEqualTo: variant)
-          .limit(1)
-          .get();
-
-      if (query.docs.isNotEmpty) {
-        final vehicle = query.docs.first;
-        final data = vehicle.data();
-        selectedVehicleId = vehicle.id;
-        priceController.text =
-            data['price']?.toString() ?? priceController.text;
-        descriptionController.text =
-            data['description']?.toString() ?? descriptionController.text;
-        showMessage('Vehicle details loaded from catalog.');
-      } else {
-        showMessage('No matching vehicle found in catalog.');
-      }
-    } catch (_) {
-      showMessage('Failed to fetch vehicle details.');
-    } finally {
-      if (mounted) {
-        setState(() => lookupLoading = false);
-      }
-    }
   }
 
   Future<bool> saveInquiry() async {
@@ -244,36 +246,41 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       showMessage("Enter valid 10-digit phone number.");
       return false;
     }
-    if (selectedBrand == null) {
+
+    final q = quotations.first;
+    if (q.selectedBrand == null) {
       showMessage("Please select vehicle brand.");
       return false;
     }
-    if (selectedModel == null) {
+    if (q.selectedModel == null) {
       showMessage("Please select vehicle model.");
       return false;
     }
-    if (selectedVariant == null) {
+    if (q.selectedVariant == null) {
       showMessage("Please select vehicle variant.");
       return false;
     }
-
-    final price = priceController.text.trim();
+    final price = q.onRoadPriceController.text.trim();
     if (price.isEmpty) {
-      showMessage("Please enter vehicle price.");
+      showMessage("Please enter on road price.");
       return false;
     }
     if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(price)) {
       showMessage("Enter valid price.");
       return false;
     }
-
     final priceValue = double.tryParse(price);
-    if (priceValue == null) {
-      showMessage("Invalid price.");
+    if (priceValue == null || priceValue < 10000) {
+      showMessage("Price must be at least 5 digits.");
       return false;
     }
-    if (priceValue < 10000) {
-      showMessage("Price must be at least 5 digits.");
+    if (selectedSource == null) {
+      showMessage("Please select a source.");
+      return false;
+    }
+    if (selectedSource == 'Reference' &&
+        referenceNameController.text.trim().isEmpty) {
+      showMessage("Please enter reference person's name.");
       return false;
     }
 
@@ -290,35 +297,66 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           .collection('counters')
           .doc('inquiryCounter');
       final counterSnapshot = await counterRef.get();
-      var currentNumber = 0;
-      if (counterSnapshot.exists) {
-        currentNumber = counterSnapshot['current'] ?? 0;
-      }
-
+      final currentNumber =
+          counterSnapshot.exists ? counterSnapshot['current'] ?? 0 : 0;
       final newInquiryNumber = currentNumber + 1;
       await counterRef.set({'current': newInquiryNumber});
+
+      final additionalQuotations = quotations.skip(1).map((aq) {
+        return {
+          'brand': aq.brandController.text.trim(),
+          'model': aq.modelController.text.trim(),
+          'variant': aq.variantController.text.trim(),
+          'onRoadPrice': aq.onRoadPriceController.text.trim(),
+          'offerPrice': aq.offerPriceController.text.trim(),
+          'description': aq.descriptionController.text.trim(),
+          'otherDescription': aq.otherController.text.trim(),
+          'vehiclePhotoUrl': aq.selectedVariantPhotoUrl,
+          'vehiclePhotoUrls': aq.selectedVariantPhotoUrls,
+        };
+      }).toList();
 
       await FirebaseFirestore.instance.collection('inquiries').add({
         'inquiryNumber': newInquiryNumber,
         'name': name,
         'phone': phone,
-        'brand': brandController.text.trim(),
-        'model': modelController.text.trim(),
-        'variant': variantController.text.trim(),
-        'vehicleId': selectedVehicleId,
-        'vehiclePhotoUrl': selectedVariantPhotoUrl,
-        'vehiclePhotoUrls': selectedVariantPhotoUrls,
-        'price': priceController.text.trim(),
-        'description': descriptionController.text.trim(),
-        'otherDescription': otherController.text.trim(),
-        'reference': referenceController.text.trim(),
+        // Primary vehicle
+        'brand': q.brandController.text.trim(),
+        'model': q.modelController.text.trim(),
+        'variant': q.variantController.text.trim(),
+        'vehicleId': q.selectedVehicleId,
+        'vehiclePhotoUrl': q.selectedVariantPhotoUrl,
+        'vehiclePhotoUrls': q.selectedVariantPhotoUrls,
+        'price': q.onRoadPriceController.text.trim(),
+        'offerPrice': q.offerPriceController.text.trim(),
+        'description': q.descriptionController.text.trim(),
+        'otherDescription': q.otherController.text.trim(),
+        if (additionalQuotations.isNotEmpty)
+          'additionalQuotations': additionalQuotations,
+        // Source
+        'source': selectedSource,
+        if (selectedSource == 'Reference') ...{
+          'referenceName': referenceNameController.text.trim(),
+          'referencePhone': referencePhoneController.text.trim(),
+        },
+        // Payment & eagerness
+        'paymentType': paymentType,
+        'eagerness': selectedEagerness,
+        // Exchange
+        'exchangeVehicle': exchangeOption == 'Yes',
+        if (exchangeOption == 'Yes') ...{
+          'exchangeBrandModel': exchangeBrandModelController.text.trim(),
+          'exchangeRegNumber': exchangeRegController.text.trim(),
+          'exchangeExpectedPrice':
+              exchangeExpectedPriceController.text.trim(),
+          'exchangeOfferPrice': exchangeOfferPriceController.text.trim(),
+        },
         'date': selectedDate,
         'staffId': user.uid,
         'assignedTo': user.uid,
         'createdBy': user.uid,
         'createdAt': Timestamp.now(),
         'status': 'New Inquiry',
-        'paymentType': paymentType,
         if (followUpDate != null)
           'nextFollowUp': Timestamp.fromDate(followUpDate!),
       });
@@ -329,100 +367,15 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       showMessage("Failed to save inquiry: $e");
       return false;
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
-    }
-  }
-
-  Future<String?> saveQuotationPdfToLocalStorage() async {
-    try {
-      final pdf = pw.Document();
-      final name = nameController.text.trim();
-      final phone = phoneController.text.trim();
-      final reference = referenceController.text.trim();
-      final brand = brandController.text.trim();
-      final model = modelController.text.trim();
-      final variant = variantController.text.trim();
-      final price = priceController.text.trim();
-      final date = DateTime.now().toString().split(' ')[0];
-
-      pdf.addPage(
-        pw.Page(
-          build: (context) => pw.Padding(
-            padding: const pw.EdgeInsets.all(24),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  "JITEN AUTO",
-                  style: pw.TextStyle(
-                    fontSize: 24,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 5),
-                pw.Text("Quotation", style: const pw.TextStyle(fontSize: 18)),
-                pw.Divider(),
-                pw.SizedBox(height: 8),
-                pw.Text(
-                  "Customer Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text("Name: $name"),
-                pw.Text("Mobile: $phone"),
-                pw.Text("Reference: $reference"),
-                pw.Text("Date: $date"),
-                pw.SizedBox(height: 20),
-                pw.Text(
-                  "Vehicle Details",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-                pw.SizedBox(height: 8),
-                pw.Text("Brand: $brand"),
-                pw.Text("Model: $model"),
-                pw.Text("Variant: $variant"),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  "Price: Rs. $price",
-                  style: pw.TextStyle(
-                    fontSize: 16,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 30),
-                pw.Text(
-                  "Thank you for your inquiry.",
-                  style: const pw.TextStyle(fontSize: 12),
-                ),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  "Regards,\nJiten Auto",
-                  style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-
-      final bytes = await pdf.save();
-      final cacheDir = await getTemporaryDirectory();
-      final filePath = '${cacheDir.path}/quotation.pdf';
-      final file = File(filePath);
-      await file.writeAsBytes(bytes, flush: true);
-      return filePath;
-    } catch (e) {
-      showMessage('Failed to save PDF: ${e.toString()}');
-      return null;
+      if (mounted) setState(() => loading = false);
     }
   }
 
   Future<void> sendPdfToWhatsApp() async {
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
-    final price = priceController.text.trim();
+    final q = quotations.first;
+    final price = q.onRoadPriceController.text.trim();
 
     if (name.isEmpty) {
       showMessage("Please enter customer name.");
@@ -436,33 +389,28 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       showMessage("Enter valid 10-digit phone number.");
       return;
     }
-    if (selectedBrand == null) {
+    if (q.selectedBrand == null) {
       showMessage("Please select vehicle brand.");
       return;
     }
-    if (selectedModel == null) {
+    if (q.selectedModel == null) {
       showMessage("Please select vehicle model.");
       return;
     }
-    if (selectedVariant == null) {
+    if (q.selectedVariant == null) {
       showMessage("Please select vehicle variant.");
       return;
     }
     if (price.isEmpty) {
-      showMessage("Please enter vehicle price.");
+      showMessage("Please enter on road price.");
       return;
     }
     if (!RegExp(r'^\d+(\.\d+)?$').hasMatch(price)) {
       showMessage("Enter valid price.");
       return;
     }
-
     final priceValue = double.tryParse(price);
-    if (priceValue == null) {
-      showMessage("Invalid price.");
-      return;
-    }
-    if (priceValue < 10000) {
+    if (priceValue == null || priceValue < 10000) {
       showMessage("Price must be at least 5 digits.");
       return;
     }
@@ -474,11 +422,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       await Permission.storage.request();
 
       if (!inquiryAlreadySaved) {
-        final inquirySaved = await saveInquiry();
-        if (!inquirySaved) {
-          if (mounted) {
-            setState(() => loading = false);
-          }
+        final saved = await saveInquiry();
+        if (!saved) {
+          if (mounted) setState(() => loading = false);
           return;
         }
         inquiryAlreadySaved = true;
@@ -486,31 +432,29 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
       final vehicleImages = <pw.MemoryImage>[];
       final imageUrls = <String>[
-        ...selectedVariantPhotoUrls,
-        if (selectedVariantPhotoUrl != null &&
-            selectedVariantPhotoUrl!.isNotEmpty &&
-            !selectedVariantPhotoUrls.contains(selectedVariantPhotoUrl))
-          selectedVariantPhotoUrl!,
+        ...q.selectedVariantPhotoUrls,
+        if (q.selectedVariantPhotoUrl != null &&
+            q.selectedVariantPhotoUrl!.isNotEmpty &&
+            !q.selectedVariantPhotoUrls
+                .contains(q.selectedVariantPhotoUrl))
+          q.selectedVariantPhotoUrl!,
       ];
-
       for (final url in imageUrls) {
         try {
           final response = await http
               .get(Uri.parse(url))
               .timeout(const Duration(seconds: 15));
-          if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
+          if (response.statusCode == 200 &&
+              response.bodyBytes.isNotEmpty) {
             vehicleImages.add(pw.MemoryImage(response.bodyBytes));
           }
-        } catch (e) {
-          debugPrint("Failed to load image $url: $e");
-        }
+        } catch (_) {}
       }
 
-      final reference = referenceController.text.trim();
-      final brand = brandController.text.trim();
-      final model = modelController.text.trim();
-      final variant = variantController.text.trim();
-      final priceFinal = priceController.text.trim();
+      final brand = q.brandController.text.trim();
+      final model = q.modelController.text.trim();
+      final variant = q.variantController.text.trim();
+      final offerPrice = q.offerPriceController.text.trim();
       final date = DateTime.now().toString().split(' ')[0];
       final pdf = pw.Document();
 
@@ -524,31 +468,21 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                 pw.Container(
                   width: double.infinity,
                   padding: const pw.EdgeInsets.symmetric(
-                    horizontal: 30,
-                    vertical: 28,
-                  ),
+                      horizontal: 30, vertical: 28),
                   decoration: const pw.BoxDecoration(
-                    color: PdfColor.fromInt(0xFF7B1F3F),
-                  ),
+                      color: PdfColor.fromInt(0xFF7B1F3F)),
                   child: pw.Column(
                     crossAxisAlignment: pw.CrossAxisAlignment.start,
                     children: [
-                      pw.Text(
-                        "JITEN AUTO",
-                        style: pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 30,
-                          fontWeight: pw.FontWeight.bold,
-                        ),
-                      ),
+                      pw.Text("JITEN AUTO",
+                          style: pw.TextStyle(
+                              color: PdfColors.white,
+                              fontSize: 30,
+                              fontWeight: pw.FontWeight.bold)),
                       pw.SizedBox(height: 8),
-                      pw.Text(
-                        "Vehicle Quotation",
-                        style: const pw.TextStyle(
-                          color: PdfColors.white,
-                          fontSize: 16,
-                        ),
-                      ),
+                      pw.Text("Vehicle Quotation",
+                          style: const pw.TextStyle(
+                              color: PdfColors.white, fontSize: 16)),
                     ],
                   ),
                 ),
@@ -566,39 +500,43 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             padding: const pw.EdgeInsets.all(18),
                             decoration: pw.BoxDecoration(
                               color: PdfColors.white,
-                              borderRadius: pw.BorderRadius.circular(18),
+                              borderRadius:
+                                  pw.BorderRadius.circular(18),
                             ),
                             child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment.start,
                               children: [
-                                pw.Text(
-                                  "Customer Details",
-                                  style: pw.TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: PdfColor.fromInt(0xFF7B1F3F),
-                                  ),
-                                ),
+                                pw.Text("Customer Details",
+                                    style: pw.TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: PdfColor.fromInt(
+                                            0xFF7B1F3F))),
                                 pw.SizedBox(height: 14),
-                                pw.Text(
-                                  "Name: $name",
-                                  style: const pw.TextStyle(fontSize: 14),
-                                ),
+                                pw.Text("Name: $name",
+                                    style: const pw.TextStyle(
+                                        fontSize: 14)),
+                                pw.SizedBox(height: 6),
+                                pw.Text("Phone: $phone",
+                                    style: const pw.TextStyle(
+                                        fontSize: 14)),
                                 pw.SizedBox(height: 6),
                                 pw.Text(
-                                  "Phone: $phone",
-                                  style: const pw.TextStyle(fontSize: 14),
-                                ),
+                                    "Source: ${selectedSource ?? ''}",
+                                    style: const pw.TextStyle(
+                                        fontSize: 14)),
+                                if (selectedSource == 'Reference') ...[
+                                  pw.SizedBox(height: 6),
+                                  pw.Text(
+                                      "Reference: ${referenceNameController.text.trim()} ${referencePhoneController.text.trim()}",
+                                      style: const pw.TextStyle(
+                                          fontSize: 14)),
+                                ],
                                 pw.SizedBox(height: 6),
-                                pw.Text(
-                                  "Reference: $reference",
-                                  style: const pw.TextStyle(fontSize: 14),
-                                ),
-                                pw.SizedBox(height: 6),
-                                pw.Text(
-                                  "Date: $date",
-                                  style: const pw.TextStyle(fontSize: 14),
-                                ),
+                                pw.Text("Date: $date",
+                                    style: const pw.TextStyle(
+                                        fontSize: 14)),
                               ],
                             ),
                           ),
@@ -608,19 +546,19 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             padding: const pw.EdgeInsets.all(18),
                             decoration: pw.BoxDecoration(
                               color: PdfColors.white,
-                              borderRadius: pw.BorderRadius.circular(18),
+                              borderRadius:
+                                  pw.BorderRadius.circular(18),
                             ),
                             child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment.start,
                               children: [
-                                pw.Text(
-                                  "Vehicle Details",
-                                  style: pw.TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: pw.FontWeight.bold,
-                                    color: PdfColor.fromInt(0xFF7B1F3F),
-                                  ),
-                                ),
+                                pw.Text("Vehicle Details",
+                                    style: pw.TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: PdfColor.fromInt(
+                                            0xFF7B1F3F))),
                                 pw.SizedBox(height: 14),
                                 pw.Text("Brand: $brand"),
                                 pw.SizedBox(height: 6),
@@ -629,44 +567,42 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                                 pw.Text("Variant: $variant"),
                                 if (vehicleImages.isNotEmpty)
                                   pw.Padding(
-                                    padding: const pw.EdgeInsets.only(top: 16),
+                                    padding: const pw.EdgeInsets.only(
+                                        top: 16),
                                     child: pw.Column(
                                       crossAxisAlignment:
                                           pw.CrossAxisAlignment.start,
                                       children: [
-                                        pw.Text(
-                                          "Available Colours",
-                                          style: pw.TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: pw.FontWeight.bold,
-                                            color: PdfColor.fromInt(0xFF7B1F3F),
-                                          ),
-                                        ),
+                                        pw.Text("Available Colours",
+                                            style: pw.TextStyle(
+                                                fontSize: 13,
+                                                fontWeight:
+                                                    pw.FontWeight.bold,
+                                                color: PdfColor.fromInt(
+                                                    0xFF7B1F3F))),
                                         pw.SizedBox(height: 10),
                                         pw.Wrap(
                                           spacing: 10,
                                           runSpacing: 10,
                                           children: vehicleImages
-                                              .map(
-                                                (img) => pw.Container(
-                                                  width: 120,
-                                                  height: 90,
-                                                  decoration: pw.BoxDecoration(
-                                                    borderRadius:
-                                                        pw.BorderRadius.circular(
-                                                      10,
+                                              .map((img) =>
+                                                  pw.Container(
+                                                    width: 120,
+                                                    height: 90,
+                                                    decoration: pw.BoxDecoration(
+                                                        borderRadius:
+                                                            pw.BorderRadius.circular(
+                                                                10)),
+                                                    child: pw.ClipRRect(
+                                                      horizontalRadius:
+                                                          10,
+                                                      verticalRadius: 10,
+                                                      child: pw.Image(
+                                                          img,
+                                                          fit: pw.BoxFit
+                                                              .cover),
                                                     ),
-                                                  ),
-                                                  child: pw.ClipRRect(
-                                                    horizontalRadius: 10,
-                                                    verticalRadius: 10,
-                                                    child: pw.Image(
-                                                      img,
-                                                      fit: pw.BoxFit.cover,
-                                                    ),
-                                                  ),
-                                                ),
-                                              )
+                                                  ))
                                               .toList(),
                                         ),
                                       ],
@@ -679,32 +615,41 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           pw.Container(
                             width: double.infinity,
                             padding: const pw.EdgeInsets.symmetric(
-                              vertical: 20,
-                              horizontal: 20,
-                            ),
+                                vertical: 20, horizontal: 20),
                             decoration: pw.BoxDecoration(
                               color: PdfColor.fromInt(0xFF7B1F3F),
-                              borderRadius: pw.BorderRadius.circular(20),
+                              borderRadius:
+                                  pw.BorderRadius.circular(20),
                             ),
                             child: pw.Column(
-                              crossAxisAlignment: pw.CrossAxisAlignment.start,
+                              crossAxisAlignment:
+                                  pw.CrossAxisAlignment.start,
                               children: [
-                                pw.Text(
-                                  "Quotation Price",
-                                  style: const pw.TextStyle(
-                                    color: PdfColors.white,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                pw.SizedBox(height: 8),
-                                pw.Text(
-                                  "Rs. $priceFinal",
-                                  style: pw.TextStyle(
-                                    color: PdfColors.white,
-                                    fontSize: 28,
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
+                                pw.Text("On Road Price",
+                                    style: const pw.TextStyle(
+                                        color: PdfColors.white,
+                                        fontSize: 13)),
+                                pw.SizedBox(height: 6),
+                                pw.Text("Rs. $price",
+                                    style: pw.TextStyle(
+                                        color: PdfColors.white,
+                                        fontSize: 26,
+                                        fontWeight:
+                                            pw.FontWeight.bold)),
+                                if (offerPrice.isNotEmpty) ...[
+                                  pw.SizedBox(height: 10),
+                                  pw.Text("Offer Price",
+                                      style: const pw.TextStyle(
+                                          color: PdfColors.white,
+                                          fontSize: 13)),
+                                  pw.SizedBox(height: 6),
+                                  pw.Text("Rs. $offerPrice",
+                                      style: pw.TextStyle(
+                                          color: PdfColors.white,
+                                          fontSize: 22,
+                                          fontWeight:
+                                              pw.FontWeight.bold)),
+                                ],
                               ],
                             ),
                           ),
@@ -713,18 +658,17 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             child: pw.Column(
                               children: [
                                 pw.Text(
-                                  "Thank you for choosing Jiten Auto",
-                                  style: pw.TextStyle(
-                                    color: PdfColor.fromInt(0xFF7B1F3F),
-                                    fontSize: 14,
-                                    fontWeight: pw.FontWeight.bold,
-                                  ),
-                                ),
+                                    "Thank you for choosing Jiten Auto",
+                                    style: pw.TextStyle(
+                                        color: PdfColor.fromInt(
+                                            0xFF7B1F3F),
+                                        fontSize: 14,
+                                        fontWeight:
+                                            pw.FontWeight.bold)),
                                 pw.SizedBox(height: 8),
-                                pw.Text(
-                                  "We appreciate your inquiry.",
-                                  style: const pw.TextStyle(fontSize: 12),
-                                ),
+                                pw.Text("We appreciate your inquiry.",
+                                    style: const pw.TextStyle(
+                                        fontSize: 12)),
                               ],
                             ),
                           ),
@@ -745,10 +689,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       final file = File(filePath);
       await file.writeAsBytes(bytes, flush: true);
 
-      final message = "Hello $name,\n\n"
-          "Please find attached the quotation for the vehicle you inquired "
-          "about.\n\n"
-          "Regards,\nJiten Auto Team";
+      final message =
+          "Hello $name,\n\nPlease find attached the quotation for the vehicle you inquired about.\n\nRegards,\nJiten Auto Team";
 
       await _platform.invokeMethod('shareToWhatsApp', {
         'filePath': filePath,
@@ -763,62 +705,274 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     } catch (e) {
       showMessage('Failed to send PDF: ${e.toString()}');
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
-  }
-
-  Future<void> sendThankYou() async {
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
-    final message = "Thank you $name\n"
-        "For visiting Jiten Auto.\n"
-        "We appreciate your inquiry.\n\n"
-        "Our team will get back to you shortly.\n\n"
-        "Regards,\nJiten Auto Team";
-
-    final url = Uri.parse(
-      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
-    );
-    await launchUrl(url, mode: LaunchMode.externalApplication);
-  }
-
-  Future<void> sendQuotation() async {
-    final name = nameController.text.trim();
-    final phone = phoneController.text.trim();
-    final brand = brandController.text;
-    final model = modelController.text;
-    final variant = variantController.text;
-    final price = priceController.text;
-
-    final message = "Hello $name,\n\n"
-        "Thank you for your interest.\n\n"
-        "Quotation Details\n"
-        "Vehicle: $brand $model $variant\n"
-        "Price: Rs. $price\n"
-        "Payment: $paymentType\n\n"
-        "Please let us know if you have any questions.\n\n"
-        "Regards,\nJiten Auto Team";
-
-    final url = Uri.parse(
-      "https://wa.me/91$phone?text=${Uri.encodeComponent(message)}",
-    );
-    await launchUrl(url, mode: LaunchMode.externalApplication);
   }
 
   @override
   void dispose() {
     nameController.dispose();
     phoneController.dispose();
-    brandController.dispose();
-    modelController.dispose();
-    variantController.dispose();
-    priceController.dispose();
-    descriptionController.dispose();
-    referenceController.dispose();
-    otherController.dispose();
+    referenceNameController.dispose();
+    referencePhoneController.dispose();
+    exchangeBrandModelController.dispose();
+    exchangeRegController.dispose();
+    exchangeExpectedPriceController.dispose();
+    exchangeOfferPriceController.dispose();
+    for (final q in quotations) {
+      q.dispose();
+    }
     super.dispose();
+  }
+
+  InputDecoration _dec(String label, IconData icon,
+      {bool disabled = false}) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: disabled ? Colors.grey.shade200 : Colors.grey.shade100,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: BorderSide.none,
+      ),
+    );
+  }
+
+  Widget _buildQuotationBlock(
+      BuildContext context, VehicleQuotation q, int index) {
+    final theme = Theme.of(context);
+    final isFirst = index == 0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!isFirst) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: Divider(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    thickness: 1.5),
+              ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12),
+                child: Text(
+                  'Vehicle ${index + 1}',
+                  style: TextStyle(
+                    color: theme.colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Divider(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    thickness: 1.5),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.red),
+                onPressed: () =>
+                    setState(() => quotations.removeAt(index)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        // Brand
+        DropdownButtonFormField<String>(
+          value: q.selectedBrand,
+          isExpanded: true,
+          hint: q.brandsLoading
+              ? const Text("Loading brands...")
+              : const Text("Select Brand"),
+          items: q.brands
+              .map((b) =>
+                  DropdownMenuItem(value: b, child: Text(b)))
+              .toList(),
+          onChanged: q.brands.isEmpty
+              ? null
+              : (value) {
+                  setState(() {
+                    q.selectedBrand = value;
+                    q.brandController.text = value ?? '';
+                  });
+                  if (value != null) _fetchModels(q, value);
+                },
+          decoration:
+              _dec('Vehicle Brand', Icons.directions_car_outlined),
+        ),
+        const SizedBox(height: 16),
+
+        // Model
+        DropdownButtonFormField<String>(
+          key: ValueKey('model_${index}_${q.selectedBrand}'),
+          value: q.selectedModel,
+          isExpanded: true,
+          hint: const Text("Select Model"),
+          disabledHint: const Text("Select a brand first"),
+          items: q.models
+              .map((m) =>
+                  DropdownMenuItem(value: m, child: Text(m)))
+              .toList(),
+          onChanged: q.selectedBrand == null || q.models.isEmpty
+              ? null
+              : (value) {
+                  setState(() {
+                    q.selectedModel = value;
+                    q.modelController.text = value ?? '';
+                  });
+                  if (value != null) _fetchVariants(q, value);
+                },
+          decoration: _dec(
+            'Model',
+            Icons.precision_manufacturing,
+            disabled: q.selectedBrand == null,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Variant
+        DropdownButtonFormField<String>(
+          key: ValueKey(
+              'variant_${index}_${q.selectedBrand}_${q.selectedModel}'),
+          value: q.selectedVariant,
+          isExpanded: true,
+          hint: const Text("Select Variant"),
+          disabledHint: const Text("Select a model first"),
+          items: q.variants
+              .map((v) => DropdownMenuItem<String>(
+                    value: v['Name']?.toString(),
+                    child: Text(v['Name']?.toString() ?? '',
+                        overflow: TextOverflow.ellipsis),
+                  ))
+              .toList(),
+          onChanged: q.selectedModel == null || q.variants.isEmpty
+              ? null
+              : (value) {
+                  final selected = q.variants
+                      .firstWhere((v) => v['Name'] == value);
+                  setState(() {
+                    q.selectedVariant = value;
+                    q.selectedVariantPhotoUrl =
+                        selected['photoUrl']?.toString();
+                    q.selectedVariantPhotoUrls =
+                        List<String>.from(
+                            selected['photoUrls'] ?? const []);
+                    q.variantController.text = value ?? '';
+                    q.onRoadPriceController.text =
+                        selected['Price']?.toString() ?? '';
+                  });
+                },
+          decoration: _dec(
+            'Variant',
+            Icons.widgets_outlined,
+            disabled: q.selectedModel == null,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Photo preview
+        if (q.selectedVariantPhotoUrl != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Image.network(
+              q.selectedVariantPhotoUrl!,
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Container(
+                height: 160,
+                color: Colors.grey.shade200,
+                alignment: Alignment.center,
+                child:
+                    const Text("Unable to load vehicle photo"),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+
+        // Colour thumbnails
+        if (q.selectedVariantPhotoUrls.isNotEmpty) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Text("Available Colours",
+                style: Theme.of(context)
+                    .textTheme
+                    .titleSmall
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              itemCount: q.selectedVariantPhotoUrls.length,
+              itemBuilder: (context, i) => Padding(
+                padding: const EdgeInsets.only(right: 10),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    q.selectedVariantPhotoUrls[i],
+                    width: 140,
+                    height: 100,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Container(
+                      width: 140,
+                      height: 100,
+                      color: Colors.grey.shade200,
+                      alignment: Alignment.center,
+                      child: const Text("Unavailable"),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // On Road Price
+        TextField(
+          controller: q.onRoadPriceController,
+          keyboardType: TextInputType.number,
+          decoration: _dec('On Road Price', Icons.currency_rupee),
+        ),
+        const SizedBox(height: 16),
+
+        // Offer Price
+        TextField(
+          controller: q.offerPriceController,
+          keyboardType: TextInputType.number,
+          decoration: _dec(
+              'Offer Price (optional)', Icons.local_offer_outlined),
+        ),
+        const SizedBox(height: 16),
+
+        // Vehicle description
+        TextField(
+          controller: q.descriptionController,
+          minLines: 1,
+          maxLines: 5,
+          decoration: _dec('Vehicle Description', Icons.info_outline),
+        ),
+        const SizedBox(height: 16),
+
+        // Other description
+        TextField(
+          controller: q.otherController,
+          minLines: 1,
+          maxLines: 5,
+          decoration:
+              _dec('Other Description', Icons.description_outlined),
+        ),
+      ],
+    );
   }
 
   @override
@@ -826,428 +980,279 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Add Inquiry"),
-      ),
+      appBar: AppBar(title: const Text("Add Inquiry")),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          padding: const EdgeInsets.symmetric(
+              horizontal: 20, vertical: 40),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Card(
               elevation: 16,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(28),
-              ),
+                  borderRadius: BorderRadius.circular(28)),
               color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(28),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // ── Header ──────────────────────────────
                     Container(
                       height: 80,
                       width: 80,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary.withOpacity(0.12),
+                        color: theme.colorScheme.primary
+                            .withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
-                        Icons.message_outlined,
-                        color: theme.colorScheme.primary,
-                        size: 40,
-                      ),
+                      child: Icon(Icons.message_outlined,
+                          color: theme.colorScheme.primary,
+                          size: 40),
                     ),
                     const SizedBox(height: 18),
-                    Text(
-                      "New Inquiry",
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    Text("New Inquiry",
+                        style: theme.textTheme.headlineSmall
+                            ?.copyWith(
+                                fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Text(
                       "Capture the lead details and send a WhatsApp confirmation.",
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: Colors.black54,
-                      ),
+                      style: theme.textTheme.bodyMedium
+                          ?.copyWith(color: Colors.black54),
                     ),
                     const SizedBox(height: 24),
+
+                    // ── Customer Name ────────────────────────
                     TextField(
                       controller: nameController,
-                      decoration: InputDecoration(
-                        labelText: "Customer Name",
-                        prefixIcon: const Icon(Icons.person_outline),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration:
+                          _dec('Customer Name', Icons.person_outline),
                     ),
                     const SizedBox(height: 16),
+
+                    // ── Phone ────────────────────────────────
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        labelText: "Phone Number",
-                        prefixIcon: const Icon(Icons.phone_outlined),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration:
+                          _dec('Phone Number', Icons.phone_outlined),
                     ),
                     const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: selectedBrand,
-                      isExpanded: true,
-                      hint: brandsLoading
-                          ? const Text("Loading brands...")
-                          : const Text("Select Brand"),
-                      items: brands
-                          .map(
-                            (brand) => DropdownMenuItem(
-                              value: brand,
-                              child: Text(brand),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: brands.isEmpty
-                          ? null
-                          : (value) {
-                              setState(() {
-                                selectedBrand = value;
-                                brandController.text = value ?? '';
-                              });
-                              if (value != null) {
-                                fetchModels(value);
-                              }
-                            },
-                      decoration: InputDecoration(
-                        labelText: "Vehicle Brand",
-                        prefixIcon:
-                            const Icon(Icons.directions_car_outlined),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('model_$selectedBrand'),
-                      value: selectedModel,
-                      isExpanded: true,
-                      hint: const Text("Select Model"),
-                      disabledHint: const Text("Select a brand first"),
-                      items: models
-                          .map(
-                            (model) => DropdownMenuItem(
-                              value: model,
-                              child: Text(model),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: selectedBrand == null || models.isEmpty
-                          ? null
-                          : (value) {
-                              setState(() {
-                                selectedModel = value;
-                                modelController.text = value ?? '';
-                              });
-                              if (value != null) {
-                                fetchVariants(value);
-                              }
-                            },
-                      decoration: InputDecoration(
-                        labelText: "Model",
-                        prefixIcon:
-                            const Icon(Icons.precision_manufacturing),
-                        filled: true,
-                        fillColor: selectedBrand == null
-                            ? Colors.grey.shade200
-                            : Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      key: ValueKey('variant_${selectedBrand}_$selectedModel'),
-                      value: selectedVariant,
-                      isExpanded: true,
-                      hint: const Text("Select Variant"),
-                      disabledHint: const Text("Select a model first"),
-                      items: variants
-                          .map(
-                            (variant) => DropdownMenuItem<String>(
-                              value: variant['Name']?.toString(),
-                              child: Text(
-                                variant['Name']?.toString() ?? '',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          )
-                          .toList(),
-                      onChanged: selectedModel == null || variants.isEmpty
-                          ? null
-                          : (value) {
-                              final selected = variants.firstWhere(
-                                (variant) => variant['Name'] == value,
-                              );
 
-                              setState(() {
-                                selectedVariant = value;
-                                selectedVariantPhotoUrl =
-                                    selected['photoUrl']?.toString();
-                                selectedVariantPhotoUrls = List<String>.from(
-                                  selected['photoUrls'] ?? const [],
-                                );
-                                brandController.text = selectedBrand ?? '';
-                                modelController.text = selectedModel ?? '';
-                                variantController.text = value ?? '';
-                                priceController.text =
-                                    selected['Price']?.toString() ?? '';
-                              });
-                            },
-                      decoration: InputDecoration(
-                        labelText: "Variant",
-                        prefixIcon: const Icon(Icons.widgets_outlined),
-                        filled: true,
-                        fillColor: selectedModel == null
-                            ? Colors.grey.shade200
-                            : Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    // ── Vehicle Quotation blocks ─────────────
+                    for (int i = 0; i < quotations.length; i++)
+                      _buildQuotationBlock(
+                          context, quotations[i], i),
+
+                    const SizedBox(height: 16),
+
+                    // ── + Add Another Vehicle ────────────────
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
-                        onPressed: lookupLoading ? null : _lookupVehicle,
-                        icon: lookupLoading
-                            ? const SizedBox(
-                                height: 16,
-                                width: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.search),
-                        label: const Text("Lookup Catalog Details"),
-                      ),
-                    ),
-                    if (selectedVariantPhotoUrl != null) ...[
-                      const SizedBox(height: 16),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: Image.network(
-                          selectedVariantPhotoUrl!,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              height: 180,
-                              width: double.infinity,
-                              color: Colors.grey.shade200,
-                              alignment: Alignment.center,
-                              child: const Text("Unable to load vehicle photo"),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.image_outlined),
-                          label: const Text("Open Vehicle Photo"),
-                          onPressed: () async {
-                            final url = Uri.parse(selectedVariantPhotoUrl!);
-                            await launchUrl(
-                              url,
-                              mode: LaunchMode.externalApplication,
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.download_outlined),
-                          label: const Text("Download Vehicle Photo"),
-                          onPressed: () async {
-                            try {
-                              final response = await http.get(
-                                Uri.parse(selectedVariantPhotoUrl!),
-                              );
-                              final dir = await getTemporaryDirectory();
-                              final file = File('${dir.path}/vehicle.jpg');
-                              await file.writeAsBytes(response.bodyBytes);
-                              showMessage("Photo downloaded successfully.");
-                            } catch (e) {
-                              showMessage("Failed to download image.");
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                    if (selectedVariantPhotoUrls.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          "Available Colours",
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
+                        icon: const Icon(Icons.add),
+                        label:
+                            const Text('+ Add Another Vehicle'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor:
+                              theme.colorScheme.primary,
+                          side: BorderSide(
+                              color: theme.colorScheme.primary),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(16),
                           ),
                         ),
+                        onPressed: _addQuotation,
                       ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 120,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: selectedVariantPhotoUrls.length,
-                          itemBuilder: (context, index) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 10),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  selectedVariantPhotoUrls[index],
-                                  width: 160,
-                                  height: 120,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      width: 160,
-                                      height: 120,
-                                      color: Colors.grey.shade200,
-                                      alignment: Alignment.center,
-                                      child: const Text("Image unavailable"),
-                                    );
-                                  },
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ════════════════════════════════════════
+                    // SOURCE, PAYMENT, EAGERNESS, EXCHANGE
+                    // (appear after vehicle details)
+                    // ════════════════════════════════════════
+
+                    // ── Source ───────────────────────────────
+                    DropdownButtonFormField<String>(
+                      value: selectedSource,
+                      isExpanded: true,
+                      hint: const Text('Select Source'),
+                      items: sourceOptions
+                          .map((s) => DropdownMenuItem(
+                              value: s, child: Text(s)))
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => selectedSource = value),
+                      decoration:
+                          _dec('Source', Icons.source_outlined),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Reference fields ─────────────────────
+                    if (selectedSource == 'Reference') ...[
+                      TextField(
+                        controller: referenceNameController,
+                        decoration: _dec(
+                            "Reference Person's Name",
+                            Icons.person_outline),
                       ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: referencePhoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: _dec(
+                            "Reference Person's Phone",
+                            Icons.phone_outlined),
+                      ),
+                      const SizedBox(height: 16),
                     ],
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: priceController,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: "Price",
-                        prefixIcon: const Icon(Icons.currency_rupee),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: descriptionController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: "Vehicle Description",
-                        prefixIcon: const Icon(Icons.info_outline),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
+
+                    // ── Payment Type ─────────────────────────
                     DropdownButtonFormField<String>(
                       value: paymentType,
                       items: const [
                         DropdownMenuItem(
-                          value: 'Loan',
-                          child: Text('Loan'),
-                        ),
+                            value: 'Loan', child: Text('Loan')),
                         DropdownMenuItem(
-                          value: 'Cash',
-                          child: Text('Cash'),
-                        ),
+                            value: 'Cash', child: Text('Cash')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
                           setState(() => paymentType = value);
                         }
                       },
-                      decoration: InputDecoration(
-                        labelText: 'Payment Option',
-                        prefixIcon: const Icon(Icons.payment_outlined),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+                      decoration: _dec(
+                          'Payment Option', Icons.payment_outlined),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: otherController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        labelText: "Other Description",
-                        prefixIcon:
-                            const Icon(Icons.description_outlined),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
+
+                    // ── Eagerness ────────────────────────────
+                    DropdownButtonFormField<String>(
+                      value: selectedEagerness,
+                      isExpanded: true,
+                      hint: const Text('Select Eagerness'),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Hot',
+                          child: Text('🔥  Hot'),
                         ),
-                      ),
+                        DropdownMenuItem(
+                          value: 'Warm',
+                          child: Text('☀️  Warm'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Cold',
+                          child: Text('❄️  Cold'),
+                        ),
+                      ],
+                      onChanged: (value) =>
+                          setState(() => selectedEagerness = value),
+                      decoration: _dec('Eagerness',
+                          Icons.local_fire_department_outlined),
                     ),
                     const SizedBox(height: 16),
-                    TextField(
-                      controller: referenceController,
-                      decoration: InputDecoration(
-                        labelText: "Reference",
-                        prefixIcon: const Icon(Icons.note_outlined),
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
+
+                    // ── Exchange Vehicle ─────────────────────
+                    DropdownButtonFormField<String>(
+                      value: exchangeOption,
+                      items: const [
+                        DropdownMenuItem(
+                            value: 'No',
+                            child: Text('No Exchange')),
+                        DropdownMenuItem(
+                            value: 'Yes',
+                            child:
+                                Text('Yes, Exchange Vehicle')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => exchangeOption = value);
+                        }
+                      },
+                      decoration: _dec('Exchange Vehicle?',
+                          Icons.swap_horiz_outlined),
                     ),
                     const SizedBox(height: 16),
+
+                    // ── Exchange fields ──────────────────────
+                    if (exchangeOption == 'Yes') ...[
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primary
+                              .withOpacity(0.05),
+                          borderRadius:
+                              BorderRadius.circular(16),
+                          border: Border.all(
+                            color: theme.colorScheme.primary
+                                .withOpacity(0.2),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment:
+                              CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Exchange Vehicle Details',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller:
+                                  exchangeBrandModelController,
+                              decoration: _dec('Brand / Model',
+                                  Icons.directions_bike_outlined),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: exchangeRegController,
+                              decoration: _dec(
+                                  'Registration Number',
+                                  Icons.confirmation_number_outlined),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller:
+                                  exchangeExpectedPriceController,
+                              keyboardType: TextInputType.number,
+                              decoration: _dec(
+                                  "Customer's Expected Price",
+                                  Icons.currency_rupee),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller:
+                                  exchangeOfferPriceController,
+                              keyboardType: TextInputType.number,
+                              decoration: _dec('Our Offer Price',
+                                  Icons.local_offer_outlined),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // ── Follow-up date ───────────────────────
                     InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: followUpDate ??
-                              DateTime.now().add(const Duration(days: 1)),
+                              DateTime.now()
+                                  .add(const Duration(days: 1)),
                           firstDate: DateTime.now(),
-                          lastDate:
-                              DateTime.now().add(const Duration(days: 365)),
+                          lastDate: DateTime.now()
+                              .add(const Duration(days: 365)),
                         );
                         if (picked != null) {
                           setState(() => followUpDate = picked);
@@ -1257,11 +1262,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius:
+                              BorderRadius.circular(16),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.calendar_today_outlined),
+                            const Icon(
+                                Icons.calendar_today_outlined),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -1278,27 +1285,34 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             if (followUpDate != null)
                               IconButton(
                                 icon: const Icon(Icons.clear),
-                                onPressed: () =>
-                                    setState(() => followUpDate = null),
+                                onPressed: () => setState(
+                                    () => followUpDate = null),
                               ),
                           ],
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
+
+                    // ── Send PDF via WhatsApp ────────────────
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        icon: const Icon(Icons.picture_as_pdf_outlined),
+                        icon: const Icon(
+                            Icons.picture_as_pdf_outlined),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF7B1F3F),
+                          backgroundColor:
+                              const Color(0xFF7B1F3F),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                            borderRadius:
+                                BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed: loading ? null : sendPdfToWhatsApp,
+                        onPressed:
+                            loading ? null : sendPdfToWhatsApp,
                         label: loading
                             ? const SizedBox(
                                 height: 20,
@@ -1311,9 +1325,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             : const Text(
                                 "Send PDF via WhatsApp",
                                 style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    fontSize: 16,
+                                    fontWeight:
+                                        FontWeight.bold),
                               ),
                       ),
                     ),
