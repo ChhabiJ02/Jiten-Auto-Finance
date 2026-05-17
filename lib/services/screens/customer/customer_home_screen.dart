@@ -169,7 +169,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
 
         // ── Horizontal model cards ──
         SizedBox(
-          height: 370,
+          height: 270,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -185,10 +185,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
               final model = item['model'] ?? '';
               final variant = item['variant'] ?? '';
               final price = item['price'] ?? '';
-              final colors = (item['colors'] as List<dynamic>?)
-                      ?.whereType<String>()
-                      .toList() ??
-                  ['Black', 'White', 'Blue'];
 
               return GestureDetector(
                 onTap: () {
@@ -257,7 +253,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                           ),
 
                           Padding(
-                            padding: const EdgeInsets.all(14),
+                            padding: const EdgeInsets.all(10),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -268,7 +264,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                   overflow: TextOverflow.ellipsis,
                                   style: theme.textTheme.titleLarge?.copyWith(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 18,
+                                    fontSize: 16,
                                   ),
                                 ),
 
@@ -285,7 +281,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                   ),
                                 ),
 
-                                const SizedBox(height: 10),
+                                const SizedBox(height: 2),
 
                                 // Price
                                 Row(
@@ -298,51 +294,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          fontSize: 20,
+                                          fontSize: 17,
                                           color: Colors.green,
                                         ),
                                       ),
                                     ),
                                   ],
-                                ),
-
-                                const SizedBox(height: 10),
-
-                                // Colors
-                                Text(
-                                  'Available Colors',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey.shade800,
-                                    fontSize: 12,
-                                  ),
-                                ),
-
-                                const SizedBox(height: 6),
-
-                                Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: colors.take(3).map((color) {
-                                    return Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: theme.colorScheme.primary
-                                            .withOpacity(0.08),
-                                        borderRadius:
-                                            BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        color,
-                                        style: TextStyle(
-                                          color: theme.colorScheme.primary,
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 11,
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
                                 ),
                               ],
                             ),
@@ -452,7 +409,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
       appBar: AppBar(
         title: searching
             ? buildSearchField()
-            : const Text('JitenAuto Dashboard'),
+            : const Text('JitenAuto Showroom'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
@@ -679,6 +636,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                         (data['Price'] ?? '').toString().trim();
                     final description =
                         (data['description'] ?? '').toString();
+
+                    // BRAND FILTER
+                    if (selectedBrand != 'All' &&
+                        selectedBrand != brand) {
+                      continue;
+                    }
 
                     // Search filter
                     if (!_matchesSearch({

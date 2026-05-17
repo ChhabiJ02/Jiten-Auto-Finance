@@ -3,7 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class NewVehicleBookingScreen extends StatefulWidget {
-  const NewVehicleBookingScreen({super.key});
+  final Map<String, dynamic>? vehicle;
+
+  const NewVehicleBookingScreen({
+    super.key,
+    this.vehicle,
+  });
 
   @override
   State<NewVehicleBookingScreen> createState() =>
@@ -12,11 +17,24 @@ class NewVehicleBookingScreen extends StatefulWidget {
 
 class _NewVehicleBookingScreenState
     extends State<NewVehicleBookingScreen> {
-  final brandController = TextEditingController();
-  final modelController = TextEditingController();
-  final variantController = TextEditingController();
-  final priceController = TextEditingController();
-  final notesController = TextEditingController();
+
+  final brandController =
+      TextEditingController();
+
+  final modelController =
+      TextEditingController();
+
+  final variantController =
+      TextEditingController();
+
+  final showroomPriceController =
+      TextEditingController();
+
+  final expectedPriceController =
+      TextEditingController();
+
+  final notesController =
+      TextEditingController();
 
   bool loading = false;
   bool brandsLoading = true;
@@ -32,246 +50,631 @@ class _NewVehicleBookingScreenState
   @override
   void initState() {
     super.initState();
+
     fetchBrands();
+
+    // Vehicle passed from Book Now
+    if (widget.vehicle != null) {
+
+      final vehicle =
+          widget.vehicle!;
+
+      selectedBrand =
+          vehicle['brand'];
+
+      selectedModel =
+          vehicle['model'];
+
+      selectedVariant =
+          vehicle['variant'];
+
+      brandController.text =
+          vehicle['brand']
+                  ?.toString() ??
+              '';
+
+      modelController.text =
+          vehicle['model']
+                  ?.toString() ??
+              '';
+
+      variantController.text =
+          vehicle['variant']
+                  ?.toString() ??
+              '';
+
+      showroomPriceController.text =
+          vehicle['price']
+                  ?.toString() ??
+              '';
+
+      fetchModels(
+        vehicle['brand'],
+      ).then((_) {
+
+        fetchVariants(
+          vehicle['model'],
+        );
+      });
+    }
   }
 
   void showMessage(String message) {
+
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+        .showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
   }
 
   Future<void> fetchBrands() async {
+
     try {
+
       final snapshot =
-          await FirebaseFirestore.instance.collection('Brand').get();
+          await FirebaseFirestore
+              .instance
+              .collection('Brand')
+              .get();
 
       setState(() {
+
         brands = snapshot.docs
-            .map((doc) => doc['Name'].toString())
+            .map(
+              (doc) => doc['Name']
+                  .toString(),
+            )
             .toList();
 
         brandsLoading = false;
       });
+
     } catch (e) {
+
       brandsLoading = false;
-      showMessage("Failed to load brands");
+
+      showMessage(
+        "Failed to load brands",
+      );
     }
   }
 
-  Future<void> fetchModels(String brand) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Model')
-        .where('ParentBrand', isEqualTo: brand)
-        .get();
+  Future<void> fetchModels(
+    String brand,
+  ) async {
+
+    final snapshot =
+        await FirebaseFirestore
+            .instance
+            .collection('Model')
+            .where(
+              'ParentBrand',
+              isEqualTo: brand,
+            )
+            .get();
 
     setState(() {
+
       models = snapshot.docs
-          .map((doc) => doc['Name'].toString())
+          .map(
+            (doc) => doc['Name']
+                .toString(),
+          )
           .toList();
 
-      selectedModel = null;
-      selectedVariant = null;
-      variants = [];
+      // ONLY reset if manually selecting
+      if (widget.vehicle == null) {
 
-      modelController.clear();
-      variantController.clear();
-      priceController.clear();
+        selectedModel = null;
+        selectedVariant = null;
+
+        modelController.clear();
+        variantController.clear();
+
+        showroomPriceController.clear();
+      }
     });
   }
 
-  Future<void> fetchVariants(String model) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Variant')
-        .where('ParentModel', isEqualTo: model)
-        .get();
+  Future<void> fetchVariants(
+    String model,
+  ) async {
+
+    final snapshot =
+        await FirebaseFirestore
+            .instance
+            .collection('Variant')
+            .where(
+              'ParentModel',
+              isEqualTo: model,
+            )
+            .get();
 
     setState(() {
+
       variants = snapshot.docs
-          .map((doc) => doc.data())
+          .map(
+            (doc) => doc.data(),
+          )
           .toList();
 
-      selectedVariant = null;
+      // ONLY reset if manual booking
+      if (widget.vehicle == null) {
 
-      variantController.clear();
-      priceController.clear();
+        selectedVariant = null;
+
+        variantController.clear();
+
+        showroomPriceController.clear();
+      }
     });
   }
 
   Future<void> saveBooking() async {
-    final user = FirebaseAuth.instance.currentUser;
+
+    final user =
+        FirebaseAuth.instance
+            .currentUser;
 
     if (user == null) return;
 
     if (selectedBrand == null) {
-      showMessage('Please select vehicle brand.');
+
+      showMessage(
+        'Select brand',
+      );
+
       return;
     }
 
     if (selectedModel == null) {
-      showMessage('Please select vehicle model.');
+
+      showMessage(
+        'Select model',
+      );
+
       return;
     }
 
     if (selectedVariant == null) {
-      showMessage('Please select vehicle variant.');
+
+      showMessage(
+        'Select variant',
+      );
+
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+    });
 
     try {
-      await FirebaseFirestore.instance
-          .collection('vehicleBookings')
+
+      // FETCH CUSTOMER INFO
+      final userDoc =
+          await FirebaseFirestore
+              .instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+
+      final userData =
+          userDoc.data() ?? {};
+
+      final customerName =
+          userData['name']
+                  ?.toString() ??
+              'Customer';
+
+      final customerPhone =
+          userData['phone']
+                  ?.toString() ??
+              '';
+
+      final customerAddress =
+          userData['address']
+                  ?.toString() ??
+              '';
+
+      await FirebaseFirestore
+          .instance
+          .collection('inquiries')
           .add({
-        'userId': user.uid,
-        'customerEmail': user.email,
-        'brand': brandController.text.trim(),
-        'model': modelController.text.trim(),
-        'variant': variantController.text.trim(),
-        'price': priceController.text.trim().isEmpty
-            ? 'Not Specified'
-            : priceController.text.trim(),
-        'notes': notesController.text.trim(),
-        'status': 'Pending',
-        'createdAt': Timestamp.now(),
+
+        // CUSTOMER
+        'name': customerName,
+
+        'phone': customerPhone,
+
+        'address':
+            customerAddress,
+
+        'customerId':
+            user.uid,
+
+        'customerEmail':
+            user.email,
+
+        // VEHICLE
+        'brand':
+            brandController.text
+                .trim(),
+
+        'model':
+            modelController.text
+                .trim(),
+
+        'variant':
+            variantController.text
+                .trim(),
+
+        'price':
+            showroomPriceController
+                .text
+                .trim(),
+
+        'expectedPrice':
+            expectedPriceController
+                .text
+                .trim(),
+
+        // NOTES
+        'notes':
+            notesController.text
+                .trim(),
+
+        // LEAD SYSTEM
+        'staffId': null,
+        'assignedTo': null,
+
+        'acceptedBy': null,
+        'acceptedByName': null,
+
+        'isLocked': false,
+
+        // STATUS
+        'status':
+            'New Inquiry',
+
+        // EXTRA
+        'createdByCustomer':
+            true,
+
+        'createdAt':
+            Timestamp.now(),
       });
 
       if (mounted) {
+
         showMessage(
-            'Vehicle booking request submitted successfully.');
+          'Booking request submitted successfully',
+        );
 
         Navigator.pop(context);
       }
+
     } catch (e) {
-      showMessage('Failed to submit booking.');
+
+      showMessage(
+        'Failed to submit booking',
+      );
+
     } finally {
-      setState(() => loading = false);
+
+      setState(() {
+        loading = false;
+      });
     }
+  }
+
+  InputDecoration fieldDecoration(
+      String label) {
+
+    return InputDecoration(
+
+      labelText: label,
+
+      border:
+          OutlineInputBorder(
+        borderRadius:
+            BorderRadius.circular(
+          14,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       appBar: AppBar(
-        title: const Text("New Vehicle Booking"),
+        title: const Text(
+          "Vehicle Booking",
+        ),
       ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+
+        padding:
+            const EdgeInsets.all(20),
+
         child: Column(
+
           children: [
 
-            DropdownButtonFormField<String>(
+            // BRAND
+            DropdownButtonFormField<
+                String>(
               value: selectedBrand,
-              hint: brandsLoading
-                  ? const Text("Loading brands...")
-                  : const Text("Select Brand"),
+
+              decoration:
+                  fieldDecoration(
+                "Vehicle Brand",
+              ),
+
               items: brands
                   .map(
-                    (brand) => DropdownMenuItem(
+                    (brand) =>
+                        DropdownMenuItem(
                       value: brand,
-                      child: Text(brand),
+                      child:
+                          Text(brand),
                     ),
                   )
                   .toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedBrand = value;
-                  brandController.text = value ?? '';
-                });
 
-                if (value != null) {
-                  fetchModels(value);
-                }
-              },
-              decoration: const InputDecoration(
-                labelText: "Vehicle Brand",
-              ),
+              onChanged:
+                  widget.vehicle !=
+                          null
+                      ? null
+                      : (value) {
+
+                          setState(() {
+
+                            selectedBrand =
+                                value;
+
+                            brandController
+                                    .text =
+                                value ??
+                                    '';
+                          });
+
+                          if (value !=
+                              null) {
+
+                            fetchModels(
+                              value,
+                            );
+                          }
+                        },
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 14,
+            ),
 
-            DropdownButtonFormField<String>(
+            // MODEL
+            DropdownButtonFormField<
+                String>(
               value: selectedModel,
-              hint: const Text("Select Model"),
+
+              decoration:
+                  fieldDecoration(
+                "Vehicle Model",
+              ),
+
               items: models
                   .map(
-                    (model) => DropdownMenuItem(
+                    (model) =>
+                        DropdownMenuItem(
                       value: model,
-                      child: Text(model),
+                      child:
+                          Text(model),
                     ),
                   )
                   .toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedModel = value;
-                  modelController.text = value ?? '';
-                });
 
-                if (value != null) {
-                  fetchVariants(value);
-                }
-              },
-              decoration: const InputDecoration(
-                labelText: "Vehicle Model",
-              ),
+              onChanged:
+                  widget.vehicle !=
+                          null
+                      ? null
+                      : (value) {
+
+                          setState(() {
+
+                            selectedModel =
+                                value;
+
+                            modelController
+                                    .text =
+                                value ??
+                                    '';
+                          });
+
+                          if (value !=
+                              null) {
+
+                            fetchVariants(
+                              value,
+                            );
+                          }
+                        },
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 14,
+            ),
 
-            DropdownButtonFormField<String>(
+            // VARIANT
+            DropdownButtonFormField<
+                String>(
               value: selectedVariant,
-              hint: const Text("Select Variant"),
-              items: variants.map((variant) {
-                return DropdownMenuItem<String>(
-                  value: variant['Name'].toString(),
-                  child: Text(variant['Name'].toString()),
+
+              decoration:
+                  fieldDecoration(
+                "Vehicle Variant",
+              ),
+
+              items: variants
+                  .map((variant) {
+
+                return DropdownMenuItem<
+                    String>(
+
+                  value:
+                      variant['Name']
+                          .toString(),
+
+                  child: Text(
+                    variant['Name']
+                        .toString(),
+                  ),
                 );
               }).toList(),
-              onChanged: (value) {
-                final selected = variants.firstWhere(
-                  (v) => v['Name'] == value,
-                );
 
-                setState(() {
-                  selectedVariant = value;
+              onChanged:
+                  widget.vehicle !=
+                          null
+                      ? null
+                      : (value) {
 
-                  variantController.text = value ?? '';
+                          final selected =
+                              variants
+                                  .firstWhere(
+                            (v) =>
+                                v['Name'] ==
+                                value,
+                          );
 
-                  priceController.text =
-                      selected['Price']?.toString() ?? '';
-                });
-              },
-              decoration: const InputDecoration(
-                labelText: "Variant",
+                          setState(() {
+
+                            selectedVariant =
+                                value;
+
+                            variantController
+                                    .text =
+                                value ??
+                                    '';
+
+                            showroomPriceController
+                                    .text =
+                                selected['Price']
+                                        ?.toString() ??
+                                    '';
+                          });
+                        },
+            ),
+
+            const SizedBox(
+              height: 14,
+            ),
+
+            // SHOWROOM PRICE
+            TextField(
+              controller:
+                  showroomPriceController,
+
+              readOnly: true,
+
+              decoration:
+                  fieldDecoration(
+                "Showroom Price",
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 14,
+            ),
 
+            // EXPECTED PRICE
             TextField(
-              controller: priceController,
-              decoration: const InputDecoration(
-                labelText: "Expected Budget / Price",
+              controller:
+                  expectedPriceController,
+
+              keyboardType:
+                  TextInputType.number,
+
+              decoration:
+                  fieldDecoration(
+                "Expected Price",
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(
+              height: 14,
+            ),
 
+            // NOTES
             TextField(
-              controller: notesController,
+              controller:
+                  notesController,
+
               maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: "Additional Notes",
+
+              decoration:
+                  fieldDecoration(
+                "Additional Notes",
               ),
             ),
 
-            const SizedBox(height: 24),
+            const SizedBox(
+              height: 30,
+            ),
 
-            ElevatedButton(
-              onPressed: loading ? null : saveBooking,
-              child: loading
-                  ? const CircularProgressIndicator()
-                  : const Text("Submit Booking Request"),
+            SizedBox(
+
+              width: double.infinity,
+
+              child: ElevatedButton(
+
+                onPressed:
+                    loading
+                        ? null
+                        : saveBooking,
+
+                style:
+                    ElevatedButton
+                        .styleFrom(
+                  padding:
+                      const EdgeInsets
+                          .symmetric(
+                    vertical: 16,
+                  ),
+                ),
+
+                child: loading
+
+                    ? const SizedBox(
+                        height: 24,
+                        width: 24,
+                        child:
+                            CircularProgressIndicator(
+                          color:
+                              Colors
+                                  .white,
+                          strokeWidth:
+                              2,
+                        ),
+                      )
+
+                    : const Text(
+                        "Submit Booking Request",
+
+                        style:
+                            TextStyle(
+                          fontSize: 16,
+                          fontWeight:
+                              FontWeight
+                                  .bold,
+                        ),
+                      ),
+              ),
             ),
           ],
         ),
