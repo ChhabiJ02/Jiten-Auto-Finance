@@ -8,6 +8,7 @@ import 'my_appointments_screen.dart';
 import 'my_service_plan_screen.dart';
 import 'customer_profile_screen.dart';
 import 'vehicle_detail_screen.dart';
+import 'my_inquiries_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -407,23 +408,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: searching
-            ? buildSearchField()
-            : const Text('JitenAuto Showroom'),
+        title: const Text('JitenAuto Showroom'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
         actions: [
-          if (!searching)
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: toggleSearch,
-            ),
-          if (searching)
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: toggleSearch,
-            ),
+          
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => Navigator.push(
@@ -548,6 +538,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen>
                 'View left services and renew plans',
                 Icons.assignment_turned_in,
                 () {},
+              ),
+
+              buildActionCard(
+                context,
+                'My Inquiries',
+                'Track all your booking inquiries',
+                Icons.receipt_long,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        const MyInquiriesScreen(),
+                  ),
+                ),
               ),
             ],
           ),
@@ -731,6 +735,7 @@ return SingleChildScrollView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           children: [
+
             buildActionCard(
               context,
               'New Vehicle Booking',
@@ -783,6 +788,20 @@ return SingleChildScrollView(
                 MaterialPageRoute(
                   builder: (_) =>
                       const MyServicePlanScreen(),
+                ),
+              ),
+            ),
+
+            buildActionCard(
+              context,
+              'My Inquiries',
+              'Track all your booking inquiries',
+              Icons.receipt_long,
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const MyInquiriesScreen(),
                 ),
               ),
             ),

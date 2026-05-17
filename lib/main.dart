@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import 'services/cloudinary_service.dart';
 import 'widgets/user_session_wrapper.dart';
@@ -126,26 +128,90 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   Future<void> _startApp() async {
-    if (mounted && _startupError != null) {
-      setState(() => _startupError = null);
-    }
-    final startedAt = DateTime.now();
-    try {
-      await Firebase.initializeApp();
-      final elapsed = DateTime.now().difference(startedAt);
-      const minDuration = Duration(seconds: 2);
-      if (elapsed < minDuration) {
-        await Future.delayed(minDuration - elapsed);
-      }
-      if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/login');
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _startupError = 'Unable to start the app. Please try again.';
-      });
-    }
+
+  if (mounted && _startupError != null) {
+    setState(() => _startupError = null);
   }
+
+  final startedAt = DateTime.now();
+
+  try {
+
+    await Firebase.initializeApp();
+
+    final elapsed =
+        DateTime.now().difference(startedAt);
+
+    const minDuration =
+        Duration(seconds: 2);
+
+    if (elapsed < minDuration) {
+      await Future.delayed(
+        minDuration - elapsed,
+      );
+    }
+
+    if (!mounted) return;
+
+    // CHECK EXISTING LOGIN
+    final user =
+        FirebaseAuth.instance.currentUser;
+
+    // NOT LOGGED IN
+    if (user == null) {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/login',
+      );
+
+      return;
+    }
+
+    // FETCH USER ROLE
+    final userDoc =
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+    final role =
+        userDoc.data()?['role'];
+
+    // NAVIGATE BY ROLE
+    if (role == 'admin') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/adminDashboard',
+      );
+
+    } else if (role == 'staff') {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/staffDashboard',
+      );
+
+    } else {
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/customerDashboard',
+      );
+    }
+
+  } catch (e) {
+
+    if (!mounted) return;
+
+    setState(() {
+
+      _startupError =
+          'Unable to start the app. Please try again.';
+    });
+  }
+}
 
   @override
   void dispose() {
