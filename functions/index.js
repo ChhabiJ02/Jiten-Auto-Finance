@@ -3,4 +3,36 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-// No admin email OTP authentication is used in this project at this time.
+exports.deleteUserCompletely = functions.https.onCall(async (data, context) => {
+  try {
+    const uid = data.uid;
+
+    if (!uid) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        "UID is required"
+      );
+    }
+
+    // Delete from Authentication
+    await admin.auth().deleteUser(uid);
+
+    // Delete from Firestore
+    await admin.firestore()
+      .collection("users")
+      .doc(uid)
+      .delete();
+
+    return {
+      success: true,
+      message: "User deleted completely",
+    };
+  } catch (error) {
+    console.error(error);
+
+    throw new functions.https.HttpsError(
+      "internal",
+      error.message
+    );
+  }
+});
