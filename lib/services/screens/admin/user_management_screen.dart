@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+//import 'package:cloud_functions/cloud_functions.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -91,18 +91,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
   }
 
   Future<void> deleteUser(String userId) async {
-    try {
-      final callable =
-          FirebaseFunctions.instance.httpsCallable(
-        'deleteUserCompletely',
-      );
+    await _firestore.collection('users').doc(userId).update({
+      'isDisabled': true,
+    });
 
-      await callable.call({
-        'uid': userId,
-      });
-    } catch (e) {
-      throw Exception("Failed to delete user: $e");
-    }
+    await Future.delayed(const Duration(seconds: 2));
+
+    await _firestore.collection('users').doc(userId).delete();
   }
 
   Future<int> transferInquiries(String oldUserDocId, String newUserDocId) async {
