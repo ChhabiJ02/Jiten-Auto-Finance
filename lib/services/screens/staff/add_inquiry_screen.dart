@@ -57,7 +57,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   final referenceNameController = TextEditingController();
   final referencePhoneController = TextEditingController();
 
-  // Exchange vehicle controllers
   final exchangeBrandModelController = TextEditingController();
   final exchangeRegController = TextEditingController();
   final exchangeExpectedPriceController = TextEditingController();
@@ -70,10 +69,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   bool loading = false;
   bool inquiryAlreadySaved = false;
 
-  // Eagerness
   String? selectedEagerness;
 
-  // Source
   String? selectedSource;
   final List<String> sourceOptions = [
     'Google',
@@ -85,10 +82,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     'Reference',
   ];
 
-  // Exchange
   String exchangeOption = 'No';
 
-  // Multiple vehicle quotations
   final List<VehicleQuotation> quotations = [];
 
   @override
@@ -320,7 +315,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         'inquiryNumber': newInquiryNumber,
         'name': name,
         'phone': phone,
-        // Primary vehicle
         'brand': q.brandController.text.trim(),
         'model': q.modelController.text.trim(),
         'variant': q.variantController.text.trim(),
@@ -333,16 +327,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         'otherDescription': q.otherController.text.trim(),
         if (additionalQuotations.isNotEmpty)
           'additionalQuotations': additionalQuotations,
-        // Source
         'source': selectedSource,
         if (selectedSource == 'Reference') ...{
           'referenceName': referenceNameController.text.trim(),
           'referencePhone': referencePhoneController.text.trim(),
         },
-        // Payment & eagerness
         'paymentType': paymentType,
         'eagerness': selectedEagerness,
-        // Exchange
         'exchangeVehicle': exchangeOption == 'Yes',
         if (exchangeOption == 'Yes') ...{
           'exchangeBrandModel': exchangeBrandModelController.text.trim(),
@@ -369,6 +360,447 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  // ── PDF header widget (shared across all pages) ────────────
+  pw.Widget _pdfHeader() {
+    return pw.Container(
+      width: double.infinity,
+      decoration: const pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFF7B1F3F),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.SizedBox(height: 6),
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(left: 20, top: 8),
+            child: pw.Text(
+              'M. 8866797000',
+              style: const pw.TextStyle(
+                color: PdfColors.white,
+                fontSize: 11,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Center(
+            child: pw.Text(
+              'JITEN AUTO',
+              style: pw.TextStyle(
+                color: PdfColors.white,
+                fontSize: 34,
+                fontWeight: pw.FontWeight.bold,
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Center(
+            child: pw.Container(
+              padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 16, vertical: 4),
+              decoration: pw.BoxDecoration(
+                color: PdfColor.fromInt(0xFF4A0E24),
+                borderRadius: pw.BorderRadius.circular(4),
+              ),
+              child: pw.Text(
+                'MULTI BRAND 2 WH. SHOWROOM & WORKSHOP',
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+          pw.SizedBox(height: 12),
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(
+                horizontal: 20, vertical: 10),
+            color: PdfColor.fromInt(0xFF4A0E24),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                _pdfAddressRow(
+                  'Head Office :-',
+                  'Sargam Complex, Opp. Bhulkabhavan School, Adajan.  M. 8866797019',
+                ),
+                pw.SizedBox(height: 5),
+                _pdfAddressRow(
+                  'Work Shop :-',
+                  'Next to Shri Ram Petrol Pump A.M. Rd, Adajan.  M. 81605 08608',
+                ),
+                pw.SizedBox(height: 5),
+                _pdfAddressRow(
+                  'Branch :- 2',
+                  'Between Ichchhapor Bus Station-2 & 3, Ichchhapor.  M. 98259 24999',
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ── FIX: use pw.Flexible instead of pw.Expanded ───────────
+  pw.Widget _pdfAddressRow(String label, String value) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(
+              horizontal: 6, vertical: 2),
+          decoration: pw.BoxDecoration(
+            color: PdfColors.white,
+            borderRadius: pw.BorderRadius.circular(3),
+          ),
+          child: pw.Text(
+            label,
+            style: pw.TextStyle(
+              color: PdfColor.fromInt(0xFF7B1F3F),
+              fontSize: 9,
+              fontWeight: pw.FontWeight.bold,
+            ),
+          ),
+        ),
+        pw.SizedBox(width: 6),
+        // ✅ pw.Flexible with loose fit — does NOT require bounded width
+        pw.Flexible(
+          fit: pw.FlexFit.loose,
+          child: pw.Text(
+            value,
+            style: const pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 9,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── PDF footer with staff details ─────────────────────────
+  pw.Widget _pdfFooter(String staffName, String staffPhone) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.symmetric(
+          horizontal: 20, vertical: 14),
+      decoration: const pw.BoxDecoration(
+        color: PdfColor.fromInt(0xFF7B1F3F),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          // ✅ pw.Flexible instead of nothing — prevents overflow on long text
+          pw.Flexible(
+            fit: pw.FlexFit.loose,
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Thank you for choosing Jiten Auto',
+                  style: pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 11,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+                pw.SizedBox(height: 3),
+                pw.Text(
+                  '-> Best Exchange Value Of Any Old Two Wheeler',
+                  style: const pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          pw.SizedBox(width: 16),
+          pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.end,
+            children: [
+              pw.Text(
+                'Sales Executive',
+                style: const pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 9,
+                ),
+              ),
+              pw.SizedBox(height: 2),
+              pw.Text(
+                staffName,
+                style: pw.TextStyle(
+                  color: PdfColors.white,
+                  fontSize: 11,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              if (staffPhone.isNotEmpty) ...[
+                pw.SizedBox(height: 2),
+                pw.Text(
+                  staffPhone,
+                  style: const pw.TextStyle(
+                    color: PdfColors.white,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Single quotation page content ─────────────────────────
+  pw.Widget _buildPdfQuotationContent({
+    required String customerName,
+    required String customerPhone,
+    required String date,
+    required String brand,
+    required String model,
+    required String variant,
+    required String onRoadPrice,
+    required String offerPrice,
+    required List<pw.MemoryImage> vehicleImages,
+    required int pageNumber,
+    required int totalPages,
+  }) {
+    return pw.Container(
+      width: double.infinity,
+      color: PdfColor.fromInt(0xFFF7EEF1),
+      padding: const pw.EdgeInsets.all(20),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          if (totalPages > 1)
+            pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.Text(
+                'Option $pageNumber of $totalPages',
+                style: pw.TextStyle(
+                  color: PdfColor.fromInt(0xFF7B1F3F),
+                  fontSize: 10,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+            ),
+          if (totalPages > 1) pw.SizedBox(height: 8),
+
+          // ── Customer details ───────────────────────────
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.white,
+              borderRadius: pw.BorderRadius.circular(12),
+              border: pw.Border(
+                left: pw.BorderSide(
+                  color: PdfColor.fromInt(0xFF7B1F3F),
+                  width: 3,
+                ),
+              ),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Customer Details',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF7B1F3F),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                // ✅ No Expanded/Flexible in this Row — plain spaceBetween
+                pw.Row(
+                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _pdfDetailRow('Name', customerName),
+                        pw.SizedBox(height: 4),
+                        _pdfDetailRow('Mob', customerPhone),
+                      ],
+                    ),
+                    _pdfDetailRow('Date', date),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          pw.SizedBox(height: 14),
+
+          // ── Vehicle details ────────────────────────────
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.white,
+              borderRadius: pw.BorderRadius.circular(12),
+              border: pw.Border(
+                left: pw.BorderSide(
+                  color: PdfColor.fromInt(0xFF7B1F3F),
+                  width: 3,
+                ),
+              ),
+            ),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'Vehicle Details',
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColor.fromInt(0xFF7B1F3F),
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+                _pdfDetailRow('Brand', brand),
+                pw.SizedBox(height: 4),
+                _pdfDetailRow('Model', model),
+                pw.SizedBox(height: 4),
+                _pdfDetailRow('Variant', variant),
+                if (vehicleImages.isNotEmpty) ...[
+                  pw.SizedBox(height: 12),
+                  pw.Text(
+                    'Available Colours',
+                    style: pw.TextStyle(
+                      fontSize: 11,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColor.fromInt(0xFF7B1F3F),
+                    ),
+                  ),
+                  pw.SizedBox(height: 8),
+                  pw.Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: vehicleImages
+                        .map(
+                          (img) => pw.Container(
+                            width: 110,
+                            height: 80,
+                            decoration: pw.BoxDecoration(
+                              borderRadius:
+                                  pw.BorderRadius.circular(8),
+                            ),
+                            child: pw.ClipRRect(
+                              horizontalRadius: 8,
+                              verticalRadius: 8,
+                              child: pw.Image(img,
+                                  fit: pw.BoxFit.cover),
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          pw.SizedBox(height: 14),
+
+          // ── Price block ────────────────────────────────
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.all(16),
+            decoration: pw.BoxDecoration(
+              color: PdfColor.fromInt(0xFF7B1F3F),
+              borderRadius: pw.BorderRadius.circular(12),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      'On Road Price',
+                      style: const pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 11,
+                      ),
+                    ),
+                    pw.SizedBox(height: 4),
+                    pw.Text(
+                      'Rs. $onRoadPrice',
+                      style: pw.TextStyle(
+                        color: PdfColors.white,
+                        fontSize: 24,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                if (offerPrice.isNotEmpty)
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text(
+                        'Offer Price',
+                        style: const pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 11,
+                        ),
+                      ),
+                      pw.SizedBox(height: 4),
+                      pw.Text(
+                        'Rs. $offerPrice',
+                        style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontSize: 20,
+                          fontWeight: pw.FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── FIX: pw.Flexible instead of pw.Expanded ───────────────
+  pw.Widget _pdfDetailRow(String label, String value) {
+    return pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.SizedBox(
+          width: 55,
+          child: pw.Text(
+            '$label :',
+            style: pw.TextStyle(
+              fontSize: 11,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromInt(0xFF7B1F3F),
+            ),
+          ),
+        ),
+        // ✅ KEY FIX: pw.Flexible with loose fit — no bounded width required
+        pw.Flexible(
+          fit: pw.FlexFit.loose,
+          child: pw.Text(
+            value,
+            style: const pw.TextStyle(fontSize: 11),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> sendPdfToWhatsApp() async {
@@ -430,258 +862,98 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         inquiryAlreadySaved = true;
       }
 
-      final vehicleImages = <pw.MemoryImage>[];
-      final imageUrls = <String>[
-        ...q.selectedVariantPhotoUrls,
-        if (q.selectedVariantPhotoUrl != null &&
-            q.selectedVariantPhotoUrl!.isNotEmpty &&
-            !q.selectedVariantPhotoUrls
-                .contains(q.selectedVariantPhotoUrl))
-          q.selectedVariantPhotoUrl!,
-      ];
-      for (final url in imageUrls) {
+      final user = FirebaseAuth.instance.currentUser;
+      String staffName = user?.displayName ?? '';
+      String staffPhone = user?.phoneNumber ?? '';
+
+      if (user != null) {
         try {
-          final response = await http
-              .get(Uri.parse(url))
-              .timeout(const Duration(seconds: 15));
-          if (response.statusCode == 200 &&
-              response.bodyBytes.isNotEmpty) {
-            vehicleImages.add(pw.MemoryImage(response.bodyBytes));
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          if (userDoc.exists) {
+            final data = userDoc.data() as Map<String, dynamic>;
+            if ((data['name'] ?? '').toString().isNotEmpty) {
+              staffName = data['name'].toString();
+            }
+            if ((data['phone'] ?? '').toString().isNotEmpty) {
+              staffPhone = data['phone'].toString();
+            } else if ((data['phoneNumber'] ?? '')
+                .toString()
+                .isNotEmpty) {
+              staffPhone = data['phoneNumber'].toString();
+            }
           }
         } catch (_) {}
       }
 
-      final brand = q.brandController.text.trim();
-      final model = q.modelController.text.trim();
-      final variant = q.variantController.text.trim();
-      final offerPrice = q.offerPriceController.text.trim();
       final date = DateTime.now().toString().split(' ')[0];
       final pdf = pw.Document();
+      final totalPages = quotations.length;
 
-      pdf.addPage(
-        pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: const pw.EdgeInsets.all(0),
-          build: (context) {
-            return pw.Column(
-              children: [
-                pw.Container(
-                  width: double.infinity,
-                  padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 30, vertical: 28),
-                  decoration: const pw.BoxDecoration(
-                      color: PdfColor.fromInt(0xFF7B1F3F)),
-                  child: pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text("JITEN AUTO",
-                          style: pw.TextStyle(
-                              color: PdfColors.white,
-                              fontSize: 30,
-                              fontWeight: pw.FontWeight.bold)),
-                      pw.SizedBox(height: 8),
-                      pw.Text("Vehicle Quotation",
-                          style: const pw.TextStyle(
-                              color: PdfColors.white, fontSize: 16)),
-                    ],
-                  ),
-                ),
-                pw.Expanded(
-                  child: pw.Container(
-                    width: double.infinity,
-                    color: PdfColor.fromInt(0xFFF7EEF1),
-                    child: pw.Padding(
-                      padding: const pw.EdgeInsets.all(24),
-                      child: pw.Column(
-                        crossAxisAlignment: pw.CrossAxisAlignment.start,
-                        children: [
-                          pw.Container(
-                            width: double.infinity,
-                            padding: const pw.EdgeInsets.all(18),
-                            decoration: pw.BoxDecoration(
-                              color: PdfColors.white,
-                              borderRadius:
-                                  pw.BorderRadius.circular(18),
-                            ),
-                            child: pw.Column(
-                              crossAxisAlignment:
-                                  pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text("Customer Details",
-                                    style: pw.TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: pw.FontWeight.bold,
-                                        color: PdfColor.fromInt(
-                                            0xFF7B1F3F))),
-                                pw.SizedBox(height: 14),
-                                pw.Text("Name: $name",
-                                    style: const pw.TextStyle(
-                                        fontSize: 14)),
-                                pw.SizedBox(height: 6),
-                                pw.Text("Phone: $phone",
-                                    style: const pw.TextStyle(
-                                        fontSize: 14)),
-                                pw.SizedBox(height: 6),
-                                pw.Text(
-                                    "Source: ${selectedSource ?? ''}",
-                                    style: const pw.TextStyle(
-                                        fontSize: 14)),
-                                if (selectedSource == 'Reference') ...[
-                                  pw.SizedBox(height: 6),
-                                  pw.Text(
-                                      "Reference: ${referenceNameController.text.trim()} ${referencePhoneController.text.trim()}",
-                                      style: const pw.TextStyle(
-                                          fontSize: 14)),
-                                ],
-                                pw.SizedBox(height: 6),
-                                pw.Text("Date: $date",
-                                    style: const pw.TextStyle(
-                                        fontSize: 14)),
-                              ],
-                            ),
-                          ),
-                          pw.SizedBox(height: 20),
-                          pw.Container(
-                            width: double.infinity,
-                            padding: const pw.EdgeInsets.all(18),
-                            decoration: pw.BoxDecoration(
-                              color: PdfColors.white,
-                              borderRadius:
-                                  pw.BorderRadius.circular(18),
-                            ),
-                            child: pw.Column(
-                              crossAxisAlignment:
-                                  pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text("Vehicle Details",
-                                    style: pw.TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: pw.FontWeight.bold,
-                                        color: PdfColor.fromInt(
-                                            0xFF7B1F3F))),
-                                pw.SizedBox(height: 14),
-                                pw.Text("Brand: $brand"),
-                                pw.SizedBox(height: 6),
-                                pw.Text("Model: $model"),
-                                pw.SizedBox(height: 6),
-                                pw.Text("Variant: $variant"),
-                                if (vehicleImages.isNotEmpty)
-                                  pw.Padding(
-                                    padding: const pw.EdgeInsets.only(
-                                        top: 16),
-                                    child: pw.Column(
-                                      crossAxisAlignment:
-                                          pw.CrossAxisAlignment.start,
-                                      children: [
-                                        pw.Text("Available Colours",
-                                            style: pw.TextStyle(
-                                                fontSize: 13,
-                                                fontWeight:
-                                                    pw.FontWeight.bold,
-                                                color: PdfColor.fromInt(
-                                                    0xFF7B1F3F))),
-                                        pw.SizedBox(height: 10),
-                                        pw.Wrap(
-                                          spacing: 10,
-                                          runSpacing: 10,
-                                          children: vehicleImages
-                                              .map((img) =>
-                                                  pw.Container(
-                                                    width: 120,
-                                                    height: 90,
-                                                    decoration: pw.BoxDecoration(
-                                                        borderRadius:
-                                                            pw.BorderRadius.circular(
-                                                                10)),
-                                                    child: pw.ClipRRect(
-                                                      horizontalRadius:
-                                                          10,
-                                                      verticalRadius: 10,
-                                                      child: pw.Image(
-                                                          img,
-                                                          fit: pw.BoxFit
-                                                              .cover),
-                                                    ),
-                                                  ))
-                                              .toList(),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                          pw.SizedBox(height: 22),
-                          pw.Container(
-                            width: double.infinity,
-                            padding: const pw.EdgeInsets.symmetric(
-                                vertical: 20, horizontal: 20),
-                            decoration: pw.BoxDecoration(
-                              color: PdfColor.fromInt(0xFF7B1F3F),
-                              borderRadius:
-                                  pw.BorderRadius.circular(20),
-                            ),
-                            child: pw.Column(
-                              crossAxisAlignment:
-                                  pw.CrossAxisAlignment.start,
-                              children: [
-                                pw.Text("On Road Price",
-                                    style: const pw.TextStyle(
-                                        color: PdfColors.white,
-                                        fontSize: 13)),
-                                pw.SizedBox(height: 6),
-                                pw.Text("Rs. $price",
-                                    style: pw.TextStyle(
-                                        color: PdfColors.white,
-                                        fontSize: 26,
-                                        fontWeight:
-                                            pw.FontWeight.bold)),
-                                if (offerPrice.isNotEmpty) ...[
-                                  pw.SizedBox(height: 10),
-                                  pw.Text("Offer Price",
-                                      style: const pw.TextStyle(
-                                          color: PdfColors.white,
-                                          fontSize: 13)),
-                                  pw.SizedBox(height: 6),
-                                  pw.Text("Rs. $offerPrice",
-                                      style: pw.TextStyle(
-                                          color: PdfColors.white,
-                                          fontSize: 22,
-                                          fontWeight:
-                                              pw.FontWeight.bold)),
-                                ],
-                              ],
-                            ),
-                          ),
-                          pw.Spacer(),
-                          pw.Center(
-                            child: pw.Column(
-                              children: [
-                                pw.Text(
-                                    "Thank you for choosing Jiten Auto",
-                                    style: pw.TextStyle(
-                                        color: PdfColor.fromInt(
-                                            0xFF7B1F3F),
-                                        fontSize: 14,
-                                        fontWeight:
-                                            pw.FontWeight.bold)),
-                                pw.SizedBox(height: 8),
-                                pw.Text("We appreciate your inquiry.",
-                                    style: const pw.TextStyle(
-                                        fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+      for (int i = 0; i < quotations.length; i++) {
+        final vq = quotations[i];
+
+        final vehicleImages = <pw.MemoryImage>[];
+        final imageUrls = <String>[
+          ...vq.selectedVariantPhotoUrls,
+          if (vq.selectedVariantPhotoUrl != null &&
+              vq.selectedVariantPhotoUrl!.isNotEmpty &&
+              !vq.selectedVariantPhotoUrls
+                  .contains(vq.selectedVariantPhotoUrl))
+            vq.selectedVariantPhotoUrl!,
+        ];
+        for (final url in imageUrls) {
+          try {
+            final response = await http
+                .get(Uri.parse(url))
+                .timeout(const Duration(seconds: 15));
+            if (response.statusCode == 200 &&
+                response.bodyBytes.isNotEmpty) {
+              vehicleImages.add(pw.MemoryImage(response.bodyBytes));
+            }
+          } catch (_) {}
+        }
+
+        final brand = vq.brandController.text.trim();
+        final model = vq.modelController.text.trim();
+        final variant = vq.variantController.text.trim();
+        final onRoadPrice = vq.onRoadPriceController.text.trim();
+        final offerPrice = vq.offerPriceController.text.trim();
+
+        pdf.addPage(
+          pw.Page(
+            pageFormat: PdfPageFormat.a4,
+            margin: const pw.EdgeInsets.all(0),
+            build: (context) {
+              // ✅ mainAxisSize.max + pw.Expanded around content
+              return pw.Column(
+                mainAxisSize: pw.MainAxisSize.max,
+                children: [
+                  _pdfHeader(),
+                  pw.Expanded(
+                    child: _buildPdfQuotationContent(
+                      customerName: name,
+                      customerPhone: phone,
+                      date: date,
+                      brand: brand,
+                      model: model,
+                      variant: variant,
+                      onRoadPrice: onRoadPrice,
+                      offerPrice: offerPrice,
+                      vehicleImages: vehicleImages,
+                      pageNumber: i + 1,
+                      totalPages: totalPages,
                     ),
                   ),
-                ),
-              ],
-            );
-          },
-        ),
-      );
+                  _pdfFooter(staffName, staffPhone),
+                ],
+              );
+            },
+          ),
+        );
+      }
 
       final bytes = await pdf.save();
       final cacheDir = await getTemporaryDirectory();
@@ -690,7 +962,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       await file.writeAsBytes(bytes, flush: true);
 
       final message =
-          "Hello $name,\n\nPlease find attached the quotation for the vehicle you inquired about.\n\nRegards,\nJiten Auto Team";
+          "Hello $name,\n\nPlease find attached the vehicle quotation from Jiten Auto.\n\nRegards,\n$staffName\nJiten Auto";
 
       await _platform.invokeMethod('shareToWhatsApp', {
         'filePath': filePath,
@@ -719,8 +991,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     exchangeRegController.dispose();
     exchangeExpectedPriceController.dispose();
     exchangeOfferPriceController.dispose();
-    for (final q in quotations) {
-      q.dispose();
+    for (final vq in quotations) {
+      vq.dispose();
     }
     super.dispose();
   }
@@ -757,8 +1029,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     thickness: 1.5),
               ),
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
                   'Vehicle ${index + 1}',
                   style: TextStyle(
@@ -783,7 +1054,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           const SizedBox(height: 8),
         ],
 
-        // Brand
         DropdownButtonFormField<String>(
           value: q.selectedBrand,
           isExpanded: true,
@@ -791,8 +1061,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
               ? const Text("Loading brands...")
               : const Text("Select Brand"),
           items: q.brands
-              .map((b) =>
-                  DropdownMenuItem(value: b, child: Text(b)))
+              .map((b) => DropdownMenuItem(value: b, child: Text(b)))
               .toList(),
           onChanged: q.brands.isEmpty
               ? null
@@ -808,7 +1077,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Model
         DropdownButtonFormField<String>(
           key: ValueKey('model_${index}_${q.selectedBrand}'),
           value: q.selectedModel,
@@ -816,8 +1084,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           hint: const Text("Select Model"),
           disabledHint: const Text("Select a brand first"),
           items: q.models
-              .map((m) =>
-                  DropdownMenuItem(value: m, child: Text(m)))
+              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
               .toList(),
           onChanged: q.selectedBrand == null || q.models.isEmpty
               ? null
@@ -836,7 +1103,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Variant
         DropdownButtonFormField<String>(
           key: ValueKey(
               'variant_${index}_${q.selectedBrand}_${q.selectedModel}'),
@@ -854,15 +1120,14 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           onChanged: q.selectedModel == null || q.variants.isEmpty
               ? null
               : (value) {
-                  final selected = q.variants
-                      .firstWhere((v) => v['Name'] == value);
+                  final selected =
+                      q.variants.firstWhere((v) => v['Name'] == value);
                   setState(() {
                     q.selectedVariant = value;
                     q.selectedVariantPhotoUrl =
                         selected['photoUrl']?.toString();
-                    q.selectedVariantPhotoUrls =
-                        List<String>.from(
-                            selected['photoUrls'] ?? const []);
+                    q.selectedVariantPhotoUrls = List<String>.from(
+                        selected['photoUrls'] ?? const []);
                     q.variantController.text = value ?? '';
                     q.onRoadPriceController.text =
                         selected['Price']?.toString() ?? '';
@@ -876,7 +1141,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Photo preview
         if (q.selectedVariantPhotoUrl != null) ...[
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
@@ -889,15 +1153,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                 height: 160,
                 color: Colors.grey.shade200,
                 alignment: Alignment.center,
-                child:
-                    const Text("Unable to load vehicle photo"),
+                child: const Text("Unable to load vehicle photo"),
               ),
             ),
           ),
           const SizedBox(height: 8),
         ],
 
-        // Colour thumbnails
         if (q.selectedVariantPhotoUrls.isNotEmpty) ...[
           Align(
             alignment: Alignment.centerLeft,
@@ -937,7 +1199,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           const SizedBox(height: 16),
         ],
 
-        // On Road Price
         TextField(
           controller: q.onRoadPriceController,
           keyboardType: TextInputType.number,
@@ -945,16 +1206,14 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Offer Price
         TextField(
           controller: q.offerPriceController,
           keyboardType: TextInputType.number,
-          decoration: _dec(
-              'Offer Price (optional)', Icons.local_offer_outlined),
+          decoration:
+              _dec('Offer Price (optional)', Icons.local_offer_outlined),
         ),
         const SizedBox(height: 16),
 
-        // Vehicle description
         TextField(
           controller: q.descriptionController,
           minLines: 1,
@@ -963,7 +1222,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         const SizedBox(height: 16),
 
-        // Other description
         TextField(
           controller: q.otherController,
           minLines: 1,
@@ -983,8 +1241,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       appBar: AppBar(title: const Text("Add Inquiry")),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-              horizontal: 20, vertical: 40),
+          padding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Card(
@@ -997,24 +1255,21 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ── Header ──────────────────────────────
                     Container(
                       height: 80,
                       width: 80,
                       decoration: BoxDecoration(
-                        color: theme.colorScheme.primary
-                            .withOpacity(0.12),
+                        color:
+                            theme.colorScheme.primary.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
                       child: Icon(Icons.message_outlined,
-                          color: theme.colorScheme.primary,
-                          size: 40),
+                          color: theme.colorScheme.primary, size: 40),
                     ),
                     const SizedBox(height: 18),
                     Text("New Inquiry",
                         style: theme.textTheme.headlineSmall
-                            ?.copyWith(
-                                fontWeight: FontWeight.bold)),
+                            ?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
                     Text(
                       "Capture the lead details and send a WhatsApp confirmation.",
@@ -1024,7 +1279,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Customer Name ────────────────────────
                     TextField(
                       controller: nameController,
                       decoration:
@@ -1032,7 +1286,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Phone ────────────────────────────────
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
@@ -1041,30 +1294,24 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Vehicle Quotation blocks ─────────────
                     for (int i = 0; i < quotations.length; i++)
-                      _buildQuotationBlock(
-                          context, quotations[i], i),
+                      _buildQuotationBlock(context, quotations[i], i),
 
                     const SizedBox(height: 16),
 
-                    // ── + Add Another Vehicle ────────────────
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.add),
-                        label:
-                            const Text('+ Add Another Vehicle'),
+                        label: const Text('+ Add Another Vehicle'),
                         style: OutlinedButton.styleFrom(
-                          foregroundColor:
-                              theme.colorScheme.primary,
+                          foregroundColor: theme.colorScheme.primary,
                           side: BorderSide(
                               color: theme.colorScheme.primary),
                           padding: const EdgeInsets.symmetric(
                               vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
                         onPressed: _addQuotation,
@@ -1072,12 +1319,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ════════════════════════════════════════
-                    // SOURCE, PAYMENT, EAGERNESS, EXCHANGE
-                    // (appear after vehicle details)
-                    // ════════════════════════════════════════
-
-                    // ── Source ───────────────────────────────
                     DropdownButtonFormField<String>(
                       value: selectedSource,
                       isExpanded: true,
@@ -1088,31 +1329,26 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           .toList(),
                       onChanged: (value) =>
                           setState(() => selectedSource = value),
-                      decoration:
-                          _dec('Source', Icons.source_outlined),
+                      decoration: _dec('Source', Icons.source_outlined),
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Reference fields ─────────────────────
                     if (selectedSource == 'Reference') ...[
                       TextField(
                         controller: referenceNameController,
-                        decoration: _dec(
-                            "Reference Person's Name",
+                        decoration: _dec("Reference Person's Name",
                             Icons.person_outline),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: referencePhoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: _dec(
-                            "Reference Person's Phone",
+                        decoration: _dec("Reference Person's Phone",
                             Icons.phone_outlined),
                       ),
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Payment Type ─────────────────────────
                     DropdownButtonFormField<String>(
                       value: paymentType,
                       items: const [
@@ -1126,29 +1362,22 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           setState(() => paymentType = value);
                         }
                       },
-                      decoration: _dec(
-                          'Payment Option', Icons.payment_outlined),
+                      decoration:
+                          _dec('Payment Option', Icons.payment_outlined),
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Eagerness ────────────────────────────
                     DropdownButtonFormField<String>(
                       value: selectedEagerness,
                       isExpanded: true,
                       hint: const Text('Select Eagerness'),
                       items: const [
                         DropdownMenuItem(
-                          value: 'Hot',
-                          child: Text('🔥  Hot'),
-                        ),
+                            value: 'Hot', child: Text('🔥  Hot')),
                         DropdownMenuItem(
-                          value: 'Warm',
-                          child: Text('☀️  Warm'),
-                        ),
+                            value: 'Warm', child: Text('☀️  Warm')),
                         DropdownMenuItem(
-                          value: 'Cold',
-                          child: Text('❄️  Cold'),
-                        ),
+                            value: 'Cold', child: Text('❄️  Cold')),
                       ],
                       onChanged: (value) =>
                           setState(() => selectedEagerness = value),
@@ -1157,45 +1386,39 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Exchange Vehicle ─────────────────────
                     DropdownButtonFormField<String>(
                       value: exchangeOption,
                       items: const [
                         DropdownMenuItem(
-                            value: 'No',
-                            child: Text('No Exchange')),
+                            value: 'No', child: Text('No Exchange')),
                         DropdownMenuItem(
                             value: 'Yes',
-                            child:
-                                Text('Yes, Exchange Vehicle')),
+                            child: Text('Yes, Exchange Vehicle')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
                           setState(() => exchangeOption = value);
                         }
                       },
-                      decoration: _dec('Exchange Vehicle?',
-                          Icons.swap_horiz_outlined),
+                      decoration: _dec(
+                          'Exchange Vehicle?', Icons.swap_horiz_outlined),
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Exchange fields ──────────────────────
                     if (exchangeOption == 'Yes') ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: theme.colorScheme.primary
                               .withOpacity(0.05),
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: theme.colorScheme.primary
                                 .withOpacity(0.2),
                           ),
                         ),
                         child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Exchange Vehicle Details',
@@ -1207,16 +1430,14 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             ),
                             const SizedBox(height: 12),
                             TextField(
-                              controller:
-                                  exchangeBrandModelController,
+                              controller: exchangeBrandModelController,
                               decoration: _dec('Brand / Model',
                                   Icons.directions_bike_outlined),
                             ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: exchangeRegController,
-                              decoration: _dec(
-                                  'Registration Number',
+                              decoration: _dec('Registration Number',
                                   Icons.confirmation_number_outlined),
                             ),
                             const SizedBox(height: 12),
@@ -1230,8 +1451,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             ),
                             const SizedBox(height: 12),
                             TextField(
-                              controller:
-                                  exchangeOfferPriceController,
+                              controller: exchangeOfferPriceController,
                               keyboardType: TextInputType.number,
                               decoration: _dec('Our Offer Price',
                                   Icons.local_offer_outlined),
@@ -1242,7 +1462,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       const SizedBox(height: 16),
                     ],
 
-                    // ── Follow-up date ───────────────────────
                     InkWell(
                       onTap: () async {
                         final picked = await showDatePicker(
@@ -1262,13 +1481,11 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: Colors.grey.shade100,
-                          borderRadius:
-                              BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
                           children: [
-                            const Icon(
-                                Icons.calendar_today_outlined),
+                            const Icon(Icons.calendar_today_outlined),
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
@@ -1285,8 +1502,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             if (followUpDate != null)
                               IconButton(
                                 icon: const Icon(Icons.clear),
-                                onPressed: () => setState(
-                                    () => followUpDate = null),
+                                onPressed: () =>
+                                    setState(() => followUpDate = null),
                               ),
                           ],
                         ),
@@ -1294,25 +1511,20 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // ── Send PDF via WhatsApp ────────────────
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(
-                        icon: const Icon(
-                            Icons.picture_as_pdf_outlined),
+                        icon: const Icon(Icons.picture_as_pdf_outlined),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor:
-                              const Color(0xFF7B1F3F),
+                          backgroundColor: const Color(0xFF7B1F3F),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                               vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(16),
+                            borderRadius: BorderRadius.circular(16),
                           ),
                         ),
-                        onPressed:
-                            loading ? null : sendPdfToWhatsApp,
+                        onPressed: loading ? null : sendPdfToWhatsApp,
                         label: loading
                             ? const SizedBox(
                                 height: 20,
@@ -1326,8 +1538,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                                 "Send PDF via WhatsApp",
                                 style: TextStyle(
                                     fontSize: 16,
-                                    fontWeight:
-                                        FontWeight.bold),
+                                    fontWeight: FontWeight.bold),
                               ),
                       ),
                     ),

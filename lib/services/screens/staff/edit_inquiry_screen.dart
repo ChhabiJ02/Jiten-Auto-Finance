@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phone_state/phone_state.dart';
@@ -65,6 +64,73 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  bool _isSameDate(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  bool get _hasPendingFollowUpDraft {
+    return followUpCommentController.text.trim().isNotEmpty ||
+        !_isSameDate(newFollowUpDate, DateTime.now());
+  }
+
+  bool get _hasPendingCallDraft {
+    return callDurationController.text.trim().isNotEmpty ||
+        callNotesController.text.trim().isNotEmpty;
+  }
+
+  bool _stagePendingFollowUp() {
+    if (!_hasPendingFollowUpDraft) {
+      return true;
+    }
+
+    final comment = followUpCommentController.text.trim();
+    final alreadyExists = followUpHistory.any((item) {
+      final itemDate = (item['date'] as Timestamp).toDate();
+      return _isSameDate(itemDate, newFollowUpDate);
+    });
+
+    if (alreadyExists) {
+      showMessage(
+        'A follow-up already exists for this date. Edit it or choose another date.',
+      );
+      return false;
+    }
+
+    followUpHistory.add({
+      'date': Timestamp.fromDate(newFollowUpDate),
+      'comment': comment,
+      'createdAt': Timestamp.now(),
+    });
+    selectedDate = newFollowUpDate;
+    followUpCommentController.clear();
+    newFollowUpDate = DateTime.now();
+    return true;
+  }
+
+  bool _stagePendingCall() {
+    if (!_hasPendingCallDraft) {
+      return true;
+    }
+
+    final duration = callDurationController.text.trim();
+    final notes = callNotesController.text.trim();
+
+    if (duration.isEmpty) {
+      showMessage('Please make a call first or enter a call duration.');
+      return false;
+    }
+
+    callHistory.add({
+      'date': Timestamp.now(),
+      'duration': duration,
+      'notes': notes,
+      'createdAt': Timestamp.now(),
+    });
+    callDurationController.clear();
+    callNotesController.clear();
+    return true;
   }
 
   Future<void> fetchBrands() async {
@@ -201,112 +267,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     super.dispose();
   }
 
-  Future<void> _addFollowUp() async {
-
-    final comment =
-        followUpCommentController.text.trim();
-
-    // CHECK DUPLICATE DATE
-    final alreadyExists =
-        followUpHistory.any((item) {
-
-      final itemDate =
-          (item['date'] as Timestamp)
-              .toDate();
-
-      return itemDate.year ==
-              newFollowUpDate.year &&
-          itemDate.month ==
-              newFollowUpDate.month &&
-          itemDate.day ==
-              newFollowUpDate.day;
-    });
-
-    if (alreadyExists) {
-
-      showMessage(
-        'You already added follow-up for this date.',
-      );
-
-      return;
-    }
-
-    final newFollowUp = {
-
-      'date':
-          Timestamp.fromDate(
-        newFollowUpDate,
-      ),
-
-      'comment': comment,
-
-      'createdAt':
-          Timestamp.now(),
-    };
-
-    setState(() {
-
-      followUpHistory
-          .add(newFollowUp);
-
-      // UPDATE MAIN FOLLOW-UP DATE
-      selectedDate =
-          newFollowUpDate;
-
-      followUpCommentController
-          .clear();
-
-      newFollowUpDate =
-          DateTime.now();
-    });
-
-    showMessage(
-      'Follow-up added successfully.',
-    );
-  }
-
-  Future<void> _addCall() async {
-
-  final duration =
-      callDurationController.text.trim();
-
-  final notes =
-      callNotesController.text.trim();
-
-  if (duration.isEmpty) {
-
-    showMessage(
-      'Please make a call first.',
-    );
-
-    return;
-  }
-
-  final newCall = {
-
-    'date': Timestamp.now(),
-
-    'duration': duration,
-
-    'notes': notes,
-
-    'createdAt': Timestamp.now(),
-  };
-
-  setState(() {
-
-    callHistory.add(newCall);
-
-    callDurationController.clear();
-
-    callNotesController.clear();
-  });
-
-  showMessage(
-    'Call logged successfully.',
-  );
-}
-
   Future<void> startDirectCall() async {
 
   final phone =
@@ -390,7 +350,37 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final otherDescription = otherController.text.trim();
     final oldData = widget.inquiry.data() as Map<String, dynamic>;
 
-    List<String> changes = [];
+    if (name.isEmpty) {
+      showMessage('Please enter the customer name.');
+      return;
+    }
+    if (phone.isEmpty) {
+      showMessage('Please enter the customer phone number.');
+      return;
+    }
+    if (brand.isEmpty) {
+      showMessage('Please enter the vehicle brand.');
+      return;
+    }
+
+    if (!_stagePendingFollowUp()) {
+      return;
+    }
+    if (!_stagePendingCall()) {
+      return;
+    }
+
+    final effectiveStatus = isClosed
+        ? 'Closed'
+        : isBooked
+            ? 'Booked'
+            : paymentType == 'Loan'
+                ? 'Finance'
+                : status == 'Finance'
+                    ? 'New Inquiry'
+                    : status;
+
+    final changes = <String>[];
 
     if (oldData['brand'] != brand) {
       changes.add('Brand changed from "${oldData['brand']}" to "$brand"');
@@ -408,8 +398,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       changes.add('Price changed from "${oldData['price']}" to "$price"');
     }
 
-    if (oldData['status'] != status) {
-      changes.add('Status changed from "${oldData['status']}" to "$status"');
+    final oldPaymentType = (oldData['paymentType'] ?? 'Loan').toString();
+    if (oldPaymentType != paymentType) {
+      changes.add('Payment option changed from "$oldPaymentType" to "$paymentType"');
+    }
+
+    final oldStatus = (oldData['status'] ?? 'New Inquiry').toString();
+    if (oldStatus != effectiveStatus) {
+      changes.add('Status changed from "$oldStatus" to "$effectiveStatus"');
     }
 
     if (changes.isNotEmpty) {
@@ -418,19 +414,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         'changes': changes,
         'time': Timestamp.now(),
       });
-    }
-
-    if (name.isEmpty) {
-      showMessage('Please enter the customer name.');
-      return;
-    }
-    if (phone.isEmpty) {
-      showMessage('Please enter the customer phone number.');
-      return;
-    }
-    if (brand.isEmpty) {
-      showMessage('Please enter the vehicle brand.');
-      return;
     }
 
     setState(() => loading = true);
@@ -457,7 +440,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
         'editHistory': editHistory,
         'isClosed': isClosed,
         'isBooked': isBooked,
-        'status': paymentType == 'Loan' ? 'Finance' : status,
+        'status': effectiveStatus,
       });
 
       if (mounted) {
@@ -675,6 +658,29 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       controller: referenceController,
                       decoration: const InputDecoration(labelText: 'Reference'),
                     ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: paymentType,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Loan',
+                          child: Text('Loan'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Cash',
+                          child: Text('Cash'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() => paymentType = value);
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Payment Option',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -831,7 +837,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           const SizedBox(width: 10),
 
                           Text(
-                            'Add New Follow-up',
+                            'Follow-up',
 
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
@@ -870,12 +876,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _addFollowUp,
-                        child: const Text('Add Follow-up'),
+                    const SizedBox(height: 12),
+                    Text(
+                      'This follow-up will be added when you tap Save All Changes.',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -937,12 +943,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                                   Row(
                                     children: [
 
-                                      IconButton(
-                                        icon: const Icon(Icons.edit),
-                                        onPressed: () {
-
-                                          followUpCommentController.text =
-                                              item['comment'] ?? '';
+                                       IconButton(
+                                         icon: const Icon(Icons.edit),
+                                         onPressed: () {
+                                          final editController =
+                                              TextEditingController(
+                                            text: item['comment'] ?? '',
+                                          );
 
                                           showDialog(
                                             context: context,
@@ -951,8 +958,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                                                 title: const Text(
                                                     'Edit Follow-up'),
                                                 content: TextField(
-                                                  controller:
-                                                      followUpCommentController,
+                                                  controller: editController,
                                                   maxLines: 3,
                                                 ),
                                                 actions: [
@@ -968,14 +974,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                                                       setState(() {
                                                         followUpHistory[index]
                                                             ['comment'] =
-                                                            followUpCommentController
+                                                            editController
                                                                 .text
                                                                 .trim();
                                                       });
 
                                                       Navigator.pop(context);
                                                     },
-                                                    child: const Text('Save'),
+                                                    child: const Text('Update'),
                                                   ),
                                                 ],
                                               );
@@ -1062,7 +1068,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
           const SizedBox(width: 10),
 
           Text(
-            'Log Call',
+            'Call Log',
 
             style: TextStyle(
               fontWeight: FontWeight.bold,
@@ -1114,11 +1120,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
               return;
             }
-
-            final Uri phoneUri = Uri(
-              scheme: 'tel',
-              path: phone,
-            );
 
             try {
 
@@ -1240,12 +1241,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _addCall,
-                        child: const Text('Log Call'),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Call duration and notes will be saved when you tap Save All Changes.',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 12,
                       ),
                     ),
                   ],
@@ -1329,7 +1330,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('Save Changes'),
+                    : const Text('Save All Changes'),
               ),
             ),
           ],
