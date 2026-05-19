@@ -12,7 +12,6 @@ class BookServiceScreen extends StatefulWidget {
 class _BookServiceScreenState extends State<BookServiceScreen> {
   final brandController = TextEditingController();
   final modelController = TextEditingController();
-  final variantController = TextEditingController();
   final registrationController = TextEditingController();
   final notesController = TextEditingController();
   final servicePackageController = TextEditingController();
@@ -26,14 +25,14 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
 
   String? selectedBrand;
   String? selectedModel;
-  String? selectedVariant;
 
   List<String> brands = [];
   List<String> models = [];
-  List<Map<String, dynamic>> variants = [];
 
   void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> pickDate() async {
@@ -67,17 +66,29 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     setState(() => loading = true);
 
     try {
+      final customerName = user.displayName?.trim();
+      final customerPhone = user.phoneNumber?.trim();
+
       await FirebaseFirestore.instance.collection('serviceRequests').add({
         'userId': user.uid,
+        'requestedByUserId': user.uid,
+        'requestedByName': customerName ?? user.email ?? 'Customer',
+        'requestedByEmail': user.email,
+        'customerName': customerName ?? user.email ?? 'Customer',
+        'customerPhone': customerPhone,
         'customerEmail': user.email,
         'vehicleBrand': brand,
         'vehicleModel': model,
-        'variant': variantController.text.trim(),
+        'variant': '',
         'registrationNumber': registrationController.text.trim(),
         'serviceType': serviceType,
         'boughtFromUs': boughtFromUs,
-        'servicePackage': boughtFromUs ? servicePackageController.text.trim() : null,
-        'remainingServices': boughtFromUs ? int.tryParse(remainingServicesController.text.trim()) ?? 0 : null,
+        'servicePackage': boughtFromUs
+            ? servicePackageController.text.trim()
+            : null,
+        'remainingServices': boughtFromUs
+            ? int.tryParse(remainingServicesController.text.trim()) ?? 0
+            : null,
         'preferredDate': Timestamp.fromDate(preferredDate),
         'notes': notesController.text.trim(),
         'status': 'Pending',
@@ -89,22 +100,21 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
         Navigator.pop(context);
       }
     } catch (e) {
-      if (mounted) showMessage('Failed to submit service request. Please try again.');
+      if (mounted)
+        showMessage('Failed to submit service request. Please try again.');
     } finally {
       if (mounted) setState(() => loading = false);
     }
   }
 
-    Future<void> fetchBrands() async {
+  Future<void> fetchBrands() async {
     try {
       setState(() => brandsLoading = true);
       final snapshot = await FirebaseFirestore.instance
           .collection('Brand')
           .get();
       setState(() {
-        brands = snapshot.docs
-            .map((doc) => doc['Name'].toString())
-            .toList();
+        brands = snapshot.docs.map((doc) => doc['Name'].toString()).toList();
         brandsLoading = false;
       });
     } catch (e) {
@@ -113,42 +123,20 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
     }
   }
 
- Future<void> fetchModels(String brand) async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('Model')
-      .where('ParentBrand', isEqualTo: brand)
-      .get();
+  Future<void> fetchModels(String brand) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Model')
+        .where('ParentBrand', isEqualTo: brand)
+        .get();
 
-  setState(() {
-    models = snapshot.docs
-        .map((doc) => doc['Name'].toString())
-        .toList();
+    setState(() {
+      models = snapshot.docs.map((doc) => doc['Name'].toString()).toList();
 
-    selectedModel = null;
-    selectedVariant = null;
-    variants = [];
+      selectedModel = null;
 
-    modelController.clear();
-    variantController.clear();
-  });
-}
-
-  Future<void> fetchVariants(String model) async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('Variant')
-      .where('ParentModel', isEqualTo: model)
-      .get();
-
-  setState(() {
-    variants = snapshot.docs
-        .map((doc) => doc.data())
-        .toList();
-
-    selectedVariant = null;
-
-    variantController.clear();
-  });
-}
+      modelController.clear();
+    });
+  }
 
   @override
   void initState() {
@@ -178,10 +166,8 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                   : const Text("Select Brand"),
               items: brands
                   .map(
-                    (brand) => DropdownMenuItem(
-                      value: brand,
-                      child: Text(brand),
-                    ),
+                    (brand) =>
+                        DropdownMenuItem(value: brand, child: Text(brand)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -194,9 +180,7 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                   fetchModels(value);
                 }
               },
-              decoration: const InputDecoration(
-                labelText: "Vehicle Brand",
-              ),
+              decoration: const InputDecoration(labelText: "Vehicle Brand"),
             ),
 
             const SizedBox(height: 12),
@@ -206,10 +190,8 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
               hint: const Text("Select Model"),
               items: models
                   .map(
-                    (model) => DropdownMenuItem(
-                      value: model,
-                      child: Text(model),
-                    ),
+                    (model) =>
+                        DropdownMenuItem(value: model, child: Text(model)),
                   )
                   .toList(),
               onChanged: (value) {
@@ -217,50 +199,34 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                   selectedModel = value;
                   modelController.text = value ?? '';
                 });
-
-                if (value != null) {
-                  fetchVariants(value);
-                }
               },
-              decoration: const InputDecoration(
-                labelText: "Vehicle Model",
-              ),
+              decoration: const InputDecoration(labelText: "Vehicle Model"),
             ),
 
-            const SizedBox(height: 12),
-
-            DropdownButtonFormField<String>(
-              value: selectedVariant,
-              hint: const Text("Select Variant"),
-              items: variants.map((variant) {
-                return DropdownMenuItem<String>(
-                  value: variant['Name'].toString(),
-                  child: Text(variant['Name'].toString()),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedVariant = value;
-                  variantController.text = value ?? '';
-                });
-              },
-              decoration: const InputDecoration(
-                labelText: "Variant",
-              ),
-            ),
             const SizedBox(height: 12),
             TextField(
               controller: registrationController,
-              decoration: const InputDecoration(labelText: 'Registration Number'),
+              decoration: const InputDecoration(
+                labelText: 'Registration Number',
+              ),
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               initialValue: serviceType,
               items: const [
-                DropdownMenuItem(value: 'Regular Service', child: Text('Regular Service')),
+                DropdownMenuItem(
+                  value: 'Regular Service',
+                  child: Text('Regular Service'),
+                ),
+                DropdownMenuItem(
+                  value: 'Paid Service',
+                  child: Text('Paid Service'),
+                ),
                 DropdownMenuItem(value: 'Repair', child: Text('Repair')),
-                DropdownMenuItem(value: 'Renew Service', child: Text('Renew Service')),
-                DropdownMenuItem(value: 'Inspection', child: Text('Inspection')),
+                DropdownMenuItem(
+                  value: 'Inspection',
+                  child: Text('Inspection'),
+                ),
               ],
               onChanged: (value) {
                 if (value != null) {
@@ -278,7 +244,9 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
             if (boughtFromUs) ...[
               TextField(
                 controller: servicePackageController,
-                decoration: const InputDecoration(labelText: 'Service Package (e.g. 5 services)'),
+                decoration: const InputDecoration(
+                  labelText: 'Service Package (e.g. 5 services)',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -291,14 +259,17 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
             InkWell(
               onTap: pickDate,
               child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'Preferred Service Date'),
+                decoration: const InputDecoration(
+                  labelText: 'Preferred Service Date',
+                ),
                 child: Text(preferredDate.toString().split(' ')[0]),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: notesController,
-              maxLines: 4,
+              minLines: 1,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Additional Instructions',
                 alignLabelWithHint: true,
@@ -311,7 +282,10 @@ class _BookServiceScreenState extends State<BookServiceScreen> {
                   ? const SizedBox(
                       height: 18,
                       width: 18,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
                     )
                   : const Text('Submit Service Request'),
             ),

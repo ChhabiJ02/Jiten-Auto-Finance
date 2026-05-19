@@ -29,9 +29,8 @@ class AuthService {
 
   // ─── Registration ──────────────────────────────────────────────────────────
 
-  /// Register a new user with email and password
-  /// Returns user credential if successful
-  /// Throws FirebaseAuthException on failure
+  /// Register a new user with email and password.
+  /// Verification is handled separately by the UI flow.
   Future<UserCredential> registerWithEmail({
     required String email,
     required String password,
@@ -61,9 +60,6 @@ class AuthService {
         phone: phone,
         role: role,
       );
-
-      // Send email verification
-      await sendEmailVerification();
 
       return userCredential;
     } on FirebaseAuthException {
@@ -193,6 +189,106 @@ class AuthService {
       throw FirebaseAuthException(
         code: 'password-reset-failed',
         message: 'Failed to send password reset email: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Generate and store a user email OTP for later verification.
+  Future<void> sendUserEmailOtp({
+    required String email,
+    required String uid,
+  }) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      if (normalizedEmail.isEmpty) {
+        throw FirebaseAuthException(
+          code: 'invalid-email',
+          message: 'Email cannot be empty',
+        );
+      }
+
+      final otp = _generateOtp();
+      final now = Timestamp.now();
+      final expiresAt = Timestamp.fromDate(
+        now.toDate().add(const Duration(minutes: 10)),
+      );
+
+      await _firestore.collection('userOtps').doc(normalizedEmail).set({
+        'uid': uid,
+        'email': normalizedEmail,
+        'otp': otp,
+        'createdAt': now,
+        'expiresAt': expiresAt,
+      });
+
+      // Email delivery still needs a backend provider.
+      debugPrint('User email OTP for $normalizedEmail: $otp');
+    } catch (e) {
+      if (e is FirebaseAuthException) rethrow;
+      throw FirebaseAuthException(
+        code: 'user-email-otp-failed',
+        message: 'Failed to generate email OTP: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Verify a user's email OTP and mark their Firestore profile as verified.
+  Future<void> verifyUserEmailOtp({
+    required String uid,
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final normalizedEmail = email.trim().toLowerCase();
+      final trimmedOtp = otp.trim();
+
+      if (normalizedEmail.isEmpty || trimmedOtp.length != 6) {
+        throw FirebaseAuthException(
+          code: 'invalid-input',
+          message: 'Email and OTP must be provided',
+        );
+      }
+
+      final doc = await _firestore.collection('userOtps').doc(normalizedEmail).get();
+      final data = doc.data();
+
+      if (data == null || data['otp'] != trimmedOtp || data['uid'] != uid) {
+        throw FirebaseAuthException(
+          code: 'invalid-otp',
+          message: 'The OTP is invalid or does not match',
+        );
+      }
+
+      final expiresAt = data['expiresAt'] as Timestamp?;
+      if (expiresAt == null || Timestamp.now().toDate().isAfter(expiresAt.toDate())) {
+        throw FirebaseAuthException(
+          code: 'expired-otp',
+          message: 'The OTP has expired',
+        );
+      }
+
+      final userDoc = await _firestore.collection('users').doc(uid).get();
+      final userData = userDoc.data();
+      final storedEmail = (userData?['email'] ?? '').toString().trim().toLowerCase();
+
+      if (!userDoc.exists || storedEmail != normalizedEmail) {
+        throw FirebaseAuthException(
+          code: 'user-not-found',
+          message: 'No matching user was found for this OTP',
+        );
+      }
+
+      await _firestore.collection('users').doc(uid).update({
+        'emailVerified': true,
+        'verifiedAt': Timestamp.now(),
+        'updatedAt': Timestamp.now(),
+      });
+      await _firestore.collection('userOtps').doc(normalizedEmail).delete();
+    } catch (e) {
+      if (e is FirebaseAuthException) rethrow;
+      throw FirebaseAuthException(
+        code: 'otp-verification-failed',
+        message: 'Failed to verify user OTP: ${e.toString()}',
       );
     }
   }
@@ -530,6 +626,12 @@ class AuthService {
         return 'Please enter a valid 10-digit phone number.';
       case 'invalid-input':
         return 'Please fill all required fields.';
+      case 'invalid-otp':
+        return 'The OTP is incorrect. Please try again.';
+      case 'expired-otp':
+        return 'The OTP has expired. Please request a new one.';
+      case 'user-email-otp-failed':
+        return 'Failed to create the verification OTP.';
       default:
         return e.message ?? 'An error occurred. Please try again.';
     }

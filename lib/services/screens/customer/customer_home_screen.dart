@@ -738,20 +738,6 @@ return SingleChildScrollView(
 
             buildActionCard(
               context,
-              'New Vehicle Booking',
-              'Request a new vehicle purchase',
-              Icons.directions_bike,
-              () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) =>
-                      const NewVehicleBookingScreen(),
-                ),
-              ),
-            ),
-
-            buildActionCard(
-              context,
               'Book Service',
               'Schedule service for any 2-wheeler',
               Icons.miscellaneous_services,

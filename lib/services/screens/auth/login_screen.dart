@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'email_otp_verification_screen.dart';
+import 'password_reset_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -184,7 +186,6 @@ class _LoginScreenState
               .toString()
               .toLowerCase();
 
-      // ADMIN
       if (role == 'admin') {
 
         Navigator.pushReplacementNamed(
@@ -201,47 +202,79 @@ class _LoginScreenState
                 .instance
                 .currentUser;
 
-        if (updatedUser != null &&
-            updatedUser.emailVerified) {
+        final firebaseVerified =
+            updatedUser?.emailVerified ==
+                true;
 
-          // STAFF
-          if (role == 'staff' ||
-              role == 'workshop') {
+        final firestoreVerified =
+            data?['emailVerified'] ==
+                true;
 
-            Navigator.pushReplacementNamed(
-              context,
-              '/staffDashboard',
-            );
+        if (firebaseVerified &&
+            !firestoreVerified &&
+            doc.exists) {
 
-          }
-          // CUSTOMER
-          else if (role ==
-              'customer') {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .update({
+            'emailVerified': true,
+            'verifiedAt':
+                Timestamp.now(),
+          });
 
-            Navigator.pushReplacementNamed(
-              context,
-              '/customerDashboard',
-            );
+          data = {
+            ...?data,
+            'emailVerified': true,
+          };
+        }
 
-          }
-          // UNKNOWN ROLE
-          else {
+        final isVerified =
+            firebaseVerified ||
+                data?['emailVerified'] ==
+                    true;
 
-            _msg(
-              "Invalid role found.",
-            );
+        if (!isVerified) {
 
-            await FirebaseAuth.instance
-                .signOut();
-          }
+          if (!mounted) return;
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder:
+                  (_) =>
+                      EmailOtpVerificationScreen(
+                email:
+                    email,
+                uid: uid,
+                role: role,
+              ),
+            ),
+          );
+
+          return;
+        }
+
+        if (role == 'staff' ||
+            role == 'workshop') {
+
+          Navigator.pushReplacementNamed(
+            context,
+            '/staffDashboard',
+          );
+
+        } else if (role ==
+            'customer') {
+
+          Navigator.pushReplacementNamed(
+            context,
+            '/customerDashboard',
+          );
 
         } else {
 
-          await updatedUser
-              ?.sendEmailVerification();
-
           _msg(
-            "Please verify your email first. Verification link sent.",
+            "Invalid role found.",
           );
 
           await FirebaseAuth.instance
@@ -520,6 +553,10 @@ class _LoginScreenState
                           ),
 
                           const SizedBox(
+                            height: 6,
+                          ),
+
+                          const SizedBox(
                             height: 28,
                           ),
 
@@ -570,6 +607,29 @@ class _LoginScreenState
                                       : const Text(
                                           "Login",
                                         ),
+                            ),
+                          ),
+
+                          const SizedBox(
+                            height: 12,
+                          ),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => PasswordResetScreen(
+                                      initialEmail: _emailCtrl.text.trim(),
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text(
+                                "Forgot Password?",
+                              ),
                             ),
                           ),
 

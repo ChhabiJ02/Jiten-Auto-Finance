@@ -6,6 +6,7 @@ import 'inquiry_list_screen.dart';
 import 'vehicle_catalog_screen.dart';
 import 'admin_profile_screen.dart';
 import 'user_management_screen.dart';
+import '../staff/service_requests_screen.dart';
 
 class AdminDashboard extends StatefulWidget {
   const AdminDashboard({super.key});
@@ -104,6 +105,27 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
 
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.miscellaneous_services,
+                color: Color(0xFF7B1F3F),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ServiceRequestsScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
           Container(
             margin: const EdgeInsets.only(right: 16),
 
@@ -383,34 +405,30 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
                   children: [
 
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-
                         const Text(
                           'Monthly Lead Report',
-
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 8,
                           ),
-
                           decoration: BoxDecoration(
                             color: const Color(0xFF7B1F3F).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(30),
                           ),
-
                           child: Text(
                             DateFormat('MMMM yyyy').format(today),
-
                             style: const TextStyle(
                               color: Color(0xFF7B1F3F),
                               fontWeight: FontWeight.w600,
@@ -473,15 +491,39 @@ class _AdminDashboardState extends State<AdminDashboard> {
                                 //isHeader: true,
                               ),
 
-                              ...dailyCounts.map(
-                                    (leadCount) => _TableCell(
+                              ...List.generate(dailyCounts.length, (i) {
+                                final leadCount = dailyCounts[i];
+                                final day = days[i];
+                                return _TableCell(
                                   label: leadCount.toString(),
-                                ),
-                              ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => InquiryListScreen(
+                                          filterFrom: DateTime(day.year, day.month, day.day),
+                                          filterTo: DateTime(day.year, day.month, day.day),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              }),
 
                               _TableCell(
                                 label: totalLeads.toString(),
                                 isBold: true,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => InquiryListScreen(
+                                        filterFrom: startDate,
+                                        filterTo: endDate,
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ],
                           ),
@@ -588,16 +630,18 @@ class _TableCell extends StatelessWidget {
     required this.label,
     this.isHeader = false,
     this.isBold = false,
+    this.onTap,
   });
 
   final String label;
   final bool isHeader;
   final bool isBold;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
 
-    return Padding(
+    final content = Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: 14,
         vertical: 12,
@@ -619,5 +663,11 @@ class _TableCell extends StatelessWidget {
         ),
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(onTap: onTap, child: content);
+    }
+
+    return content;
   }
 }

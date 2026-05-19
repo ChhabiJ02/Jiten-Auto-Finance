@@ -404,6 +404,7 @@ class _StaffProfileScreenState
                               const InputDecoration(
                             labelText: 'Email',
                           ),
+                          readOnly: true,
                         ),
 
                         const SizedBox(
@@ -422,6 +423,7 @@ class _StaffProfileScreenState
                               const InputDecoration(
                             labelText: 'Phone',
                           ),
+                          readOnly: true,
                         ),
                       ],
                     ),

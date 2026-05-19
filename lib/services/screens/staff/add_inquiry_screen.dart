@@ -9,7 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:url_launcher/url_launcher.dart';
+import '../../vehicle_model_lookup.dart';
+import '../customer/new_vehicle_booking_screen.dart';
 
 // ─── Model for a single vehicle quotation block ──────────────
 class VehicleQuotation {
@@ -61,6 +62,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   final exchangeRegController = TextEditingController();
   final exchangeExpectedPriceController = TextEditingController();
   final exchangeOfferPriceController = TextEditingController();
+  String? selectedAssignedStaffId;
+  List<Map<String, String>> staffList = [];
 
   String paymentType = 'Loan';
   DateTime selectedDate = DateTime.now();
@@ -90,6 +93,26 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   void initState() {
     super.initState();
     _addQuotation();
+    _loadStaffList();
+  }
+
+  Future<void> _loadStaffList() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'staff')
+          .get();
+
+      final list = snap.docs.map((d) {
+        final data = d.data();
+        return {
+          'id': d.id,
+          'name': (data['name'] ?? data['email'] ?? 'Staff').toString(),
+        };
+      }).toList();
+
+      if (mounted) setState(() => staffList = list);
+    } catch (_) {}
   }
 
   void _addQuotation() {
@@ -99,14 +122,61 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _addVehicleFromCatalog() async {
+    final vehicleData = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NewVehicleBookingScreen(
+          isAddingToInquiry: true,
+          onVehicleSelected: (data) {
+            Navigator.pop(context, data);
+          },
+        ),
+      ),
+    );
+
+    if (vehicleData != null && mounted) {
+      final q = VehicleQuotation();
+      quotations.add(q);
+
+      // Pre-fill the quotation with the selected vehicle data
+      q.brandController.text = vehicleData['brand'] ?? '';
+      q.modelController.text = vehicleData['model'] ?? '';
+      q.variantController.text = vehicleData['variant'] ?? '';
+      q.onRoadPriceController.text = vehicleData['price'] ?? '';
+      q.offerPriceController.text = vehicleData['expectedPrice'] ?? '';
+      q.descriptionController.text = vehicleData['notes'] ?? '';
+
+      q.selectedBrand = vehicleData['brand'];
+      q.selectedModel = vehicleData['model'];
+      q.selectedVariant = vehicleData['variant'];
+      q.selectedVehicleId = vehicleData['vehicleId']?.toString();
+      q.selectedVariantPhotoUrl = vehicleData['vehiclePhotoUrl']?.toString();
+      q.selectedVariantPhotoUrls =
+          (vehicleData['vehiclePhotoUrls'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          [];
+
+      // Fetch the models and details for the selected brand/model
+      await _fetchBrandsForQuotation(q);
+      await _fetchModels(q, vehicleData['brand'] ?? '');
+      await _loadModelDetailsForQuotation(q, vehicleData['model'] ?? '');
+
+      setState(() {});
+    }
+  }
+
   Future<void> _fetchBrandsForQuotation(VehicleQuotation q) async {
     try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('Brand').get();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Brand')
+          .get();
       if (mounted) {
         setState(() {
-          q.brands =
-              snapshot.docs.map((doc) => doc['Name'].toString()).toList();
+          q.brands = snapshot.docs
+              .map((doc) => doc['Name'].toString())
+              .toList();
           q.brandsLoading = false;
         });
       }
@@ -122,8 +192,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         .get();
     if (mounted) {
       setState(() {
-        q.models =
-            snapshot.docs.map((doc) => doc['Name'].toString()).toList();
+        q.models = snapshot.docs.map((doc) => doc['Name'].toString()).toList();
         q.selectedModel = null;
         q.selectedVariant = null;
         q.variants = [];
@@ -137,88 +206,43 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
   }
 
-  Future<void> _fetchVariants(VehicleQuotation q, String model) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Variant')
-        .where('ParentModel', isEqualTo: model)
-        .get();
+  Future<void> _loadModelDetailsForQuotation(
+    VehicleQuotation q,
+    String model,
+  ) async {
+    final brand = q.selectedBrand?.trim() ?? '';
 
-    final fetchedVariants = <Map<String, dynamic>>[];
-
-    for (final doc in snapshot.docs) {
-      final variantData = Map<String, dynamic>.from(doc.data());
-      final variantName = (variantData['Name'] ?? '').toString();
-      final photoUrls = <String>[];
-      final docId =
-          (variantData['vehicleImagesDocId'] ?? '').toString().trim();
-
-      try {
-        QuerySnapshot<Map<String, dynamic>>? imagesSnap;
-        if (docId.isNotEmpty) {
-          imagesSnap = await FirebaseFirestore.instance
-              .collection('VehicleImages')
-              .doc(docId)
-              .collection('images')
-              .get();
-        }
-        if (imagesSnap == null || imagesSnap.docs.isEmpty) {
-          final imageSearch = await FirebaseFirestore.instance
-              .collection('VehicleImages')
-              .where('name', isEqualTo: variantName)
-              .limit(1)
-              .get();
-          if (imageSearch.docs.isNotEmpty) {
-            imagesSnap = await imageSearch.docs.first.reference
-                .collection('images')
-                .get();
-          }
-        }
-        if (imagesSnap == null || imagesSnap.docs.isEmpty) {
-          imagesSnap = await FirebaseFirestore.instance
-              .collection('VehicleImages')
-              .doc(variantName)
-              .collection('images')
-              .get();
-        }
-        for (final imageDoc in imagesSnap.docs) {
-          final url = imageDoc.data()['url']?.toString();
-          if (url != null && url.isNotEmpty && !photoUrls.contains(url)) {
-            photoUrls.add(url);
-          }
-        }
-      } catch (e) {
-        debugPrint("Error fetching images for $variantName: $e");
-      }
-
-      final fallbackUrl = variantData['photoUrl']?.toString();
-      if (photoUrls.isEmpty &&
-          fallbackUrl != null &&
-          fallbackUrl.isNotEmpty) {
-        photoUrls.add(fallbackUrl);
-      }
-
-      variantData['photoUrls'] = photoUrls;
-      variantData['photoUrl'] =
-          photoUrls.isNotEmpty ? photoUrls.first : null;
-      fetchedVariants.add(variantData);
+    if (brand.isEmpty || model.trim().isEmpty) {
+      return;
     }
 
-    if (mounted) {
-      setState(() {
-        q.variants = fetchedVariants;
-        q.selectedVariant = null;
-        q.variantController.clear();
-        q.onRoadPriceController.clear();
-        q.selectedVariantPhotoUrl = null;
-        q.selectedVariantPhotoUrls = [];
-        q.selectedVehicleId = null;
-      });
+    final details = await fetchVehicleModelLookupData(
+      firestore: FirebaseFirestore.instance,
+      brand: brand,
+      model: model,
+    );
+
+    if (!mounted) {
+      return;
     }
+
+    setState(() {
+      q.selectedVariant = null;
+      q.variantController.clear();
+      q.onRoadPriceController.text = details.price.isNotEmpty
+          ? details.price
+          : q.onRoadPriceController.text;
+      q.selectedVariantPhotoUrl =
+          details.primaryPhotoUrl ?? q.selectedVariantPhotoUrl;
+      q.selectedVariantPhotoUrls = details.photoUrls.isNotEmpty
+          ? details.photoUrls
+          : q.selectedVariantPhotoUrls;
+      q.selectedVehicleId = details.vehicleId ?? q.selectedVehicleId;
+    });
   }
 
   void showMessage(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   Future<bool> saveInquiry() async {
@@ -249,10 +273,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
     if (q.selectedModel == null) {
       showMessage("Please select vehicle model.");
-      return false;
-    }
-    if (q.selectedVariant == null) {
-      showMessage("Please select vehicle variant.");
       return false;
     }
     final price = q.onRoadPriceController.text.trim();
@@ -292,8 +312,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           .collection('counters')
           .doc('inquiryCounter');
       final counterSnapshot = await counterRef.get();
-      final currentNumber =
-          counterSnapshot.exists ? counterSnapshot['current'] ?? 0 : 0;
+      final currentNumber = counterSnapshot.exists
+          ? counterSnapshot['current'] ?? 0
+          : 0;
       final newInquiryNumber = currentNumber + 1;
       await counterRef.set({'current': newInquiryNumber});
 
@@ -301,7 +322,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         return {
           'brand': aq.brandController.text.trim(),
           'model': aq.modelController.text.trim(),
-          'variant': aq.variantController.text.trim(),
+          'variant': '',
           'onRoadPrice': aq.onRoadPriceController.text.trim(),
           'offerPrice': aq.offerPriceController.text.trim(),
           'description': aq.descriptionController.text.trim(),
@@ -317,7 +338,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         'phone': phone,
         'brand': q.brandController.text.trim(),
         'model': q.modelController.text.trim(),
-        'variant': q.variantController.text.trim(),
+        'variant': '',
         'vehicleId': q.selectedVehicleId,
         'vehiclePhotoUrl': q.selectedVariantPhotoUrl,
         'vehiclePhotoUrls': q.selectedVariantPhotoUrls,
@@ -338,14 +359,19 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         if (exchangeOption == 'Yes') ...{
           'exchangeBrandModel': exchangeBrandModelController.text.trim(),
           'exchangeRegNumber': exchangeRegController.text.trim(),
-          'exchangeExpectedPrice':
-              exchangeExpectedPriceController.text.trim(),
+          'exchangeExpectedPrice': exchangeExpectedPriceController.text.trim(),
           'exchangeOfferPrice': exchangeOfferPriceController.text.trim(),
         },
         'date': selectedDate,
-        'staffId': user.uid,
-        'assignedTo': user.uid,
         'createdBy': user.uid,
+        if (selectedAssignedStaffId != null &&
+            selectedAssignedStaffId!.isNotEmpty) ...{
+          'staffId': selectedAssignedStaffId,
+          'assignedTo': selectedAssignedStaffId,
+        } else ...{
+          'staffId': user.uid,
+          'assignedTo': user.uid,
+        },
         'createdAt': Timestamp.now(),
         'status': 'New Inquiry',
         if (followUpDate != null)
@@ -363,12 +389,10 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   // ── PDF header widget (shared across all pages) ────────────
-  pw.Widget _pdfHeader() {
+  pw.Widget _pdfHeader(String staffName) {
     return pw.Container(
       width: double.infinity,
-      decoration: const pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFF7B1F3F),
-      ),
+      decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF7B1F3F)),
       child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -377,10 +401,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             padding: const pw.EdgeInsets.only(left: 20, top: 8),
             child: pw.Text(
               'M. 8866797000',
-              style: const pw.TextStyle(
-                color: PdfColors.white,
-                fontSize: 11,
-              ),
+              style: const pw.TextStyle(color: PdfColors.white, fontSize: 11),
             ),
           ),
           pw.SizedBox(height: 4),
@@ -395,10 +416,20 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             ),
           ),
           pw.SizedBox(height: 4),
+          if (staffName.isNotEmpty)
+            pw.Center(
+              child: pw.Text(
+                'Staff: $staffName',
+                style: const pw.TextStyle(color: PdfColors.white, fontSize: 12),
+              ),
+            ),
+          if (staffName.isNotEmpty) pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Container(
               padding: const pw.EdgeInsets.symmetric(
-                  horizontal: 16, vertical: 4),
+                horizontal: 16,
+                vertical: 4,
+              ),
               decoration: pw.BoxDecoration(
                 color: PdfColor.fromInt(0xFF4A0E24),
                 borderRadius: pw.BorderRadius.circular(4),
@@ -418,7 +449,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           pw.Container(
             width: double.infinity,
             padding: const pw.EdgeInsets.symmetric(
-                horizontal: 20, vertical: 10),
+              horizontal: 20,
+              vertical: 10,
+            ),
             color: PdfColor.fromInt(0xFF4A0E24),
             child: pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -452,8 +485,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         pw.Container(
-          padding: const pw.EdgeInsets.symmetric(
-              horizontal: 6, vertical: 2),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: pw.BoxDecoration(
             color: PdfColors.white,
             borderRadius: pw.BorderRadius.circular(3),
@@ -469,14 +501,11 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         ),
         pw.SizedBox(width: 6),
         // ✅ pw.Flexible with loose fit — does NOT require bounded width
-        pw.Flexible(
-          fit: pw.FlexFit.loose,
+        pw.SizedBox(
+          width: 320,
           child: pw.Text(
             value,
-            style: const pw.TextStyle(
-              color: PdfColors.white,
-              fontSize: 9,
-            ),
+            style: const pw.TextStyle(color: PdfColors.white, fontSize: 9),
           ),
         ),
       ],
@@ -484,74 +513,26 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   // ── PDF footer with staff details ─────────────────────────
-  pw.Widget _pdfFooter(String staffName, String staffPhone) {
+  pw.Widget _pdfFooter() {
     return pw.Container(
       width: double.infinity,
-      padding: const pw.EdgeInsets.symmetric(
-          horizontal: 20, vertical: 14),
-      decoration: const pw.BoxDecoration(
-        color: PdfColor.fromInt(0xFF7B1F3F),
-      ),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+      decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF7B1F3F)),
+      child: pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          // ✅ pw.Flexible instead of nothing — prevents overflow on long text
-          pw.Flexible(
-            fit: pw.FlexFit.loose,
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Thank you for choosing Jiten Auto',
-                  style: pw.TextStyle(
-                    color: PdfColors.white,
-                    fontSize: 11,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 3),
-                pw.Text(
-                  '-> Best Exchange Value Of Any Old Two Wheeler',
-                  style: const pw.TextStyle(
-                    color: PdfColors.white,
-                    fontSize: 9,
-                  ),
-                ),
-              ],
+          pw.Text(
+            'Thank you for choosing Jiten Auto',
+            style: pw.TextStyle(
+              color: PdfColors.white,
+              fontSize: 11,
+              fontWeight: pw.FontWeight.bold,
             ),
           ),
-          pw.SizedBox(width: 16),
-          pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.end,
-            children: [
-              pw.Text(
-                'Sales Executive',
-                style: const pw.TextStyle(
-                  color: PdfColors.white,
-                  fontSize: 9,
-                ),
-              ),
-              pw.SizedBox(height: 2),
-              pw.Text(
-                staffName,
-                style: pw.TextStyle(
-                  color: PdfColors.white,
-                  fontSize: 11,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
-              if (staffPhone.isNotEmpty) ...[
-                pw.SizedBox(height: 2),
-                pw.Text(
-                  staffPhone,
-                  style: const pw.TextStyle(
-                    color: PdfColors.white,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ],
+          pw.SizedBox(height: 6),
+          pw.Text(
+            '-> Best Exchange Value Of Any Old Two Wheeler',
+            style: const pw.TextStyle(color: PdfColors.white, fontSize: 9),
           ),
         ],
       ),
@@ -599,12 +580,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             padding: const pw.EdgeInsets.all(16),
             decoration: pw.BoxDecoration(
               color: PdfColors.white,
-              borderRadius: pw.BorderRadius.circular(12),
-              border: pw.Border(
-                left: pw.BorderSide(
-                  color: PdfColor.fromInt(0xFF7B1F3F),
-                  width: 3,
-                ),
+              border: pw.Border.all(
+                color: PdfColor.fromInt(0xFF7B1F3F),
+                width: 1.5,
               ),
             ),
             child: pw.Column(
@@ -642,72 +620,75 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           pw.SizedBox(height: 14),
 
           // ── Vehicle details ────────────────────────────
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(16),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              borderRadius: pw.BorderRadius.circular(12),
-              border: pw.Border(
-                left: pw.BorderSide(
-                  color: PdfColor.fromInt(0xFF7B1F3F),
-                  width: 3,
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Container(width: 6, color: PdfColor.fromInt(0xFF7B1F3F)),
+              pw.SizedBox(width: 8),
+              pw.Expanded(
+                child: pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(16),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.white,
+                    borderRadius: pw.BorderRadius.circular(12),
+                  ),
+                  child: pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Text(
+                        'Vehicle Details',
+                        style: pw.TextStyle(
+                          fontSize: 14,
+                          fontWeight: pw.FontWeight.bold,
+                          color: PdfColor.fromInt(0xFF7B1F3F),
+                        ),
+                      ),
+                      pw.SizedBox(height: 10),
+                      _pdfDetailRow('Brand', brand),
+                      pw.SizedBox(height: 4),
+                      _pdfDetailRow('Model', model),
+                      if (variant.trim().isNotEmpty) ...[
+                        pw.SizedBox(height: 4),
+                        _pdfDetailRow('Variant', variant),
+                      ],
+                      if (vehicleImages.isNotEmpty) ...[
+                        pw.SizedBox(height: 12),
+                        pw.Text(
+                          'Available Colours',
+                          style: pw.TextStyle(
+                            fontSize: 11,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColor.fromInt(0xFF7B1F3F),
+                          ),
+                        ),
+                        pw.SizedBox(height: 8),
+                        pw.Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: vehicleImages
+                              .map(
+                                (img) => pw.Container(
+                                  width: 110,
+                                  height: 80,
+                                  decoration: pw.BoxDecoration(
+                                    borderRadius: pw.BorderRadius.circular(8),
+                                  ),
+                                  child: pw.ClipRRect(
+                                    horizontalRadius: 8,
+                                    verticalRadius: 8,
+                                    child: pw.Image(img, fit: pw.BoxFit.cover),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Vehicle Details',
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF7B1F3F),
-                  ),
-                ),
-                pw.SizedBox(height: 10),
-                _pdfDetailRow('Brand', brand),
-                pw.SizedBox(height: 4),
-                _pdfDetailRow('Model', model),
-                pw.SizedBox(height: 4),
-                _pdfDetailRow('Variant', variant),
-                if (vehicleImages.isNotEmpty) ...[
-                  pw.SizedBox(height: 12),
-                  pw.Text(
-                    'Available Colours',
-                    style: pw.TextStyle(
-                      fontSize: 11,
-                      fontWeight: pw.FontWeight.bold,
-                      color: PdfColor.fromInt(0xFF7B1F3F),
-                    ),
-                  ),
-                  pw.SizedBox(height: 8),
-                  pw.Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: vehicleImages
-                        .map(
-                          (img) => pw.Container(
-                            width: 110,
-                            height: 80,
-                            decoration: pw.BoxDecoration(
-                              borderRadius:
-                                  pw.BorderRadius.circular(8),
-                            ),
-                            child: pw.ClipRRect(
-                              horizontalRadius: 8,
-                              verticalRadius: 8,
-                              child: pw.Image(img,
-                                  fit: pw.BoxFit.cover),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-              ],
-            ),
+            ],
           ),
 
           pw.SizedBox(height: 14),
@@ -792,12 +773,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           ),
         ),
         // ✅ KEY FIX: pw.Flexible with loose fit — no bounded width required
-        pw.Flexible(
-          fit: pw.FlexFit.loose,
-          child: pw.Text(
-            value,
-            style: const pw.TextStyle(fontSize: 11),
-          ),
+        pw.SizedBox(
+          width: 180,
+          child: pw.Text(value, style: const pw.TextStyle(fontSize: 11)),
         ),
       ],
     );
@@ -827,10 +805,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
     if (q.selectedModel == null) {
       showMessage("Please select vehicle model.");
-      return;
-    }
-    if (q.selectedVariant == null) {
-      showMessage("Please select vehicle variant.");
       return;
     }
     if (price.isEmpty) {
@@ -864,7 +838,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
       final user = FirebaseAuth.instance.currentUser;
       String staffName = user?.displayName ?? '';
-      String staffPhone = user?.phoneNumber ?? '';
 
       if (user != null) {
         try {
@@ -876,13 +849,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             final data = userDoc.data() as Map<String, dynamic>;
             if ((data['name'] ?? '').toString().isNotEmpty) {
               staffName = data['name'].toString();
-            }
-            if ((data['phone'] ?? '').toString().isNotEmpty) {
-              staffPhone = data['phone'].toString();
-            } else if ((data['phoneNumber'] ?? '')
-                .toString()
-                .isNotEmpty) {
-              staffPhone = data['phoneNumber'].toString();
             }
           }
         } catch (_) {}
@@ -900,8 +866,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           ...vq.selectedVariantPhotoUrls,
           if (vq.selectedVariantPhotoUrl != null &&
               vq.selectedVariantPhotoUrl!.isNotEmpty &&
-              !vq.selectedVariantPhotoUrls
-                  .contains(vq.selectedVariantPhotoUrl))
+              !vq.selectedVariantPhotoUrls.contains(vq.selectedVariantPhotoUrl))
             vq.selectedVariantPhotoUrl!,
         ];
         for (final url in imageUrls) {
@@ -909,8 +874,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             final response = await http
                 .get(Uri.parse(url))
                 .timeout(const Duration(seconds: 15));
-            if (response.statusCode == 200 &&
-                response.bodyBytes.isNotEmpty) {
+            if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
               vehicleImages.add(pw.MemoryImage(response.bodyBytes));
             }
           } catch (_) {}
@@ -921,33 +885,32 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         final variant = vq.variantController.text.trim();
         final onRoadPrice = vq.onRoadPriceController.text.trim();
         final offerPrice = vq.offerPriceController.text.trim();
+        final isFirstPage = i == 0;
+        final isLastPage = i == totalPages - 1;
 
         pdf.addPage(
           pw.Page(
             pageFormat: PdfPageFormat.a4,
             margin: const pw.EdgeInsets.all(0),
             build: (context) {
-              // ✅ mainAxisSize.max + pw.Expanded around content
               return pw.Column(
                 mainAxisSize: pw.MainAxisSize.max,
                 children: [
-                  _pdfHeader(),
-                  pw.Expanded(
-                    child: _buildPdfQuotationContent(
-                      customerName: name,
-                      customerPhone: phone,
-                      date: date,
-                      brand: brand,
-                      model: model,
-                      variant: variant,
-                      onRoadPrice: onRoadPrice,
-                      offerPrice: offerPrice,
-                      vehicleImages: vehicleImages,
-                      pageNumber: i + 1,
-                      totalPages: totalPages,
-                    ),
+                  if (isFirstPage) _pdfHeader(staffName),
+                  _buildPdfQuotationContent(
+                    customerName: name,
+                    customerPhone: phone,
+                    date: date,
+                    brand: brand,
+                    model: model,
+                    variant: variant,
+                    onRoadPrice: onRoadPrice,
+                    offerPrice: offerPrice,
+                    vehicleImages: vehicleImages,
+                    pageNumber: i + 1,
+                    totalPages: totalPages,
                   ),
-                  _pdfFooter(staffName, staffPhone),
+                  if (isLastPage) _pdfFooter(),
                 ],
               );
             },
@@ -974,7 +937,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         showMessage("Quotation sent successfully");
         Navigator.pop(context);
       }
-    } catch (e) {
+    } catch (e, st) {
+      debugPrint('sendPdfToWhatsApp error:');
+      debugPrint(st.toString());
       showMessage('Failed to send PDF: ${e.toString()}');
     } finally {
       if (mounted) setState(() => loading = false);
@@ -997,8 +962,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     super.dispose();
   }
 
-  InputDecoration _dec(String label, IconData icon,
-      {bool disabled = false}) {
+  InputDecoration _dec(String label, IconData icon, {bool disabled = false}) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon),
@@ -1012,7 +976,10 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   Widget _buildQuotationBlock(
-      BuildContext context, VehicleQuotation q, int index) {
+    BuildContext context,
+    VehicleQuotation q,
+    int index,
+  ) {
     final theme = Theme.of(context);
     final isFirst = index == 0;
 
@@ -1024,10 +991,12 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           Row(
             children: [
               Expanded(
-                child: Divider(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    thickness: 1.5),
+                child: Container(
+                  height: 1.5,
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                ),
               ),
+
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
@@ -1039,15 +1008,17 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                   ),
                 ),
               ),
+
               Expanded(
-                child: Divider(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    thickness: 1.5),
+                child: Container(
+                  height: 1.5,
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                ),
               ),
+
               IconButton(
                 icon: const Icon(Icons.close, color: Colors.red),
-                onPressed: () =>
-                    setState(() => quotations.removeAt(index)),
+                onPressed: () => setState(() => quotations.removeAt(index)),
               ),
             ],
           ),
@@ -1072,8 +1043,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                   });
                   if (value != null) _fetchModels(q, value);
                 },
-          decoration:
-              _dec('Vehicle Brand', Icons.directions_car_outlined),
+          decoration: _dec('Vehicle Brand', Icons.directions_car_outlined),
         ),
         const SizedBox(height: 16),
 
@@ -1092,51 +1062,21 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                   setState(() {
                     q.selectedModel = value;
                     q.modelController.text = value ?? '';
+                    q.selectedVariant = null;
+                    q.variantController.clear();
+                    q.onRoadPriceController.clear();
+                    q.selectedVariantPhotoUrl = null;
+                    q.selectedVariantPhotoUrls = [];
+                    q.selectedVehicleId = null;
                   });
-                  if (value != null) _fetchVariants(q, value);
+                  if (value != null) {
+                    _loadModelDetailsForQuotation(q, value);
+                  }
                 },
           decoration: _dec(
             'Model',
             Icons.precision_manufacturing,
             disabled: q.selectedBrand == null,
-          ),
-        ),
-        const SizedBox(height: 16),
-
-        DropdownButtonFormField<String>(
-          key: ValueKey(
-              'variant_${index}_${q.selectedBrand}_${q.selectedModel}'),
-          value: q.selectedVariant,
-          isExpanded: true,
-          hint: const Text("Select Variant"),
-          disabledHint: const Text("Select a model first"),
-          items: q.variants
-              .map((v) => DropdownMenuItem<String>(
-                    value: v['Name']?.toString(),
-                    child: Text(v['Name']?.toString() ?? '',
-                        overflow: TextOverflow.ellipsis),
-                  ))
-              .toList(),
-          onChanged: q.selectedModel == null || q.variants.isEmpty
-              ? null
-              : (value) {
-                  final selected =
-                      q.variants.firstWhere((v) => v['Name'] == value);
-                  setState(() {
-                    q.selectedVariant = value;
-                    q.selectedVariantPhotoUrl =
-                        selected['photoUrl']?.toString();
-                    q.selectedVariantPhotoUrls = List<String>.from(
-                        selected['photoUrls'] ?? const []);
-                    q.variantController.text = value ?? '';
-                    q.onRoadPriceController.text =
-                        selected['Price']?.toString() ?? '';
-                  });
-                },
-          decoration: _dec(
-            'Variant',
-            Icons.widgets_outlined,
-            disabled: q.selectedModel == null,
           ),
         ),
         const SizedBox(height: 16),
@@ -1163,11 +1103,12 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         if (q.selectedVariantPhotoUrls.isNotEmpty) ...[
           Align(
             alignment: Alignment.centerLeft,
-            child: Text("Available Colours",
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(fontWeight: FontWeight.bold)),
+            child: Text(
+              "Available Colours",
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 8),
           SizedBox(
@@ -1201,6 +1142,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
         TextField(
           controller: q.onRoadPriceController,
+          readOnly: true,
           keyboardType: TextInputType.number,
           decoration: _dec('On Road Price', Icons.currency_rupee),
         ),
@@ -1209,8 +1151,10 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         TextField(
           controller: q.offerPriceController,
           keyboardType: TextInputType.number,
-          decoration:
-              _dec('Offer Price (optional)', Icons.local_offer_outlined),
+          decoration: _dec(
+            'Offer Price (optional)',
+            Icons.local_offer_outlined,
+          ),
         ),
         const SizedBox(height: 16),
 
@@ -1226,8 +1170,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
           controller: q.otherController,
           minLines: 1,
           maxLines: 5,
-          decoration:
-              _dec('Other Description', Icons.description_outlined),
+          decoration: _dec('Other Description', Icons.description_outlined),
         ),
       ],
     );
@@ -1241,14 +1184,14 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       appBar: AppBar(title: const Text("Add Inquiry")),
       body: Center(
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 520),
             child: Card(
               elevation: 16,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28)),
+                borderRadius: BorderRadius.circular(28),
+              ),
               color: Colors.white,
               child: Padding(
                 padding: const EdgeInsets.all(28),
@@ -1259,38 +1202,42 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       height: 80,
                       width: 80,
                       decoration: BoxDecoration(
-                        color:
-                            theme.colorScheme.primary.withOpacity(0.12),
+                        color: theme.colorScheme.primary.withOpacity(0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(Icons.message_outlined,
-                          color: theme.colorScheme.primary, size: 40),
+                      child: Icon(
+                        Icons.message_outlined,
+                        color: theme.colorScheme.primary,
+                        size: 40,
+                      ),
                     ),
                     const SizedBox(height: 18),
-                    Text("New Inquiry",
-                        style: theme.textTheme.headlineSmall
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      "New Inquiry",
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Text(
                       "Capture the lead details and send a WhatsApp confirmation.",
                       textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium
-                          ?.copyWith(color: Colors.black54),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
                     ),
                     const SizedBox(height: 24),
 
                     TextField(
                       controller: nameController,
-                      decoration:
-                          _dec('Customer Name', Icons.person_outline),
+                      decoration: _dec('Customer Name', Icons.person_outline),
                     ),
                     const SizedBox(height: 16),
 
                     TextField(
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
-                      decoration:
-                          _dec('Phone Number', Icons.phone_outlined),
+                      decoration: _dec('Phone Number', Icons.phone_outlined),
                     ),
                     const SizedBox(height: 16),
 
@@ -1299,23 +1246,44 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
                     const SizedBox(height: 16),
 
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        icon: const Icon(Icons.add),
-                        label: const Text('+ Add Another Vehicle'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: theme.colorScheme.primary,
-                          side: BorderSide(
-                              color: theme.colorScheme.primary),
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.add),
+                            label: const Text('+ Add Manual'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.colorScheme.primary,
+                              side: BorderSide(
+                                color: theme.colorScheme.primary,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: _addQuotation,
                           ),
                         ),
-                        onPressed: _addQuotation,
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.search),
+                            label: const Text('+ Add from Catalog'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: theme.colorScheme.primary,
+                              side: BorderSide(
+                                color: theme.colorScheme.primary,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: _addVehicleFromCatalog,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
 
@@ -1324,8 +1292,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       isExpanded: true,
                       hint: const Text('Select Source'),
                       items: sourceOptions
-                          .map((s) => DropdownMenuItem(
-                              value: s, child: Text(s)))
+                          .map(
+                            (s) => DropdownMenuItem(value: s, child: Text(s)),
+                          )
                           .toList(),
                       onChanged: (value) =>
                           setState(() => selectedSource = value),
@@ -1336,15 +1305,19 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     if (selectedSource == 'Reference') ...[
                       TextField(
                         controller: referenceNameController,
-                        decoration: _dec("Reference Person's Name",
-                            Icons.person_outline),
+                        decoration: _dec(
+                          "Reference Person's Name",
+                          Icons.person_outline,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       TextField(
                         controller: referencePhoneController,
                         keyboardType: TextInputType.phone,
-                        decoration: _dec("Reference Person's Phone",
-                            Icons.phone_outlined),
+                        decoration: _dec(
+                          "Reference Person's Phone",
+                          Icons.phone_outlined,
+                        ),
                       ),
                       const SizedBox(height: 16),
                     ],
@@ -1352,18 +1325,18 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     DropdownButtonFormField<String>(
                       value: paymentType,
                       items: const [
-                        DropdownMenuItem(
-                            value: 'Loan', child: Text('Loan')),
-                        DropdownMenuItem(
-                            value: 'Cash', child: Text('Cash')),
+                        DropdownMenuItem(value: 'Loan', child: Text('Loan')),
+                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
                           setState(() => paymentType = value);
                         }
                       },
-                      decoration:
-                          _dec('Payment Option', Icons.payment_outlined),
+                      decoration: _dec(
+                        'Payment Option',
+                        Icons.payment_outlined,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -1372,17 +1345,22 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       isExpanded: true,
                       hint: const Text('Select Eagerness'),
                       items: const [
+                        DropdownMenuItem(value: 'Hot', child: Text('🔥  Hot')),
                         DropdownMenuItem(
-                            value: 'Hot', child: Text('🔥  Hot')),
+                          value: 'Warm',
+                          child: Text('☀️  Warm'),
+                        ),
                         DropdownMenuItem(
-                            value: 'Warm', child: Text('☀️  Warm')),
-                        DropdownMenuItem(
-                            value: 'Cold', child: Text('❄️  Cold')),
+                          value: 'Cold',
+                          child: Text('❄️  Cold'),
+                        ),
                       ],
                       onChanged: (value) =>
                           setState(() => selectedEagerness = value),
-                      decoration: _dec('Eagerness',
-                          Icons.local_fire_department_outlined),
+                      decoration: _dec(
+                        'Eagerness',
+                        Icons.local_fire_department_outlined,
+                      ),
                     ),
                     const SizedBox(height: 16),
 
@@ -1390,10 +1368,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       value: exchangeOption,
                       items: const [
                         DropdownMenuItem(
-                            value: 'No', child: Text('No Exchange')),
+                          value: 'No',
+                          child: Text('No Exchange'),
+                        ),
                         DropdownMenuItem(
-                            value: 'Yes',
-                            child: Text('Yes, Exchange Vehicle')),
+                          value: 'Yes',
+                          child: Text('Yes, Exchange Vehicle'),
+                        ),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -1401,20 +1382,43 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         }
                       },
                       decoration: _dec(
-                          'Exchange Vehicle?', Icons.swap_horiz_outlined),
+                        'Exchange Vehicle?',
+                        Icons.swap_horiz_outlined,
+                      ),
                     ),
                     const SizedBox(height: 16),
+
+                    if (staffList.isNotEmpty) ...[
+                      DropdownButtonFormField<String>(
+                        value: selectedAssignedStaffId,
+                        isExpanded: true,
+                        hint: const Text('Assign to staff (optional)'),
+                        items: staffList
+                            .map(
+                              (s) => DropdownMenuItem(
+                                value: s['id'],
+                                child: Text(s['name']!),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (v) =>
+                            setState(() => selectedAssignedStaffId = v),
+                        decoration: _dec(
+                          'Assign Staff (optional)',
+                          Icons.person_outline,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
 
                     if (exchangeOption == 'Yes') ...[
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: theme.colorScheme.primary
-                              .withOpacity(0.05),
+                          color: theme.colorScheme.primary.withOpacity(0.05),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: theme.colorScheme.primary
-                                .withOpacity(0.2),
+                            color: theme.colorScheme.primary.withOpacity(0.2),
                           ),
                         ),
                         child: Column(
@@ -1431,30 +1435,36 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             const SizedBox(height: 12),
                             TextField(
                               controller: exchangeBrandModelController,
-                              decoration: _dec('Brand / Model',
-                                  Icons.directions_bike_outlined),
+                              decoration: _dec(
+                                'Brand / Model',
+                                Icons.directions_bike_outlined,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: exchangeRegController,
-                              decoration: _dec('Registration Number',
-                                  Icons.confirmation_number_outlined),
+                              decoration: _dec(
+                                'Registration Number',
+                                Icons.confirmation_number_outlined,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
-                              controller:
-                                  exchangeExpectedPriceController,
+                              controller: exchangeExpectedPriceController,
                               keyboardType: TextInputType.number,
                               decoration: _dec(
-                                  "Customer's Expected Price",
-                                  Icons.currency_rupee),
+                                "Customer's Expected Price",
+                                Icons.currency_rupee,
+                              ),
                             ),
                             const SizedBox(height: 12),
                             TextField(
                               controller: exchangeOfferPriceController,
                               keyboardType: TextInputType.number,
-                              decoration: _dec('Our Offer Price',
-                                  Icons.local_offer_outlined),
+                              decoration: _dec(
+                                'Our Offer Price',
+                                Icons.local_offer_outlined,
+                              ),
                             ),
                           ],
                         ),
@@ -1466,12 +1476,13 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: followUpDate ??
-                              DateTime.now()
-                                  .add(const Duration(days: 1)),
+                          initialDate:
+                              followUpDate ??
+                              DateTime.now().add(const Duration(days: 1)),
                           firstDate: DateTime.now(),
-                          lastDate: DateTime.now()
-                              .add(const Duration(days: 365)),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
                         );
                         if (picked != null) {
                           setState(() => followUpDate = picked);
@@ -1487,7 +1498,8 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                           children: [
                             const Icon(Icons.calendar_today_outlined),
                             const SizedBox(width: 12),
-                            Expanded(
+                            Flexible(
+                              fit: FlexFit.loose,
                               child: Text(
                                 followUpDate != null
                                     ? 'Follow-up: ${followUpDate!.toString().split(' ')[0]}'
@@ -1509,7 +1521,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 8),
 
                     SizedBox(
                       width: double.infinity,
@@ -1518,8 +1530,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF7B1F3F),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -1537,8 +1548,9 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                             : const Text(
                                 "Send PDF via WhatsApp",
                                 style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                       ),
                     ),

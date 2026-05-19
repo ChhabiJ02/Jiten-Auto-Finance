@@ -2,9 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../staff/edit_inquiry_screen.dart';
+import '../staff/add_inquiry_screen.dart';
 
 class InquiryListScreen extends StatefulWidget {
-  const InquiryListScreen({super.key});
+  final DateTime? filterFrom;
+  final DateTime? filterTo;
+  final String? filterStatus;
+
+  const InquiryListScreen({
+    super.key,
+    this.filterFrom,
+    this.filterTo,
+    this.filterStatus,
+  });
 
   @override
   State<InquiryListScreen> createState() => _InquiryListScreenState();
@@ -16,6 +26,10 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
   Set<String> selectedInquiries = {};
   bool isSelectionMode = false;
   bool isAssigningLeads = false;
+  final TextEditingController searchController = TextEditingController();
+  DateTime? fromDate;
+  DateTime? toDate;
+  String selectedStatus = 'All';
 
   String _normalizeRole(String? role) {
     final normalizedRole =
@@ -62,6 +76,49 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     return '';
   }
 
+  Future<void> _openSearchDialog() async {
+    final dialogController = TextEditingController(text: searchController.text.trim());
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Search Inquiries'),
+          content: TextField(
+            controller: dialogController,
+            decoration: const InputDecoration(
+              hintText: 'Enter name, phone, brand or model',
+              prefixIcon: Icon(Icons.search),
+            ),
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            onSubmitted: (_) => Navigator.of(context).pop(dialogController.text.trim()),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(''),
+              child: const Text('Clear'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(dialogController.text.trim()),
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() {
+        searchController.text = result;
+      });
+    }
+  }
+
   String _getStaffNameById(String staffId) {
     final staffMember = staffList.firstWhere(
       (staff) => staff['id'] == staffId,
@@ -79,6 +136,12 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     super.initState();
     _loadStaffList();
     _assignUnassignedInquiries();
+    // Initialize filters from navigator params if provided
+    fromDate = widget.filterFrom;
+    toDate = widget.filterTo;
+    if (widget.filterStatus != null && widget.filterStatus!.isNotEmpty) {
+      selectedStatus = widget.filterStatus!;
+    }
   }
 
   Future<void> _assignUnassignedInquiries() async {
@@ -370,11 +433,27 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
   }
 
   @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text("All Inquiries"),
         actions: [
+          IconButton(
+            tooltip: 'Add Inquiry',
+            icon: const Icon(Icons.add),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddInquiryScreen()),
+              );
+            },
+          ),
           if (isSelectionMode)
             IconButton(
               icon: isAssigningLeads
@@ -392,12 +471,10 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                   : null,
               tooltip: 'Assign selected leads',
             ),
-          if (isSelectionMode)
+          if (isSelectionMode && selectedInquiries.length == 1)
             IconButton(
               icon: const Icon(Icons.send),
-              onPressed: selectedInquiries.isNotEmpty && !isAssigningLeads
-                  ? _sendBulkWhatsApp
-                  : null,
+              onPressed: !isAssigningLeads ? _sendBulkWhatsApp : null,
               tooltip: 'Send WhatsApp to selected',
             ),
           IconButton(
@@ -409,31 +486,106 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
       ),
       body: Column(
         children: [
-          // Staff Filter Dropdown
+          // Search + Filters Row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-            child: DropdownButtonFormField<String?>(
-              initialValue: selectedStaffId,
-              decoration: const InputDecoration(
-                labelText: 'Filter by Staff',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              ),
-              items: [
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('All Staff'),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      tooltip: 'Search inquiries',
+                      icon: const Icon(Icons.search),
+                      onPressed: _openSearchDialog,
+                    ),
+                    if (searchController.text.trim().isNotEmpty) ...[
+                      Expanded(
+                        child: Text(
+                          'Search: "${searchController.text.trim()}"',
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Clear search',
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() {
+                          searchController.clear();
+                        }),
+                      ),
+                    ] else
+                      const Expanded(child: SizedBox()),
+                    const SizedBox(width: 8),
+                    DropdownButton<String>(
+                      value: selectedStatus,
+                      items: const [
+                        DropdownMenuItem(value: 'All', child: Text('All')),
+                        DropdownMenuItem(value: 'New Inquiry', child: Text('New')),
+                        DropdownMenuItem(value: 'Follow Ups', child: Text('Follow Ups')),
+                        DropdownMenuItem(value: 'Booked', child: Text('Booked')),
+                        DropdownMenuItem(value: 'Closed', child: Text('Closed')),
+                      ],
+                      onChanged: (v) => setState(() {
+                        selectedStatus = v ?? 'All';
+                      }),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Pick from date',
+                      icon: const Icon(Icons.date_range),
+                      onPressed: () async {
+                        final d = await showDatePicker(
+                          context: context,
+                          initialDate: fromDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (d != null) setState(() => fromDate = d);
+                      },
+                    ),
+                    IconButton(
+                      tooltip: 'Pick to date',
+                      icon: const Icon(Icons.date_range_outlined),
+                      onPressed: () async {
+                        final d = await showDatePicker(
+                          context: context,
+                          initialDate: toDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (d != null) setState(() => toDate = d);
+                      },
+                    ),
+                  ],
                 ),
-                ...staffList.map((staff) => DropdownMenuItem<String?>(
-                  value: staff['id'],
-                  child: Text(staff['name']),
-                )),
+                const SizedBox(height: 8),
+                // Staff Filter Dropdown
+                DropdownButtonFormField<String?>(
+                  initialValue: selectedStaffId,
+                  decoration: const InputDecoration(
+                    labelText: 'Filter by Staff',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All Staff'),
+                    ),
+                    ...staffList.map((staff) => DropdownMenuItem<String?>(
+                      value: staff['id'],
+                      child: Text(staff['name']),
+                    )),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      selectedStaffId = value;
+                    });
+                  },
+                ),
               ],
-              onChanged: (value) {
-                setState(() {
-                  selectedStaffId = value;
-                });
-              },
             ),
           ),
           // Staff Lead Counts
@@ -472,16 +624,75 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
 
                 final allInquiries = snapshot.data!.docs;
 
-                // Filter by selected staff
-                final inquiries = selectedStaffId == null
-                    ? allInquiries
-                    : allInquiries.where((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        return _matchesStaffLead(
-                          data,
-                          selectedStaffId!,
-                        );
-                      }).toList();
+                // Apply filters: staff, date-range, status, search
+                final query = searchController.text.trim().toLowerCase();
+
+                List<QueryDocumentSnapshot> inquiries = allInquiries.where((doc) {
+                  final data = doc.data() as Map<String, dynamic>;
+
+                  // Date range filter (createdAt)
+                  if (fromDate != null || toDate != null) {
+                    final created = data['createdAt'];
+                    if (created is Timestamp) {
+                      final createdDate = created.toDate();
+                      final createdOnly = DateTime(createdDate.year, createdDate.month, createdDate.day);
+                      if (fromDate != null) {
+                        final f = DateTime(fromDate!.year, fromDate!.month, fromDate!.day);
+                        if (createdOnly.isBefore(f)) return false;
+                      }
+                      if (toDate != null) {
+                        final t = DateTime(toDate!.year, toDate!.month, toDate!.day);
+                        if (createdOnly.isAfter(t)) return false;
+                      }
+                    }
+                  }
+
+                  // Status filter
+                  if (selectedStatus != 'All') {
+                    final status = (data['status'] ?? '').toString().toLowerCase();
+                    final isClosed = data['isClosed'] == true;
+                    final isBooked = data['isBooked'] == true;
+
+                    if (selectedStatus.toLowerCase() == 'booked' && !isBooked) return false;
+                    if (selectedStatus.toLowerCase() == 'closed' && !isClosed) return false;
+                    if (selectedStatus.toLowerCase() == 'new inquiry' && (isClosed || isBooked || status == 'booked' || status == 'closed')) return false;
+                    if (selectedStatus.toLowerCase() == 'follow ups' && status != 'follow ups') return false;
+                  }
+
+                  // Staff filter
+                  if (selectedStaffId != null) {
+                    if (!_matchesStaffLead(data, selectedStaffId!)) return false;
+                  }
+
+                  // Search filter
+                  if (query.isNotEmpty) {
+                    final name = (data['name'] ?? '').toString().toLowerCase();
+                    final phone = (data['phone'] ?? '').toString().toLowerCase();
+                    final brand = (data['brand'] ?? data['vehicle'] ?? '').toString().toLowerCase();
+                    final model = (data['model'] ?? '').toString().toLowerCase();
+                    if (!name.contains(query) && !phone.contains(query) && !brand.contains(query) && !model.contains(query)) {
+                      return false;
+                    }
+                  }
+
+                  return true;
+                }).toList();
+
+                // Sort: if selection mode, put unassigned leads on top, then newest first
+                inquiries.sort((a, b) {
+                  final ad = a.data() as Map<String, dynamic>;
+                  final bd = b.data() as Map<String, dynamic>;
+                  final aOwner = _resolveStaffOwnerId(ad);
+                  final bOwner = _resolveStaffOwnerId(bd);
+                  final aUnassigned = aOwner.isEmpty ? 1 : 0;
+                  final bUnassigned = bOwner.isEmpty ? 1 : 0;
+                  if (isSelectionMode) {
+                    if (aUnassigned != bUnassigned) return bUnassigned - aUnassigned;
+                  }
+                  final aCreated = (ad['createdAt'] as Timestamp?)?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  final bCreated = (bd['createdAt'] as Timestamp?)?.toDate() ?? DateTime.fromMillisecondsSinceEpoch(0);
+                  return bCreated.compareTo(aCreated);
+                });
 
                 if (inquiries.isEmpty) {
                   return const Center(child: Text("No inquiries yet"));

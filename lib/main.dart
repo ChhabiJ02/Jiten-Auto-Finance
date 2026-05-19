@@ -6,16 +6,18 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import 'services/cloudinary_service.dart';
 import 'widgets/user_session_wrapper.dart';
+import 'services/screens/auth/email_otp_verification_screen.dart';
 import 'services/screens/auth/login_screen.dart';
+import 'services/screens/auth/password_reset_screen.dart';
 import 'services/screens/admin/admin_dashboard.dart';
 import 'services/screens/staff/staff_dashboard.dart';
 import 'services/screens/customer/customer_home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
+  );
   CloudinaryService.initialize(
     cloudName: 'dzgudsmu8',
     uploadPreset: 'showroom_upload',
@@ -84,6 +86,7 @@ class MyApp extends StatelessWidget {
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const LoginScreen(),
+        '/passwordReset': (context) => const PasswordResetScreen(),
         '/adminDashboard': (context) =>
             UserSessionWrapper(child: AdminDashboard()),
         '/staffDashboard': (context) =>
@@ -117,101 +120,101 @@ class _SplashScreenState extends State<SplashScreen>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     );
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
-    _scaleAnim = Tween<double>(begin: 0.8, end: 1).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _fadeAnim = Tween<double>(
+      begin: 0,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
+    _scaleAnim = Tween<double>(
+      begin: 0.8,
+      end: 1,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
     _controller.forward();
     _startApp();
   }
 
   Future<void> _startApp() async {
-
-  if (mounted && _startupError != null) {
-    setState(() => _startupError = null);
-  }
-
-  final startedAt = DateTime.now();
-
-  try {
-
-    await Firebase.initializeApp();
-
-    final elapsed =
-        DateTime.now().difference(startedAt);
-
-    const minDuration =
-        Duration(seconds: 2);
-
-    if (elapsed < minDuration) {
-      await Future.delayed(
-        minDuration - elapsed,
-      );
+    if (mounted && _startupError != null) {
+      setState(() => _startupError = null);
     }
 
-    if (!mounted) return;
+    final startedAt = DateTime.now();
 
-    // CHECK EXISTING LOGIN
-    final user =
-        FirebaseAuth.instance.currentUser;
+    try {
+      await Firebase.initializeApp();
 
-    // NOT LOGGED IN
-    if (user == null) {
+      final elapsed = DateTime.now().difference(startedAt);
 
-      Navigator.pushReplacementNamed(
-        context,
-        '/login',
-      );
+      const minDuration = Duration(seconds: 2);
 
-      return;
-    }
+      if (elapsed < minDuration) {
+        await Future.delayed(minDuration - elapsed);
+      }
 
-    // FETCH USER ROLE
-    final userDoc =
+      if (!mounted) return;
+
+      // CHECK EXISTING LOGIN
+      final user = FirebaseAuth.instance.currentUser;
+
+      // NOT LOGGED IN
+      if (user == null) {
+        Navigator.pushReplacementNamed(context, '/login');
+
+        return;
+      }
+
+      // FETCH USER ROLE
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      final userData = userDoc.data();
+
+      final role = (userData?['role'] ?? '').toString().toLowerCase();
+
+      final firestoreVerified = userData?['emailVerified'] == true;
+
+      if (user.emailVerified && !firestoreVerified && userDoc.exists) {
         await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
-            .get();
+            .update({'emailVerified': true, 'verifiedAt': Timestamp.now()});
+      }
 
-    final role =
-        userDoc.data()?['role'];
+      final isVerified =
+          role == 'admin' || firestoreVerified || user.emailVerified;
 
-    // NAVIGATE BY ROLE
-    if (role == 'admin') {
+      if (!isVerified && user.email != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EmailOtpVerificationScreen(
+              email: user.email!,
+              uid: user.uid,
+              role: role,
+            ),
+          ),
+        );
 
-      Navigator.pushReplacementNamed(
-        context,
-        '/adminDashboard',
-      );
+        return;
+      }
 
-    } else if (role == 'staff') {
+      // NAVIGATE BY ROLE
+      if (role == 'admin') {
+        Navigator.pushReplacementNamed(context, '/adminDashboard');
+      } else if (role == 'staff' || role == 'workshop') {
+        Navigator.pushReplacementNamed(context, '/staffDashboard');
+      } else {
+        Navigator.pushReplacementNamed(context, '/customerDashboard');
+      }
+    } catch (e) {
+      if (!mounted) return;
 
-      Navigator.pushReplacementNamed(
-        context,
-        '/staffDashboard',
-      );
-
-    } else {
-
-      Navigator.pushReplacementNamed(
-        context,
-        '/customerDashboard',
-      );
+      setState(() {
+        _startupError = 'Unable to start the app. Please try again.';
+      });
     }
-
-  } catch (e) {
-
-    if (!mounted) return;
-
-    setState(() {
-
-      _startupError =
-          'Unable to start the app. Please try again.';
-    });
   }
-}
 
   @override
   void dispose() {
@@ -232,98 +235,125 @@ class _SplashScreenState extends State<SplashScreen>
             end: Alignment.bottomCenter,
           ),
         ),
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo in rounded square (matches native splash style)
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 24,
-                        offset: const Offset(0, 8),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Expanded(
+                child: Center(
+                  child: FadeTransition(
+                    opacity: _fadeAnim,
+                    child: ScaleTransition(
+                      scale: _scaleAnim,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Logo in rounded square (matches native splash style)
+                          Container(
+                            width: 150,
+                            height: 150,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(32),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.25),
+                                  blurRadius: 24,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Image.asset(
+                              'assets/appLogo/applogo.png', // exact path, capital L
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+
+                          const SizedBox(height: 28),
+
+                          // App name
+                          const Text(
+                            'Jiten Auto Finance',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+
+                          const SizedBox(height: 8),
+
+                          // Tagline
+                          const Text(
+                            'Multi brand 2 wh. showroom & workshop',
+                            style: TextStyle(
+                              color: Color(0xFFE8B4C4),
+                              fontSize: 13,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+
+                          const SizedBox(height: 60),
+
+                          if (_startupError == null)
+                            SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(
+                                color: Colors.white.withOpacity(0.7),
+                                strokeWidth: 2.5,
+                              ),
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 28,
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _startupError!,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  ElevatedButton(
+                                    onPressed: _startApp,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: const Color(0xFF7B1F3F),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 22,
+                                        vertical: 12,
+                                      ),
+                                    ),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  child: Image.asset(
-                    'assets/appLogo/applogo.png', // exact path, capital L
-                    fit: BoxFit.contain,
+                    ),
                   ),
                 ),
-
-                const SizedBox(height: 28),
-
-                // App name
-                const Text(
-                  'Jiten Auto Finance',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 1.0,
-                  ),
-                ),
-
-                const SizedBox(height: 8),
-
-                // Tagline
-                const Text(
-                  'Multi brand 2 wh. showroom & workshop',
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 14),
+                child: Text(
+                  "Copyright © Rex Soltuion'S",
                   style: TextStyle(
                     color: Color(0xFFE8B4C4),
-                    fontSize: 13,
-                    letterSpacing: 0.4,
+                    fontSize: 12,
+                    letterSpacing: 0.3,
                   ),
                 ),
-
-                const SizedBox(height: 60),
-
-                if (_startupError == null)
-                  SizedBox(
-                    width: 26,
-                    height: 26,
-                    child: CircularProgressIndicator(
-                      color: Colors.white.withOpacity(0.7),
-                      strokeWidth: 2.5,
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 28),
-                    child: Column(
-                      children: [
-                        Text(
-                          _startupError!,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                              color: Colors.white, fontSize: 14),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _startApp,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF7B1F3F),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 22, vertical: 12),
-                          ),
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

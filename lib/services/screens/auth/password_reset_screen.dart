@@ -3,7 +3,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:showroom_app/services/auth_service.dart';
 
 class PasswordResetScreen extends StatefulWidget {
-  const PasswordResetScreen({super.key});
+  final String initialEmail;
+
+  const PasswordResetScreen({
+    super.key,
+    this.initialEmail = '',
+  });
 
   @override
   State<PasswordResetScreen> createState() => _PasswordResetScreenState();
@@ -15,6 +20,12 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
 
   bool loading = false;
   bool emailSent = false;
+
+  @override
+  void initState() {
+    super.initState();
+    emailController.text = widget.initialEmail;
+  }
 
   void showMessage(String message, {bool isError = true}) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -46,7 +57,7 @@ class _PasswordResetScreenState extends State<PasswordResetScreen> {
       });
 
       showMessage(
-        'Password reset link sent to your email!',
+        'Password reset email sent to your registered email.',
         isError: false,
       );
     } on FirebaseAuthException catch (e) {

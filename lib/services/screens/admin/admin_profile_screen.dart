@@ -407,6 +407,7 @@ class _AdminProfileScreenState
                             labelText:
                                 'Admin Email',
                           ),
+                          readOnly: true,
                         ),
 
                         const SizedBox(
@@ -425,6 +426,7 @@ class _AdminProfileScreenState
                             labelText:
                                 'Admin Phone',
                           ),
+                          readOnly: true,
                         ),
                       ],
                     ),

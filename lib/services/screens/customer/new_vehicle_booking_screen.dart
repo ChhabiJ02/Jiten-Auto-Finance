@@ -1,13 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import '../../vehicle_model_lookup.dart';
 
 class NewVehicleBookingScreen extends StatefulWidget {
   final Map<String, dynamic>? vehicle;
+  final bool isAddingToInquiry;
+  final Function(Map<String, dynamic>)? onVehicleSelected;
 
   const NewVehicleBookingScreen({
     super.key,
     this.vehicle,
+    this.isAddingToInquiry = false,
+    this.onVehicleSelected,
   });
 
   @override
@@ -15,37 +20,30 @@ class NewVehicleBookingScreen extends StatefulWidget {
       _NewVehicleBookingScreenState();
 }
 
-class _NewVehicleBookingScreenState
-    extends State<NewVehicleBookingScreen> {
+class _NewVehicleBookingScreenState extends State<NewVehicleBookingScreen> {
+  final brandController = TextEditingController();
 
-  final brandController =
-      TextEditingController();
+  final modelController = TextEditingController();
 
-  final modelController =
-      TextEditingController();
+  final variantController = TextEditingController();
 
-  final variantController =
-      TextEditingController();
+  final showroomPriceController = TextEditingController();
 
-  final showroomPriceController =
-      TextEditingController();
+  final expectedPriceController = TextEditingController();
 
-  final expectedPriceController =
-      TextEditingController();
-
-  final notesController =
-      TextEditingController();
+  final notesController = TextEditingController();
 
   bool loading = false;
   bool brandsLoading = true;
 
   String? selectedBrand;
   String? selectedModel;
-  String? selectedVariant;
+  String? selectedVehiclePhotoUrl;
+  List<String> selectedVehiclePhotoUrls = [];
+  String? selectedVehicleId;
 
   List<String> brands = [];
   List<String> models = [];
-  List<Map<String, dynamic>> variants = [];
 
   @override
   void initState() {
@@ -55,195 +53,153 @@ class _NewVehicleBookingScreenState
 
     // Vehicle passed from Book Now
     if (widget.vehicle != null) {
+      final vehicle = widget.vehicle!;
 
-      final vehicle =
-          widget.vehicle!;
+      selectedBrand = vehicle['brand'];
 
-      selectedBrand =
-          vehicle['brand'];
+      selectedModel = vehicle['model'];
 
-      selectedModel =
-          vehicle['model'];
+      brandController.text = vehicle['brand']?.toString() ?? '';
 
-      selectedVariant =
-          vehicle['variant'];
+      modelController.text = vehicle['model']?.toString() ?? '';
 
-      brandController.text =
-          vehicle['brand']
-                  ?.toString() ??
-              '';
+      showroomPriceController.text = vehicle['price']?.toString() ?? '';
 
-      modelController.text =
-          vehicle['model']
-                  ?.toString() ??
-              '';
+      final vehiclePhotos =
+          (vehicle['vehiclePhotoUrls'] as List<dynamic>?)
+              ?.whereType<String>()
+              .toList() ??
+          (vehicle['photos'] as List<dynamic>?)?.whereType<String>().toList() ??
+          [];
 
-      variantController.text =
-          vehicle['variant']
-                  ?.toString() ??
-              '';
+      selectedVehiclePhotoUrls = vehiclePhotos;
+      selectedVehiclePhotoUrl =
+          vehicle['vehiclePhotoUrl']?.toString() ??
+          (vehiclePhotos.isNotEmpty ? vehiclePhotos.first : null);
+      selectedVehicleId = vehicle['vehicleId']?.toString();
 
-      showroomPriceController.text =
-          vehicle['price']
-                  ?.toString() ??
-              '';
-
-      fetchModels(
-        vehicle['brand'],
-      ).then((_) {
-
-        fetchVariants(
-          vehicle['model'],
+      fetchModels(vehicle['brand']).then((_) {
+        _loadSelectedModelDetails(
+          brand: vehicle['brand']?.toString() ?? '',
+          model: vehicle['model']?.toString() ?? '',
         );
       });
     }
   }
 
   void showMessage(String message) {
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> fetchBrands() async {
-
     try {
-
-      final snapshot =
-          await FirebaseFirestore
-              .instance
-              .collection('Brand')
-              .get();
+      final snapshot = await FirebaseFirestore.instance
+          .collection('Brand')
+          .get();
 
       setState(() {
-
-        brands = snapshot.docs
-            .map(
-              (doc) => doc['Name']
-                  .toString(),
-            )
-            .toList();
+        brands = snapshot.docs.map((doc) => doc['Name'].toString()).toList();
 
         brandsLoading = false;
       });
-
     } catch (e) {
-
       brandsLoading = false;
 
-      showMessage(
-        "Failed to load brands",
-      );
+      showMessage("Failed to load brands");
     }
   }
 
-  Future<void> fetchModels(
-    String brand,
-  ) async {
-
-    final snapshot =
-        await FirebaseFirestore
-            .instance
-            .collection('Model')
-            .where(
-              'ParentBrand',
-              isEqualTo: brand,
-            )
-            .get();
+  Future<void> fetchModels(String brand) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Model')
+        .where('ParentBrand', isEqualTo: brand)
+        .get();
 
     setState(() {
-
-      models = snapshot.docs
-          .map(
-            (doc) => doc['Name']
-                .toString(),
-          )
-          .toList();
+      models = snapshot.docs.map((doc) => doc['Name'].toString()).toList();
 
       // ONLY reset if manually selecting
       if (widget.vehicle == null) {
-
         selectedModel = null;
-        selectedVariant = null;
 
         modelController.clear();
         variantController.clear();
-
         showroomPriceController.clear();
+        selectedVehiclePhotoUrl = null;
+        selectedVehiclePhotoUrls = [];
+        selectedVehicleId = null;
       }
     });
   }
 
-  Future<void> fetchVariants(
-    String model,
-  ) async {
+  Future<void> _loadSelectedModelDetails({
+    required String brand,
+    required String model,
+  }) async {
+    final details = await fetchVehicleModelLookupData(
+      firestore: FirebaseFirestore.instance,
+      brand: brand,
+      model: model,
+    );
 
-    final snapshot =
-        await FirebaseFirestore
-            .instance
-            .collection('Variant')
-            .where(
-              'ParentModel',
-              isEqualTo: model,
-            )
-            .get();
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-
-      variants = snapshot.docs
-          .map(
-            (doc) => doc.data(),
-          )
-          .toList();
-
-      // ONLY reset if manual booking
-      if (widget.vehicle == null) {
-
-        selectedVariant = null;
-
-        variantController.clear();
-
-        showroomPriceController.clear();
-      }
+      showroomPriceController.text = details.price.isNotEmpty
+          ? details.price
+          : showroomPriceController.text;
+      selectedVehiclePhotoUrl =
+          details.primaryPhotoUrl ?? selectedVehiclePhotoUrl;
+      selectedVehiclePhotoUrls = details.photoUrls.isNotEmpty
+          ? details.photoUrls
+          : selectedVehiclePhotoUrls;
+      selectedVehicleId = details.vehicleId ?? selectedVehicleId;
+      variantController.clear();
     });
   }
 
   Future<void> saveBooking() async {
-
-    final user =
-        FirebaseAuth.instance
-            .currentUser;
+    final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) return;
 
     if (selectedBrand == null) {
-
-      showMessage(
-        'Select brand',
-      );
+      showMessage('Select brand');
 
       return;
     }
 
     if (selectedModel == null) {
-
-      showMessage(
-        'Select model',
-      );
+      showMessage('Select model');
 
       return;
     }
 
-    if (selectedVariant == null) {
+    // If adding to inquiry, return the vehicle data
+    if (widget.isAddingToInquiry) {
+      final vehicleData = {
+        'brand': brandController.text.trim(),
+        'model': modelController.text.trim(),
+        'variant': '',
+        'price': showroomPriceController.text.trim(),
+        'expectedPrice': expectedPriceController.text.trim(),
+        'notes': notesController.text.trim(),
+        'vehicleId': selectedVehicleId,
+        'vehiclePhotoUrl': selectedVehiclePhotoUrl,
+        'vehiclePhotoUrls': selectedVehiclePhotoUrls,
+      };
 
-      showMessage(
-        'Select variant',
-      );
+      if (widget.onVehicleSelected != null) {
+        widget.onVehicleSelected!(vehicleData);
+      }
 
+      if (mounted) {
+        Navigator.pop(context);
+      }
       return;
     }
 
@@ -252,79 +208,51 @@ class _NewVehicleBookingScreenState
     });
 
     try {
-
       // FETCH CUSTOMER INFO
-      final userDoc =
-          await FirebaseFirestore
-              .instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
 
-      final userData =
-          userDoc.data() ?? {};
+      final userData = userDoc.data() ?? {};
 
-      final customerName =
-          userData['name']
-                  ?.toString() ??
-              'Customer';
+      final customerName = userData['name']?.toString() ?? 'Customer';
 
-      final customerPhone =
-          userData['phone']
-                  ?.toString() ??
-              '';
+      final customerPhone = userData['phone']?.toString() ?? '';
 
-      final customerAddress =
-          userData['address']
-                  ?.toString() ??
-              '';
+      final customerAddress = userData['address']?.toString() ?? '';
 
-      await FirebaseFirestore
-          .instance
-          .collection('inquiries')
-          .add({
-
+      await FirebaseFirestore.instance.collection('inquiries').add({
         // CUSTOMER
         'name': customerName,
 
         'phone': customerPhone,
 
-        'address':
-            customerAddress,
+        'address': customerAddress,
 
-        'customerId':
-            user.uid,
+        'customerId': user.uid,
 
-        'customerEmail':
-            user.email,
+        'customerEmail': user.email,
 
         // VEHICLE
-        'brand':
-            brandController.text
-                .trim(),
+        'brand': brandController.text.trim(),
 
-        'model':
-            modelController.text
-                .trim(),
+        'model': modelController.text.trim(),
 
-        'variant':
-            variantController.text
-                .trim(),
+        'variant': '',
 
-        'price':
-            showroomPriceController
-                .text
-                .trim(),
+        'price': showroomPriceController.text.trim(),
 
-        'expectedPrice':
-            expectedPriceController
-                .text
-                .trim(),
+        'vehicleId': selectedVehicleId,
+
+        'vehiclePhotoUrl': selectedVehiclePhotoUrl,
+
+        'vehiclePhotoUrls': selectedVehiclePhotoUrls,
+
+        'expectedPrice': expectedPriceController.text.trim(),
 
         // NOTES
-        'notes':
-            notesController.text
-                .trim(),
+        'notes': notesController.text.trim(),
 
         // LEAD SYSTEM
         'staffId': null,
@@ -336,342 +264,204 @@ class _NewVehicleBookingScreenState
         'isLocked': false,
 
         // STATUS
-        'status':
-            'New Inquiry',
+        'status': 'New Inquiry',
 
         // EXTRA
-        'createdByCustomer':
-            true,
+        'createdByCustomer': true,
 
-        'createdAt':
-            Timestamp.now(),
+        'createdAt': Timestamp.now(),
       });
 
       if (mounted) {
-
-        showMessage(
-          'Booking request submitted successfully',
-        );
+        showMessage('Booking request submitted successfully');
 
         Navigator.pop(context);
       }
-
     } catch (e) {
-
-      showMessage(
-        'Failed to submit booking',
-      );
-
+      showMessage('Failed to submit booking');
     } finally {
-
       setState(() {
         loading = false;
       });
     }
   }
 
-  InputDecoration fieldDecoration(
-      String label) {
-
+  InputDecoration fieldDecoration(String label) {
     return InputDecoration(
-
       labelText: label,
 
-      border:
-          OutlineInputBorder(
-        borderRadius:
-            BorderRadius.circular(
-          14,
-        ),
-      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
-
       appBar: AppBar(
-        title: const Text(
-          "Vehicle Booking",
+        title: Text(
+          widget.isAddingToInquiry ? "Add Vehicle" : "Vehicle Booking",
         ),
+        leading: widget.isAddingToInquiry
+            ? IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.pop(context),
+              )
+            : null,
       ),
 
       body: SingleChildScrollView(
-
-        padding:
-            const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
 
         child: Column(
-
           children: [
-
             // BRAND
-            DropdownButtonFormField<
-                String>(
+            DropdownButtonFormField<String>(
               value: selectedBrand,
 
-              decoration:
-                  fieldDecoration(
-                "Vehicle Brand",
-              ),
+              decoration: fieldDecoration("Vehicle Brand"),
 
               items: brands
                   .map(
                     (brand) =>
-                        DropdownMenuItem(
-                      value: brand,
-                      child:
-                          Text(brand),
-                    ),
+                        DropdownMenuItem(value: brand, child: Text(brand)),
                   )
                   .toList(),
 
-              onChanged:
-                  widget.vehicle !=
-                          null
-                      ? null
-                      : (value) {
+              onChanged: widget.vehicle != null
+                  ? null
+                  : (value) {
+                      setState(() {
+                        selectedBrand = value;
 
-                          setState(() {
+                        brandController.text = value ?? '';
+                      });
 
-                            selectedBrand =
-                                value;
-
-                            brandController
-                                    .text =
-                                value ??
-                                    '';
-                          });
-
-                          if (value !=
-                              null) {
-
-                            fetchModels(
-                              value,
-                            );
-                          }
-                        },
+                      if (value != null) {
+                        fetchModels(value);
+                      }
+                    },
             ),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
             // MODEL
-            DropdownButtonFormField<
-                String>(
+            DropdownButtonFormField<String>(
               value: selectedModel,
 
-              decoration:
-                  fieldDecoration(
-                "Vehicle Model",
-              ),
+              decoration: fieldDecoration("Vehicle Model"),
 
               items: models
                   .map(
                     (model) =>
-                        DropdownMenuItem(
-                      value: model,
-                      child:
-                          Text(model),
-                    ),
+                        DropdownMenuItem(value: model, child: Text(model)),
                   )
                   .toList(),
 
-              onChanged:
-                  widget.vehicle !=
-                          null
-                      ? null
-                      : (value) {
+              onChanged: widget.vehicle != null
+                  ? null
+                  : (value) {
+                      setState(() {
+                        selectedModel = value;
 
-                          setState(() {
+                        modelController.text = value ?? '';
+                        variantController.clear();
+                        showroomPriceController.clear();
+                        selectedVehiclePhotoUrl = null;
+                        selectedVehiclePhotoUrls = [];
+                        selectedVehicleId = null;
+                      });
 
-                            selectedModel =
-                                value;
-
-                            modelController
-                                    .text =
-                                value ??
-                                    '';
-                          });
-
-                          if (value !=
-                              null) {
-
-                            fetchVariants(
-                              value,
-                            );
-                          }
-                        },
+                      if (value != null) {
+                        _loadSelectedModelDetails(
+                          brand: selectedBrand ?? '',
+                          model: value,
+                        );
+                      }
+                    },
             ),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
-            // VARIANT
-            DropdownButtonFormField<
-                String>(
-              value: selectedVariant,
-
-              decoration:
-                  fieldDecoration(
-                "Vehicle Variant",
-              ),
-
-              items: variants
-                  .map((variant) {
-
-                return DropdownMenuItem<
-                    String>(
-
-                  value:
-                      variant['Name']
-                          .toString(),
-
-                  child: Text(
-                    variant['Name']
-                        .toString(),
+            if (selectedVehiclePhotoUrl != null &&
+                selectedVehiclePhotoUrl!.isNotEmpty) ...[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  selectedVehiclePhotoUrl!,
+                  height: 160,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    height: 160,
+                    color: Colors.grey.shade200,
+                    alignment: Alignment.center,
+                    child: const Text('Unable to load vehicle photo'),
                   ),
-                );
-              }).toList(),
-
-              onChanged:
-                  widget.vehicle !=
-                          null
-                      ? null
-                      : (value) {
-
-                          final selected =
-                              variants
-                                  .firstWhere(
-                            (v) =>
-                                v['Name'] ==
-                                value,
-                          );
-
-                          setState(() {
-
-                            selectedVariant =
-                                value;
-
-                            variantController
-                                    .text =
-                                value ??
-                                    '';
-
-                            showroomPriceController
-                                    .text =
-                                selected['Price']
-                                        ?.toString() ??
-                                    '';
-                          });
-                        },
-            ),
-
-            const SizedBox(
-              height: 14,
-            ),
+                ),
+              ),
+              const SizedBox(height: 14),
+            ],
 
             // SHOWROOM PRICE
             TextField(
-              controller:
-                  showroomPriceController,
+              controller: showroomPriceController,
 
               readOnly: true,
 
-              decoration:
-                  fieldDecoration(
-                "Showroom Price",
-              ),
+              decoration: fieldDecoration("Showroom Price"),
             ),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
             // EXPECTED PRICE
             TextField(
-              controller:
-                  expectedPriceController,
+              controller: expectedPriceController,
 
-              keyboardType:
-                  TextInputType.number,
+              keyboardType: TextInputType.number,
 
-              decoration:
-                  fieldDecoration(
-                "Expected Price",
-              ),
+              decoration: fieldDecoration("Expected Price"),
             ),
 
-            const SizedBox(
-              height: 14,
-            ),
+            const SizedBox(height: 14),
 
             // NOTES
             TextField(
-              controller:
-                  notesController,
+              controller: notesController,
 
               maxLines: 4,
 
-              decoration:
-                  fieldDecoration(
-                "Additional Notes",
-              ),
+              decoration: fieldDecoration("Additional Notes"),
             ),
 
-            const SizedBox(
-              height: 30,
-            ),
+            const SizedBox(height: 30),
 
             SizedBox(
-
               width: double.infinity,
 
               child: ElevatedButton(
+                onPressed: loading ? null : saveBooking,
 
-                onPressed:
-                    loading
-                        ? null
-                        : saveBooking,
-
-                style:
-                    ElevatedButton
-                        .styleFrom(
-                  padding:
-                      const EdgeInsets
-                          .symmetric(
-                    vertical: 16,
-                  ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
 
                 child: loading
-
                     ? const SizedBox(
                         height: 24,
                         width: 24,
-                        child:
-                            CircularProgressIndicator(
-                          color:
-                              Colors
-                                  .white,
-                          strokeWidth:
-                              2,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
                         ),
                       )
+                    : Text(
+                        widget.isAddingToInquiry
+                            ? "Add This Vehicle"
+                            : "Submit Booking Request",
 
-                    : const Text(
-                        "Submit Booking Request",
-
-                        style:
-                            TextStyle(
+                        style: const TextStyle(
                           fontSize: 16,
-                          fontWeight:
-                              FontWeight
-                                  .bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
               ),

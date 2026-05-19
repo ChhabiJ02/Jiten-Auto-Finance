@@ -6,11 +6,28 @@ class ServiceRequestsScreen extends StatelessWidget {
   const ServiceRequestsScreen({super.key});
 
   Future<void> updateStatus(String id, String status) async {
-    await FirebaseFirestore.instance.collection('serviceRequests').doc(id).update({
-      'status': status,
-      'approvedBy': FirebaseAuth.instance.currentUser?.uid,
-      'approvedAt': Timestamp.now(),
-    });
+    final currentUser = FirebaseAuth.instance.currentUser;
+    String approvedByName = currentUser?.displayName ?? '';
+    if (approvedByName.trim().isEmpty && currentUser != null) {
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      final userData = userDoc.data();
+      if (userData != null) {
+        approvedByName = (userData['name'] ?? approvedByName).toString();
+      }
+    }
+
+    await FirebaseFirestore.instance
+        .collection('serviceRequests')
+        .doc(id)
+        .update({
+          'status': status,
+          'approvedBy': currentUser?.uid,
+          'approvedByName': approvedByName.isNotEmpty ? approvedByName : null,
+          'approvedAt': Timestamp.now(),
+        });
   }
 
   @override
@@ -22,28 +39,19 @@ class ServiceRequestsScreen extends StatelessWidget {
             .collection('serviceRequests')
             .snapshots(),
         builder: (context, snapshot) {
-
           // LOADING
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
+            return const Center(child: CircularProgressIndicator());
           }
 
           // ERROR
           if (snapshot.hasError) {
-            return Center(
-              child: Text(
-                'Error: ${snapshot.error}',
-              ),
-            );
+            return Center(child: Text('Error: ${snapshot.error}'));
           }
 
           // NO DATA
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(
-              child: Text('No service requests found.'),
-            );
+            return const Center(child: Text('No service requests found.'));
           }
 
           // SORT SAFELY
@@ -67,7 +75,6 @@ class ServiceRequestsScreen extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             itemCount: docs.length,
             itemBuilder: (context, index) {
-
               final data = docs[index].data() as Map<String, dynamic>;
               final id = docs[index].id;
 
@@ -77,8 +84,26 @@ class ServiceRequestsScreen extends StatelessWidget {
                   ? preferredDate.toDate().toString().split(' ')[0]
                   : 'N/A';
 
-              final boughtFromUs =
-                  data['boughtFromUs'] as bool? ?? false;
+              final requestedByName =
+                  (data['requestedByName'] ??
+                          data['customerName'] ??
+                          data['customerEmail'] ??
+                          'Customer')
+                      .toString();
+
+              final requestedByEmail =
+                  (data['requestedByEmail'] ?? data['customerEmail'] ?? '')
+                      .toString();
+
+              final variant = (data['variant'] ?? '').toString().trim();
+
+              final vehicleText = [
+                (data['vehicleBrand'] ?? '').toString().trim(),
+                (data['vehicleModel'] ?? '').toString().trim(),
+                if (variant.isNotEmpty) variant,
+              ].where((part) => part.isNotEmpty).join(' ');
+
+              final boughtFromUs = data['boughtFromUs'] as bool? ?? false;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 14),
@@ -87,44 +112,51 @@ class ServiceRequestsScreen extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
                       Text(
-                        data['customerEmail'] ?? 'Customer',
+                        requestedByName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
                       ),
 
+                      if (requestedByEmail.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text('Requested by: $requestedByEmail'),
+                      ],
+
+                      if ((data['customerPhone'] as String?)?.isNotEmpty ??
+                          false) ...[
+                        const SizedBox(height: 4),
+                        Text('Phone: ${data['customerPhone']}'),
+                      ],
+
                       const SizedBox(height: 8),
 
-                      Text(
-                        'Vehicle: ${data['vehicleBrand'] ?? ''} ${data['vehicleModel'] ?? ''} ${data['variant'] ?? ''}'
-                            .trim(),
-                      ),
+                      Text('Vehicle: $vehicleText'),
 
-                      Text(
-                        'Service Type: ${data['serviceType'] ?? 'N/A'}',
-                      ),
+                      Text('Service Type: ${data['serviceType'] ?? 'N/A'}'),
 
-                      Text(
-                        'Preferred Date: $dateText',
-                      ),
+                      Text('Preferred Date: $dateText'),
 
-                      Text(
-                        'Status: ${data['status'] ?? 'Pending'}',
-                      ),
+                      Text('Status: ${data['status'] ?? 'Pending'}'),
+
+                      if ((data['approvedByName'] as String?)?.isNotEmpty ??
+                          false) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          data['status'] == 'Approved'
+                              ? 'Accepted by: ${data['approvedByName']}'
+                              : 'Handled by: ${data['approvedByName']}',
+                        ),
+                      ],
 
                       if (boughtFromUs) ...[
                         const SizedBox(height: 8),
 
-                        const Text(
-                          'Bought from us: Yes',
-                        ),
+                        const Text('Bought from us: Yes'),
 
-                        Text(
-                          'Package: ${data['servicePackage'] ?? 'N/A'}',
-                        ),
+                        Text('Package: ${data['servicePackage'] ?? 'N/A'}'),
 
                         Text(
                           'Left Services: ${data['remainingServices'] ?? 'N/A'}',
@@ -134,38 +166,30 @@ class ServiceRequestsScreen extends StatelessWidget {
                       if ((data['notes'] as String?)?.isNotEmpty ?? false) ...[
                         const SizedBox(height: 8),
 
-                        Text(
-                          'Notes: ${data['notes']}',
-                        ),
+                        Text('Notes: ${data['notes']}'),
                       ],
 
                       const SizedBox(height: 16),
 
                       Row(
                         children: [
-
                           ElevatedButton(
                             onPressed: data['status'] == 'Pending'
                                 ? () async {
-
-                                    await updateStatus(
-                                      id,
-                                      'Approved',
-                                    );
+                                    await updateStatus(id, 'Approved');
 
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
-                                          content: Text(
-                                            'Request approved',
-                                          ),
+                                          content: Text('Request accepted'),
                                         ),
                                       );
                                     }
                                   }
                                 : null,
-                            child: const Text('Approve'),
+                            child: const Text('Accept'),
                           ),
 
                           const SizedBox(width: 12),
@@ -176,19 +200,14 @@ class ServiceRequestsScreen extends StatelessWidget {
                             ),
                             onPressed: data['status'] == 'Pending'
                                 ? () async {
-
-                                    await updateStatus(
-                                      id,
-                                      'Rejected',
-                                    );
+                                    await updateStatus(id, 'Rejected');
 
                                     if (context.mounted) {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
                                         const SnackBar(
-                                          content: Text(
-                                            'Request rejected',
-                                          ),
+                                          content: Text('Request rejected'),
                                         ),
                                       );
                                     }

@@ -391,6 +391,7 @@ class _CustomerProfileScreenState
                             labelText:
                                 'Customer Email',
                           ),
+                          readOnly: true,
                         ),
 
                         const SizedBox(
@@ -410,6 +411,7 @@ class _CustomerProfileScreenState
                             labelText:
                                 'Customer Phone',
                           ),
+                          readOnly: true,
                         ),
                       ],
                     ),

@@ -557,92 +557,117 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
           final users = snapshot.data!.docs;
 
-          return ListView.builder(
-            itemCount: users.length,
+          // Compute role counts
+          final counts = <String, int>{'admin': 0, 'staff': 0, 'customer': 0};
+          for (final doc in users) {
+            final data = doc.data() as Map<String, dynamic>;
+            final role = _normalizeRole(data['role']?.toString());
+            if (counts.containsKey(role)) counts[role] = counts[role]! + 1;
+          }
 
-            itemBuilder: (context, index) {
-              final doc = users[index];
-
-              final data = doc.data() as Map<String, dynamic>;
-
-              final name = data['name'] ?? 'No Name';
-              final email = data['email'] ?? '';
-
-              final currentRole = _normalizeRole(
-                data['role']?.toString(),
-              );
-
-              selectedRoles.putIfAbsent(
-                doc.id,
-                () => currentRole,
-              );
-
-              return Card(
-                margin: const EdgeInsets.all(10),
-
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(12),
-
-                  title: Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 5),
-
-                      Text(email),
-
-                      const SizedBox(height: 10),
-
-                      DropdownButton<String>(
-                        isExpanded: true,
-                        value: selectedRoles[doc.id],
-
-                        items: roles.map((role) {
-                          return DropdownMenuItem(
-                            value: role,
-                            child: Text(role.toUpperCase()),
-                          );
-                        }).toList(),
-
-                        onChanged: (value) {
-                          if (value != null &&
-                              value != currentRole) {
-                            setState(() {
-                              selectedRoles[doc.id] = value;
-                            });
-
-                            confirmRoleChange(
-                              userId: doc.id,
-                              userName: name,
-                              oldRole: currentRole,
-                              newRole: value,
-                            );
-                          }
-                        },
-                      ),
-                    ],
-                  ),
-
-                  trailing: IconButton(
-                    icon: const Icon(
-                      Icons.delete,
-                      color: Colors.red,
-                    ),
-                    onPressed: () => confirmDelete(
-                      doc.id,
-                      name,
-                      currentRole,
-                    ),
-                  ),
+          return Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Chip(label: Text('Admins: ${counts['admin']}')),
+                    Chip(label: Text('Staff: ${counts['staff']}')),
+                    Chip(label: Text('Customers: ${counts['customer']}')),
+                  ],
                 ),
-              );
-            },
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: users.length,
+
+                  itemBuilder: (context, index) {
+                    final doc = users[index];
+
+                    final data = doc.data() as Map<String, dynamic>;
+
+                    final name = data['name'] ?? 'No Name';
+                    final email = data['email'] ?? '';
+
+                    final currentRole = _normalizeRole(
+                      data['role']?.toString(),
+                    );
+
+                    selectedRoles.putIfAbsent(
+                      doc.id,
+                      () => currentRole,
+                    );
+
+                    return Card(
+                      margin: const EdgeInsets.all(10),
+
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(12),
+
+                        title: Text(
+                          name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 5),
+
+                            Text(email),
+
+                            const SizedBox(height: 10),
+
+                            DropdownButton<String>(
+                              isExpanded: true,
+                              value: selectedRoles[doc.id],
+
+                              items: roles.map((role) {
+                                return DropdownMenuItem(
+                                  value: role,
+                                  child: Text(role.toUpperCase()),
+                                );
+                              }).toList(),
+
+                              onChanged: (value) {
+                                if (value != null &&
+                                    value != currentRole) {
+                                  setState(() {
+                                    selectedRoles[doc.id] = value;
+                                  });
+
+                                  confirmRoleChange(
+                                    userId: doc.id,
+                                    userName: name,
+                                    oldRole: currentRole,
+                                    newRole: value,
+                                  );
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+
+                        trailing: IconButton(
+                          icon: const Icon(
+                            Icons.delete,
+                            color: Colors.red,
+                          ),
+                          onPressed: () => confirmDelete(
+                            doc.id,
+                            name,
+                            currentRole,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           );
         },
       ),

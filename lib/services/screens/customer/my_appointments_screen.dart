@@ -25,7 +25,9 @@ class MyAppointmentsScreen extends StatelessWidget {
 
                 final docs = snapshot.data!.docs;
                 if (docs.isEmpty) {
-                  return const Center(child: Text('No service appointments found.'));
+                  return const Center(
+                    child: Text('No service appointments found.'),
+                  );
                 }
 
                 return ListView.builder(
@@ -38,6 +40,12 @@ class MyAppointmentsScreen extends StatelessWidget {
                         ? preferredDate.toDate().toString().split(' ')[0]
                         : 'Not set';
                     final boughtFromUs = data['boughtFromUs'] as bool? ?? false;
+                    final variant = (data['variant'] ?? '').toString().trim();
+                    final vehicleText = [
+                      (data['vehicleBrand'] ?? '').toString().trim(),
+                      (data['vehicleModel'] ?? '').toString().trim(),
+                      if (variant.isNotEmpty) variant,
+                    ].where((part) => part.isNotEmpty).join(' ');
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 14),
@@ -48,20 +56,38 @@ class MyAppointmentsScreen extends StatelessWidget {
                           children: [
                             Text(
                               data['serviceType'] as String? ?? 'Service',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             const SizedBox(height: 8),
-                            Text('Vehicle: ${data['vehicleBrand'] ?? ''} ${data['vehicleModel'] ?? ''} ${data['variant'] ?? ''}'.trim()),
-                            Text('Reg. No: ${data['registrationNumber'] ?? 'N/A'}'),
+                            Text('Vehicle: $vehicleText'),
+                            Text(
+                              'Reg. No: ${data['registrationNumber'] ?? 'N/A'}',
+                            ),
                             Text('Preferred Date: $preferredDateText'),
                             Text('Status: ${data['status'] ?? 'Pending'}'),
+                            if ((data['approvedByName'] as String?)
+                                    ?.isNotEmpty ??
+                                false)
+                              Text(
+                                data['status'] == 'Approved'
+                                    ? 'Accepted by: ${data['approvedByName']}'
+                                    : 'Handled by: ${data['approvedByName']}',
+                              ),
                             if (boughtFromUs) ...[
                               const SizedBox(height: 8),
                               Text('Bought from us: Yes'),
-                              Text('Service Package: ${data['servicePackage'] ?? 'N/A'}'),
-                              Text('Left Services: ${data['remainingServices'] ?? 'N/A'}'),
+                              Text(
+                                'Service Package: ${data['servicePackage'] ?? 'N/A'}',
+                              ),
+                              Text(
+                                'Left Services: ${data['remainingServices'] ?? 'N/A'}',
+                              ),
                             ],
-                            if ((data['notes'] as String?)?.isNotEmpty ?? false) ...[
+                            if ((data['notes'] as String?)?.isNotEmpty ??
+                                false) ...[
                               const SizedBox(height: 8),
                               Text('Notes: ${data['notes']}'),
                             ],

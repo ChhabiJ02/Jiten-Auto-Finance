@@ -38,12 +38,16 @@ class CloudinaryService {
         return null;
       }
 
-      final formData = FormData.fromMap({
+      final uploadData = {
         'file': await MultipartFile.fromFile(filePath),
         'upload_preset': _uploadPreset,
         'folder': folder,
-        'public_id': ?publicId,
-      });
+      };
+      if (publicId != null) {
+        uploadData['public_id'] = publicId;
+      }
+
+      final formData = FormData.fromMap(uploadData);
 
       final response = await _dio.post(
         'https://api.cloudinary.com/v1_1/$_cloudName/image/upload',

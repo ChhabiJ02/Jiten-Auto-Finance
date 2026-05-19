@@ -5,6 +5,7 @@ import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:phone_state/phone_state.dart';
 import 'dart:async';
+import '../../vehicle_model_lookup.dart';
 
 class EditInquiryScreen extends StatefulWidget {
   final QueryDocumentSnapshot inquiry;
@@ -16,6 +17,8 @@ class EditInquiryScreen extends StatefulWidget {
 }
 
 class _EditInquiryScreenState extends State<EditInquiryScreen> {
+  static const double _sectionTitleFontSize = 16;
+
   late final TextEditingController nameController;
   late final TextEditingController phoneController;
   late final TextEditingController brandController;
@@ -25,13 +28,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController descriptionController;
   late final TextEditingController referenceController;
   late final TextEditingController otherController;
-  late final TextEditingController followUpCommentController;
   late final TextEditingController callDurationController;
-  late final TextEditingController callNotesController;
   late String paymentType;
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
-  
+
   bool loading = false;
   bool isClosed = false;
   bool isBooked = false;
@@ -70,14 +71,31 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
+  DateTime? _parseDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  String _formatDate(dynamic value) {
+    final parsed = _parseDate(value);
+    if (parsed == null) return 'N/A';
+    return parsed.toString().split(' ')[0];
+  }
+
   bool get _hasPendingFollowUpDraft {
-    return followUpCommentController.text.trim().isNotEmpty ||
-        !_isSameDate(newFollowUpDate, DateTime.now());
+    return !_isSameDate(newFollowUpDate, selectedDate);
   }
 
   bool get _hasPendingCallDraft {
-    return callDurationController.text.trim().isNotEmpty ||
-        callNotesController.text.trim().isNotEmpty;
+    return callDurationController.text.trim().isNotEmpty;
   }
 
   bool _stagePendingFollowUp() {
@@ -85,10 +103,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       return true;
     }
 
-    final comment = followUpCommentController.text.trim();
     final alreadyExists = followUpHistory.any((item) {
-      final itemDate = (item['date'] as Timestamp).toDate();
-      return _isSameDate(itemDate, newFollowUpDate);
+      final itemDate = _parseDate(item['date']);
+      return itemDate != null && _isSameDate(itemDate, newFollowUpDate);
     });
 
     if (alreadyExists) {
@@ -100,12 +117,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
     followUpHistory.add({
       'date': Timestamp.fromDate(newFollowUpDate),
-      'comment': comment,
       'createdAt': Timestamp.now(),
     });
     selectedDate = newFollowUpDate;
-    followUpCommentController.clear();
-    newFollowUpDate = DateTime.now();
     return true;
   }
 
@@ -115,8 +129,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     }
 
     final duration = callDurationController.text.trim();
-    final notes = callNotesController.text.trim();
-
     if (duration.isEmpty) {
       showMessage('Please make a call first or enter a call duration.');
       return false;
@@ -125,17 +137,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     callHistory.add({
       'date': Timestamp.now(),
       'duration': duration,
-      'notes': notes,
       'createdAt': Timestamp.now(),
     });
     callDurationController.clear();
-    callNotesController.clear();
     return true;
   }
 
   Future<void> fetchBrands() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('Brand').get();
+    final snapshot = await FirebaseFirestore.instance.collection('Brand').get();
 
     setState(() {
       brands = snapshot.docs.map((e) => e['Name'].toString()).toList();
@@ -150,18 +159,28 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
     setState(() {
       models = snapshot.docs.map((e) => e['Name'].toString()).toList();
-      variants = [];
     });
   }
 
-  Future<void> fetchVariants(String model) async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Variant')
-        .where('ParentModel', isEqualTo: model)
-        .get();
+  Future<void> _loadSelectedModelDetails(String brand, String model) async {
+    final details = await fetchVehicleModelLookupData(
+      firestore: FirebaseFirestore.instance,
+      brand: brand,
+      model: model,
+    );
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
-      variants = snapshot.docs.map((e) => e.data()).toList();
+      selectedVariant = null;
+      variantController.clear();
+      selectedVariantPhotoUrl =
+          details.primaryPhotoUrl ?? selectedVariantPhotoUrl;
+      priceController.text = details.price.isNotEmpty
+          ? details.price
+          : priceController.text;
     });
   }
 
@@ -180,27 +199,22 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     descriptionController = TextEditingController(
       text: data['description'] ?? '',
     );
-    referenceController =
-        TextEditingController(text: data['reference'] ?? '');
+    referenceController = TextEditingController(text: data['reference'] ?? '');
 
     otherController = TextEditingController(
       text: data['otherDescription'] ?? '',
     );
 
-    followUpCommentController = TextEditingController();
     callDurationController = TextEditingController();
-    callNotesController = TextEditingController();
 
     paymentType = data['paymentType'] ?? 'Loan';
 
     final nextFollowUp = data['nextFollowUp'];
 
-    selectedDate = nextFollowUp is Timestamp
-        ? nextFollowUp.toDate()
-        : DateTime.now();
+    selectedDate = _parseDate(nextFollowUp) ?? DateTime.now();
 
-    newFollowUpDate = DateTime.now();
-  
+    newFollowUpDate = selectedDate;
+
     selectedBrand = data['brand'];
     selectedModel = data['model'];
     selectedVariant = data['variant'];
@@ -213,8 +227,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       fetchModels(selectedBrand!);
     }
 
-    if (selectedModel != null) {
-      fetchVariants(selectedModel!);
+    if (selectedBrand != null && selectedModel != null) {
+      _loadSelectedModelDetails(selectedBrand!, selectedModel!);
       Future.delayed(const Duration(milliseconds: 500), () {
         setState(() {});
       });
@@ -245,7 +259,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     } else if (isBooked) {
       status = 'Booked';
     } else {
-      status = _statusOptions.contains(savedStatus) ? savedStatus : 'New Inquiry';
+      status = _statusOptions.contains(savedStatus)
+          ? savedStatus
+          : 'New Inquiry';
     }
   }
 
@@ -260,77 +276,57 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     descriptionController.dispose();
     referenceController.dispose();
     otherController.dispose();
-    followUpCommentController.dispose();
     callDurationController.dispose();
-    callNotesController.dispose();
     callSubscription?.cancel();
     super.dispose();
   }
 
   Future<void> startDirectCall() async {
+    final phone = phoneController.text.trim();
 
-  final phone =
-      phoneController.text.trim();
+    if (phone.isEmpty) {
+      showMessage('Customer phone number missing.');
 
-  if (phone.isEmpty) {
-
-    showMessage(
-      'Customer phone number missing.',
-    );
-
-    return;
-  }
-
-  // PERMISSION
-  await Permission.phone.request();
-
-  // SAVE START TIME
-  callStartedAt = DateTime.now();
-
-  // LISTEN CALL STATE
-  callSubscription?.cancel();
-
-  callSubscription =
-      PhoneState.stream.listen((event) async {
-
-    final status = event.status;
-
-    // CALL ENDED
-    if (
-      lastStatus == PhoneStateStatus.CALL_STARTED &&
-      status == PhoneStateStatus.CALL_ENDED
-    ) {
-
-      final callEndedAt =
-          DateTime.now();
-
-      final duration =
-          callEndedAt.difference(
-            callStartedAt!,
-          );
-
-      final durationText =
-          '${duration.inMinutes} min ${duration.inSeconds % 60} sec';
-
-      setState(() {
-
-        callDurationController.text =
-            durationText;
-      });
-
-      showMessage(
-        'Call ended. Add notes and click Log Call.',
-      );
+      return;
     }
 
-    lastStatus = status;
-  });
+    // PERMISSION
+    await Permission.phone.request();
 
-  // START DIRECT CALL
-  await FlutterPhoneDirectCaller.callNumber(
-    phone,
-  );
-}
+    // SAVE START TIME
+    callStartedAt = DateTime.now();
+
+    // LISTEN CALL STATE
+    callSubscription?.cancel();
+
+    callSubscription = PhoneState.stream.listen((event) async {
+      final status = event.status;
+
+      // CALL ENDED
+      if (lastStatus == PhoneStateStatus.CALL_STARTED &&
+          status == PhoneStateStatus.CALL_ENDED) {
+        final callEndedAt = DateTime.now();
+
+        final duration = callEndedAt.difference(callStartedAt!);
+
+        final durationText =
+            '${duration.inMinutes} min ${duration.inSeconds % 60} sec';
+
+        setState(() {
+          callDurationController.text = durationText;
+        });
+
+        showMessage(
+          'Call ended. Review the duration and tap Save All Changes.',
+        );
+      }
+
+      lastStatus = status;
+    });
+
+    // START DIRECT CALL
+    await FlutterPhoneDirectCaller.callNumber(phone);
+  }
 
   Future<void> _saveChanges() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -373,12 +369,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final effectiveStatus = isClosed
         ? 'Closed'
         : isBooked
-            ? 'Booked'
-            : paymentType == 'Loan'
-                ? 'Finance'
-                : status == 'Finance'
-                    ? 'New Inquiry'
-                    : status;
+        ? 'Booked'
+        : paymentType == 'Loan'
+        ? 'Finance'
+        : status == 'Finance'
+        ? 'New Inquiry'
+        : status;
 
     final changes = <String>[];
 
@@ -400,7 +396,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
     final oldPaymentType = (oldData['paymentType'] ?? 'Loan').toString();
     if (oldPaymentType != paymentType) {
-      changes.add('Payment option changed from "$oldPaymentType" to "$paymentType"');
+      changes.add(
+        'Payment option changed from "$oldPaymentType" to "$paymentType"',
+      );
     }
 
     final oldStatus = (oldData['status'] ?? 'New Inquiry').toString();
@@ -423,25 +421,25 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
           .collection('inquiries')
           .doc(widget.inquiry.id)
           .update({
-        'name': name,
-        'phone': phone,
-        'brand': brand,
-        'model': model,
-        'variant': variant,
-        'price': price,
-        'description': description,
-        'paymentType': paymentType,
-        'otherDescription': otherDescription,
-        'reference': reference,
-        'nextFollowUp': Timestamp.fromDate(selectedDate),
-        'followUpHistory': followUpHistory,
-        'callHistory': callHistory,
-        'vehiclePhotoUrl': selectedVariantPhotoUrl,
-        'editHistory': editHistory,
-        'isClosed': isClosed,
-        'isBooked': isBooked,
-        'status': effectiveStatus,
-      });
+            'name': name,
+            'phone': phone,
+            'brand': brand,
+            'model': model,
+            'variant': variant,
+            'price': price,
+            'description': description,
+            'paymentType': paymentType,
+            'otherDescription': otherDescription,
+            'reference': reference,
+            'nextFollowUp': Timestamp.fromDate(selectedDate),
+            'followUpHistory': followUpHistory,
+            'callHistory': callHistory,
+            'vehiclePhotoUrl': selectedVariantPhotoUrl,
+            'editHistory': editHistory,
+            'isClosed': isClosed,
+            'isBooked': isBooked,
+            'status': effectiveStatus,
+          });
 
       if (mounted) {
         showMessage('Inquiry updated successfully.');
@@ -470,6 +468,56 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     }
   }
 
+  Widget _buildSectionHeader(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    Widget? trailing,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.primary.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.primary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Icon(icon, color: colorScheme.primary),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: _sectionTitleFontSize,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (trailing != null) trailing,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: _sectionTitleFontSize,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -485,58 +533,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-
-                      decoration: BoxDecoration(
-
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withOpacity(0.10),
-
-                        borderRadius:
-                            BorderRadius.circular(12),
-
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(0.25),
-                        ),
-                      ),
-
-                      child: Row(
-                        children: [
-
-                          Icon(
-                            Icons.person,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary,
-                          ),
-
-                          const SizedBox(width: 10),
-
-                          Text(
-                            'Basic Information',
-
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.person,
+                      title: 'Basic Information',
                     ),
                     const SizedBox(height: 16),
                     TextField(
@@ -550,7 +550,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: brands.contains(selectedBrand) ? selectedBrand : null,
+                      initialValue: brands.contains(selectedBrand)
+                          ? selectedBrand
+                          : null,
                       isExpanded: true,
                       hint: const Text("Select Brand"),
                       items: brands.map((b) {
@@ -563,6 +565,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           selectedVariant = null;
                           modelController.clear();
                           variantController.clear();
+                          selectedVariantPhotoUrl = null;
+                          priceController.clear();
                         });
 
                         brandController.text = val ?? '';
@@ -575,7 +579,9 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      initialValue: models.contains(selectedModel) ? selectedModel : null,
+                      initialValue: models.contains(selectedModel)
+                          ? selectedModel
+                          : null,
                       isExpanded: true,
                       hint: const Text("Select Model"),
                       items: models.map((m) {
@@ -586,70 +592,46 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           selectedModel = val;
                           selectedVariant = null;
                           variantController.clear();
+                          selectedVariantPhotoUrl = null;
+                          priceController.clear();
                         });
 
                         modelController.text = val ?? '';
-                        await fetchVariants(val!);
+                        await _loadSelectedModelDetails(
+                          selectedBrand ?? '',
+                          val!,
+                        );
                       },
                       decoration: const InputDecoration(
                         labelText: 'Model',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      initialValue: variants.any((v) => v['Name'] == selectedVariant)
-                          ? selectedVariant
-                          : null,
-                      isExpanded: true,
-                      hint: const Text("Select Variant"),
-                      items: variants.map((v) {
-                        return DropdownMenuItem<String>(
-                          value: v['Name'],
-                          child: Text(v['Name'], overflow: TextOverflow.ellipsis),
-                        );
-                      }).toList(),
-                      onChanged: (val) {
-                        final selected = variants.firstWhere((e) => e['Name'] == val);
-
-                        setState(() {
-                          selectedVariant = val ?? '';
-                          selectedVariantPhotoUrl = selected['photoUrl'] ?? selected['photos']?[0];
-                          variantController.text = val ?? '';
-                          priceController.text = selected['Price'].toString();
-                        });
-                      },
-                      decoration: const InputDecoration(
-                        labelText: 'Variant',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
                     const SizedBox(height: 14),
 
                     if (selectedVariantPhotoUrl != null &&
-                        selectedVariantPhotoUrl!.isNotEmpty)
-                      Column(
-                        children: [
-                          const SizedBox(height: 14),
-                          Container(
-                            height: 220,
-                            width: double.infinity,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(16),
-                              child: Image.network(
-                                selectedVariantPhotoUrl!,
-                                fit: BoxFit.cover,
-                              ),
-                            ),
+                        selectedVariantPhotoUrl!.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        height: 220,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.network(
+                            selectedVariantPhotoUrl!,
+                            fit: BoxFit.cover,
                           ),
-                        ],
+                        ),
                       ),
+                      const SizedBox(height: 14),
+                    ],
 
                     TextField(
                       controller: priceController,
+                      readOnly: true,
                       decoration: const InputDecoration(labelText: 'Price'),
                       keyboardType: TextInputType.number,
                     ),
@@ -662,14 +644,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     DropdownButtonFormField<String>(
                       value: paymentType,
                       items: const [
-                        DropdownMenuItem(
-                          value: 'Loan',
-                          child: Text('Loan'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Cash',
-                          child: Text('Cash'),
-                        ),
+                        DropdownMenuItem(value: 'Loan', child: Text('Loan')),
+                        DropdownMenuItem(value: 'Cash', child: Text('Cash')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
@@ -687,7 +663,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             ),
             const SizedBox(height: 5),
 
-            // Status Section
             Card(
               elevation: 2,
               child: Padding(
@@ -695,95 +670,129 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-
-                      decoration: BoxDecoration(
-
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withOpacity(0.10),
-
-                        borderRadius:
-                            BorderRadius.circular(12),
-
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(0.25),
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.call,
+                      title: 'Call Log',
+                      trailing: Container(
+                        height: 40,
+                        width: 40,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.primary,
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      ),
-
-                      child: Row(
-                        children: [
-
-                          Icon(
-                            Icons.person,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(
+                            Icons.call,
+                            color: Colors.white,
+                            size: 18,
                           ),
+                          onPressed: () async {
+                            final phone = phoneController.text.trim();
 
-                          const SizedBox(width: 10),
+                            if (phone.isEmpty) {
+                              showMessage('Customer phone number missing.');
+                              return;
+                            }
 
-                          Text(
-                            'Status',
-
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary,
-                            ),
-                          ),
-                        ],
+                            try {
+                              await startDirectCall();
+                            } catch (e) {
+                              showMessage('Could not open phone dialer.');
+                            }
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: isClosed,
-                          onChanged: (value) {
-                            setState(() {
-                              isClosed = value ?? false;
-                              if (isClosed) {
-                                isBooked = false;
-                                status = 'Closed'; // Auto-set status when closed
-                              } else if (status == 'Closed') {
-                                status = 'New Inquiry';
-                              }
-                            });
-                          },
+
+                    if (callHistory.isNotEmpty)
+                      Card(
+                        elevation: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildCardTitle('Call History'),
+                              const SizedBox(height: 14),
+                              ...callHistory.reversed
+                                  .toList()
+                                  .asMap()
+                                  .entries
+                                  .map((entry) {
+                                    final index =
+                                        callHistory.length - 1 - entry.key;
+                                    final item = entry.value;
+                                    final notes = (item['notes'] ?? '')
+                                        .toString()
+                                        .trim();
+
+                                    return Container(
+                                      margin: const EdgeInsets.only(bottom: 12),
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                _formatDate(item['date']),
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+
+                                              IconButton(
+                                                icon: const Icon(
+                                                  Icons.delete,
+                                                  color: Colors.red,
+                                                ),
+                                                onPressed: () {
+                                                  setState(() {
+                                                    callHistory.removeAt(index);
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+
+                                          const SizedBox(height: 6),
+
+                                          Text(
+                                            'Duration: ${item['duration'] ?? ''}',
+                                          ),
+                                          if (notes.isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text('Notes: $notes'),
+                                          ],
+                                        ],
+                                      ),
+                                    );
+                                  }),
+                            ],
+                          ),
                         ),
-                        const Text('Closed'),
-                        const SizedBox(width: 30),
-                        Checkbox(
-                          value: isBooked,
-                          onChanged: (value) {
-                            setState(() {
-                              isBooked = value ?? false;
-                              if (isBooked) {
-                                isClosed = false;
-                                status = 'Booked'; // Auto-set status when booked
-                              } else if (status == 'Booked') {
-                                status = 'New Inquiry';
-                              }
-                            });
-                          },
-                        ),
-                        const Text('Booked'),
-                      ],
+                      ),
+
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: callDurationController,
+                      decoration: const InputDecoration(
+                        labelText: 'Call Duration (e.g., 5 min 30 sec)',
+                        hintText: 'Enter call duration...',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
+                    const SizedBox(height: 12),
                   ],
                 ),
               ),
@@ -798,58 +807,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      width: double.infinity,
-
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-
-                      decoration: BoxDecoration(
-
-                        color: Theme.of(context)
-                            .colorScheme
-                            .primary
-                            .withOpacity(0.10),
-
-                        borderRadius:
-                            BorderRadius.circular(12),
-
-                        border: Border.all(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .primary
-                              .withOpacity(0.25),
-                        ),
-                      ),
-
-                      child: Row(
-                        children: [
-
-                          Icon(
-                            Icons.person,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary,
-                          ),
-
-                          const SizedBox(width: 10),
-
-                          Text(
-                            'Follow-up',
-
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
-
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .primary,
-                            ),
-                          ),
-                        ],
-                      ),
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.event_repeat,
+                      title: 'Follow-up',
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -867,23 +828,6 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: followUpCommentController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Follow-up Comment',
-                        hintText: 'Enter details about this follow-up...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'This follow-up will be added when you tap Save All Changes.',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 12,
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -891,7 +835,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
             const SizedBox(height: 5),
 
-            if (followUpHistory.isNotEmpty)
+            if (followUpHistory.isNotEmpty) ...[
               Card(
                 elevation: 2,
                 child: Padding(
@@ -899,21 +843,16 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Follow-up History',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
+                      _buildCardTitle('Follow-up History'),
                       const SizedBox(height: 14),
-
-                      ...followUpHistory.reversed.toList().asMap().entries.map((entry) {
-
-                        final index =
-                            followUpHistory.length - 1 - entry.key;
-
+                      ...followUpHistory.reversed.toList().asMap().entries.map((
+                        entry,
+                      ) {
+                        final index = followUpHistory.length - 1 - entry.key;
                         final item = entry.value;
+                        final comment = (item['comment'] ?? '')
+                            .toString()
+                            .trim();
 
                         return Container(
                           margin: const EdgeInsets.only(bottom: 12),
@@ -925,88 +864,33 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    (item['date'] as Timestamp)
-                                        .toDate()
-                                        .toString()
-                                        .split(' ')[0],
+                                    _formatDate(item['date']),
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),
-
-                                  Row(
-                                    children: [
-
-                                       IconButton(
-                                         icon: const Icon(Icons.edit),
-                                         onPressed: () {
-                                          final editController =
-                                              TextEditingController(
-                                            text: item['comment'] ?? '',
-                                          );
-
-                                          showDialog(
-                                            context: context,
-                                            builder: (_) {
-                                              return AlertDialog(
-                                                title: const Text(
-                                                    'Edit Follow-up'),
-                                                content: TextField(
-                                                  controller: editController,
-                                                  maxLines: 3,
-                                                ),
-                                                actions: [
-                                                  TextButton(
-                                                    onPressed: () {
-                                                      Navigator.pop(context);
-                                                    },
-                                                    child: const Text('Cancel'),
-                                                  ),
-                                                  ElevatedButton(
-                                                    onPressed: () {
-
-                                                      setState(() {
-                                                        followUpHistory[index]
-                                                            ['comment'] =
-                                                            editController
-                                                                .text
-                                                                .trim();
-                                                      });
-
-                                                      Navigator.pop(context);
-                                                    },
-                                                    child: const Text('Update'),
-                                                  ),
-                                                ],
-                                              );
-                                            },
-                                          );
-                                        },
-                                      ),
-
-                                      IconButton(
-                                        icon: const Icon(Icons.delete,
-                                            color: Colors.red),
-                                        onPressed: () {
-                                          setState(() {
-                                            followUpHistory.removeAt(index);
-                                          });
-                                        },
-                                      ),
-                                    ],
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.delete,
+                                      color: Colors.red,
+                                    ),
+                                    onPressed: () {
+                                      setState(() {
+                                        followUpHistory.removeAt(index);
+                                      });
+                                    },
                                   ),
                                 ],
                               ),
-
-                              const SizedBox(height: 8),
-
-                              Text(item['comment'] ?? ''),
+                              if (comment.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Text(comment),
+                              ],
                             ],
                           ),
                         );
@@ -1015,246 +899,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   ),
                 ),
               ),
-
-            Card(
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-  width: double.infinity,
-
-  padding: const EdgeInsets.symmetric(
-    horizontal: 14,
-    vertical: 12,
-  ),
-
-  decoration: BoxDecoration(
-
-    color: Theme.of(context)
-        .colorScheme
-        .primary
-        .withOpacity(0.10),
-
-    borderRadius:
-        BorderRadius.circular(12),
-
-    border: Border.all(
-      color: Theme.of(context)
-          .colorScheme
-          .primary
-          .withOpacity(0.25),
-    ),
-  ),
-
-  child: Row(
-    mainAxisAlignment:
-        MainAxisAlignment.spaceBetween,
-
-    children: [
-
-      Row(
-        children: [
-
-          Icon(
-            Icons.call,
-            color: Theme.of(context)
-                .colorScheme
-                .primary,
-          ),
-
-          const SizedBox(width: 10),
-
-          Text(
-            'Call Log',
-
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-
-              color: Theme.of(context)
-                  .colorScheme
-                  .primary,
-            ),
-          ),
-        ],
-      ),
-
-      Container(
-
-        height: 40,
-        width: 40,
-
-        decoration: BoxDecoration(
-
-          color: Theme.of(context)
-              .colorScheme
-              .primary,
-
-          borderRadius:
-              BorderRadius.circular(10),
-        ),
-
-        child: IconButton(
-
-          padding: EdgeInsets.zero,
-
-          icon: const Icon(
-            Icons.call,
-            color: Colors.white,
-            size: 18,
-          ),
-
-          onPressed: () async {
-
-            final phone =
-                phoneController.text.trim();
-
-            if (phone.isEmpty) {
-
-              showMessage(
-                'Customer phone number missing.',
-              );
-
-              return;
-            }
-
-            try {
-
-              await startDirectCall();
-
-            } catch (e) {
-
-              showMessage(
-                'Could not open phone dialer.',
-              );
-            }
-          },
-        ),
-      ),
-    ],
-  ),
-),
-                    const SizedBox(height: 16),
-
-                    if (callHistory.isNotEmpty)
-                      Card(
-                        elevation: 2,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-
-                              const Text(
-                                'Call History',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                ),
-                              ),
-
-                              const SizedBox(height: 14),
-
-                              ...callHistory.reversed.toList().asMap().entries.map((entry) {
-
-                                final index =
-                                    callHistory.length - 1 - entry.key;
-
-                                final item = entry.value;
-
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 12),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey.shade100,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-
-                                          Text(
-                                            (item['date'] as Timestamp)
-                                                .toDate()
-                                                .toString()
-                                                .split(' ')[0],
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-
-                                          IconButton(
-                                            icon: const Icon(Icons.delete,
-                                                color: Colors.red),
-                                            onPressed: () {
-                                              setState(() {
-                                                callHistory.removeAt(index);
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
-
-                                      const SizedBox(height: 6),
-
-                                      Text(
-                                          "Duration: ${item['duration'] ?? ''}"),
-
-                                      const SizedBox(height: 4),
-
-                                      Text(
-                                          "Notes: ${item['notes'] ?? ''}"),
-                                    ],
-                                  ),
-                                );
-                              }),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                    
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: callDurationController,
-                      decoration: const InputDecoration(
-                        labelText: 'Call Duration (e.g., 5 min 30 sec)',
-                        hintText: 'Enter call duration...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: callNotesController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Call Notes',
-                        hintText: 'Enter notes about the call...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Call duration and notes will be saved when you tap Save All Changes.',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 5),
+              const SizedBox(height: 5),
+            ],
 
             if (editHistory.isNotEmpty)
               Card(
@@ -1264,13 +910,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Lead Changes History',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
+                      _buildCardTitle('Lead Changes History'),
                       const SizedBox(height: 14),
                       ...editHistory.reversed.map((e) {
                         final changes = List<String>.from(e['changes'] ?? []);
@@ -1295,7 +935,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                               ...changes.map(
                                 (c) => Padding(
                                   padding: const EdgeInsets.only(bottom: 4),
-                                  child: Text("• $c"),
+                                  child: Text("- $c"),
                                 ),
                               ),
                               const SizedBox(height: 6),
@@ -1314,6 +954,61 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                   ),
                 ),
               ),
+
+            const SizedBox(height: 5),
+
+            Card(
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader(
+                      context,
+                      icon: Icons.flag_outlined,
+                      title: 'Status',
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isClosed,
+                          onChanged: (value) {
+                            setState(() {
+                              isClosed = value ?? false;
+                              if (isClosed) {
+                                isBooked = false;
+                                status = 'Closed';
+                              } else if (status == 'Closed') {
+                                status = 'New Inquiry';
+                              }
+                            });
+                          },
+                        ),
+                        const Text('Closed'),
+                        const SizedBox(width: 30),
+                        Checkbox(
+                          value: isBooked,
+                          onChanged: (value) {
+                            setState(() {
+                              isBooked = value ?? false;
+                              if (isBooked) {
+                                isClosed = false;
+                                status = 'Booked';
+                              } else if (status == 'Booked') {
+                                status = 'New Inquiry';
+                              }
+                            });
+                          },
+                        ),
+                        const Text('Booked'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
             const SizedBox(height: 20),
 

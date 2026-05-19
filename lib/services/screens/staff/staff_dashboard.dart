@@ -20,6 +20,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
   Set<String> selectedInquiryIds = {};
 
+  String? selectedBrandFilter;
+  String? selectedModelFilter;
+  String? selectedExchangeName;
+
   final filters = [
     'All',
     'New Inquiry',
@@ -75,6 +79,101 @@ class _StaffDashboardState extends State<StaffDashboard> {
     );
 
     return createdDay == todayDay;
+  }
+
+  DateTime _dateOnly(DateTime value) {
+    return DateTime(
+      value.year,
+      value.month,
+      value.day,
+    );
+  }
+
+  bool _isCompletedInquiry(
+    Map<String, dynamic> itemData,
+  ) {
+    final status =
+        itemData['status']
+                as String? ??
+            'New Inquiry';
+
+    final isClosed =
+        itemData['isClosed'] == true;
+
+    final isBooked =
+        itemData['isBooked'] == true;
+
+    return isClosed ||
+        isBooked ||
+        status.toLowerCase() ==
+            'booked' ||
+        status.toLowerCase() ==
+            'closed';
+  }
+
+  DateTime? _followUpDay(
+    Map<String, dynamic> itemData,
+  ) {
+    final nextFollowUp = itemData['nextFollowUp'];
+
+    if (nextFollowUp is Timestamp) {
+      return _dateOnly(nextFollowUp.toDate());
+    }
+    if (nextFollowUp is DateTime) {
+      return _dateOnly(nextFollowUp);
+    }
+    if (nextFollowUp is String) {
+      try {
+        return _dateOnly(DateTime.parse(nextFollowUp));
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  bool _hasDueFollowUp(
+    Map<String, dynamic> itemData,
+  ) {
+    final followUpDay =
+        _followUpDay(itemData);
+
+    if (followUpDay == null ||
+        _isCompletedInquiry(itemData)) {
+      return false;
+    }
+
+    final todayDay = _dateOnly(
+      DateTime.now(),
+    );
+
+    return !followUpDay.isAfter(
+      todayDay,
+    );
+  }
+
+  String? _followUpReminderText(
+    Map<String, dynamic> itemData,
+  ) {
+    final followUpDay =
+        _followUpDay(itemData);
+
+    if (followUpDay == null ||
+        !_hasDueFollowUp(itemData)) {
+      return null;
+    }
+
+    final todayDay = _dateOnly(
+      DateTime.now(),
+    );
+
+    if (followUpDay.isBefore(
+      todayDay,
+    )) {
+      return 'Reminder: follow-up pending since ${followUpDay.toString().split(' ')[0]}';
+    }
+
+    return 'Reminder: follow-up due today';
   }
 
   @override
@@ -151,10 +250,21 @@ class _StaffDashboardState extends State<StaffDashboard> {
         title: Text(
           selectionMode
               ? "${selectedInquiryIds.length} Selected"
-              : "Staff Dashboard - $staffName",
+              : "$staffName",
         ),
 
         actions: [
+          IconButton(
+            icon: const Icon(Icons.miscellaneous_services_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ServiceRequestsScreen(),
+                ),
+              );
+            },
+          ),
 
           if (selectionMode)
 
@@ -324,10 +434,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
           }).toList();
 
-          final filteredData =
+            var filteredData =
               selectedFilter == 'All'
-                  ? data
-                  : data.where((item) {
+                ? data
+                : data.where((item) {
 
                       final itemData =
                           item.data()
@@ -338,23 +448,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                   as String? ??
                               'New Inquiry';
 
-                      final isClosed =
-                          itemData['isClosed'] ==
-                              true;
-
-                      final isBooked =
-                          itemData['isBooked'] ==
-                              true;
-
                       final isCompleted =
-                          isClosed ||
-                              isBooked ||
-                              status
-                                      .toLowerCase() ==
-                                  'booked' ||
-                              status
-                                      .toLowerCase() ==
-                                  'closed';
+                          _isCompletedInquiry(
+                        itemData,
+                      );
 
                       // NEW INQUIRY
                       if (selectedFilter ==
@@ -384,6 +481,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
                             'Cash';
                       }
 
+                      final isClosed = itemData['isClosed'] == true;
+                      final isBooked = itemData['isBooked'] == true;
+
                       // BOOKED
                       if (selectedFilter ==
                           'Booked') {
@@ -405,54 +505,38 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       // FOLLOW UPS
                       if (selectedFilter ==
                           'Follow Ups') {
-
-                        final nextFollowUp =
-                            itemData[
-                                'nextFollowUp'];
-
-                        if (nextFollowUp
-                            is Timestamp) {
-
-                          final followUpDate =
-                              nextFollowUp
-                                  .toDate();
-
-                          final followUpDay =
-                              DateTime(
-                            followUpDate.year,
-                            followUpDate.month,
-                            followUpDate.day,
-                          );
-
-                          final today =
-                              DateTime.now();
-
-                          final todayDay =
-                              DateTime(
-                            today.year,
-                            today.month,
-                            today.day,
-                          );
-
-                          return !isCompleted &&
-                              status ==
-                                  'New Inquiry' &&
-                              (
-                                followUpDay
-                                        .isBefore(
-                                            todayDay) ||
-                                    followUpDay ==
-                                        todayDay
-                              );
-                        }
-
-                        return false;
+                        return _hasDueFollowUp(
+                          itemData,
+                        );
                       }
 
                       return status ==
-                          selectedFilter;
+                            selectedFilter;
 
                     }).toList();
+
+            // apply brand/model/exchange filters
+            if (selectedBrandFilter != null && selectedBrandFilter!.isNotEmpty) {
+              filteredData = filteredData.where((item) {
+                final d = (item.data() as Map<String, dynamic>);
+                return (d['brand'] ?? '').toString() == selectedBrandFilter;
+              }).toList();
+            }
+
+            if (selectedModelFilter != null && selectedModelFilter!.isNotEmpty) {
+              filteredData = filteredData.where((item) {
+                final d = (item.data() as Map<String, dynamic>);
+                return (d['model'] ?? '').toString() == selectedModelFilter;
+              }).toList();
+            }
+
+            if (selectedExchangeName != null && selectedExchangeName!.isNotEmpty) {
+              filteredData = filteredData.where((item) {
+                final d = (item.data() as Map<String, dynamic>);
+                return d['exchangeVehicle'] == true &&
+                    (d['name'] ?? '').toString() == selectedExchangeName;
+              }).toList();
+            }
 
           filteredData.sort((a, b) {
 
@@ -535,6 +619,33 @@ class _StaffDashboardState extends State<StaffDashboard> {
             );
           }
 
+          // derive brand/model/exchange lists from data
+          final brandSet = <String>{};
+          final modelSet = <String>{};
+          final exchangeNames = <String>{};
+          final brandToModels = <String, Set<String>>{};
+
+          for (final d in data) {
+            final itemData = d.data() as Map<String, dynamic>;
+            final b = (itemData['brand'] ?? '').toString().trim();
+            final m = (itemData['model'] ?? '').toString().trim();
+            if (b.isNotEmpty) {
+              brandSet.add(b);
+              if (m.isNotEmpty) {
+                brandToModels.putIfAbsent(b, () => <String>{}).add(m);
+              }
+            }
+            if (m.isNotEmpty) modelSet.add(m);
+            if (itemData['exchangeVehicle'] == true) {
+              final n = (itemData['name'] ?? '').toString().trim();
+              if (n.isNotEmpty) exchangeNames.add(n);
+            }
+          }
+
+          final availableModelSet = (selectedBrandFilter?.isNotEmpty ?? false)
+              ? (brandToModels[selectedBrandFilter!] ?? <String>{})
+              : modelSet;
+
           return Column(
 
             crossAxisAlignment:
@@ -558,73 +669,75 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     const Expanded(
 
                       child: Text(
+
                         "Your leads",
 
                         style: TextStyle(
+
                           fontSize: 24,
+
                           fontWeight:
                               FontWeight.bold,
+
                         ),
+
                       ),
+
                     ),
 
-                    TextButton.icon(
-
-                      style:
-                          TextButton.styleFrom(
-
-                        padding:
-                            const EdgeInsets
-                                .symmetric(
-                          horizontal: 14,
-                          vertical: 10,
+                    if (brandSet.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: DropdownButton<String>(
+                          value: selectedBrandFilter,
+                          hint: const Text('Brand'),
+                          isExpanded: true,
+                          items: brandSet
+                              .map((b) => DropdownMenuItem(value: b, child: Text(b)))
+                              .toList(),
+                          onChanged: (v) {
+                            setState(() {
+                              selectedBrandFilter = v;
+                              selectedModelFilter = null;
+                            });
+                          },
                         ),
+                      ),
+                    ],
 
-                        minimumSize:
-                            const Size(
-                          0,
-                          36,
+                    if (selectedBrandFilter != null && availableModelSet.isNotEmpty) ...[
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: DropdownButton<String>(
+                          value: selectedModelFilter,
+                          hint: const Text('Model'),
+                          isExpanded: true,
+                          items: availableModelSet
+                              .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                              .toList(),
+                          onChanged: (v) {
+                            setState(() {
+                              selectedModelFilter = v;
+                            });
+                          },
                         ),
-
-                        shape:
-                            RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius
-                                  .circular(
-                            12,
-                          ),
-                        ),
-
-                        backgroundColor:
-                            Theme.of(context)
-                                .colorScheme
-                                .primary,
-
-                        foregroundColor:
-                            Colors.white,
                       ),
+                    ],
 
-                      icon: const Icon(
-                        Icons
-                            .miscellaneous_services_outlined,
-                        size: 18,
+                    if ((selectedBrandFilter?.isNotEmpty ?? false) ||
+                        (selectedModelFilter?.isNotEmpty ?? false)) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        tooltip: 'Clear brand/model filter',
+                        onPressed: () {
+                          setState(() {
+                            selectedBrandFilter = null;
+                            selectedModelFilter = null;
+                          });
+                        },
                       ),
-
-                      label: const Text(
-                        'Service Requests',
-                      ),
-
-                      onPressed: () {
-
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                const ServiceRequestsScreen(),
-                          ),
-                        );
-                      },
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -657,73 +770,91 @@ class _StaffDashboardState extends State<StaffDashboard> {
                     ),
 
                     child:
-                        SingleChildScrollView(
+                      SingleChildScrollView(
 
                       scrollDirection:
                           Axis.horizontal,
 
                       child: Row(
 
-                        children:
-                            filters.map((filter) {
+                        children: [
+                          ...filters.map((filter) {
 
-                          final isSelected =
-                              filter ==
-                                  selectedFilter;
+                            final isSelected =
+                                filter ==
+                                    selectedFilter;
 
-                          return Padding(
+                            return Padding(
 
-                            padding:
-                                const EdgeInsets.only(
-                              right: 8,
-                            ),
-
-                            child: ChoiceChip(
-
-                              label:
-                                  Text(filter),
-
-                              selected:
-                                  isSelected,
-
-                              selectedColor:
-                                  Theme.of(context)
-                                      .colorScheme
-                                      .primary,
-
-                              backgroundColor:
-                                  Theme.of(context)
-                                      .colorScheme
-                                      .surface,
-
-                              labelStyle:
-                                  TextStyle(
-
-                                color:
-                                    isSelected
-                                        ? Theme.of(context)
-                                            .colorScheme
-                                            .onPrimary
-                                        : Theme.of(context)
-                                            .colorScheme
-                                            .onSurface,
+                              padding:
+                                  const EdgeInsets.only(
+                                right: 8,
                               ),
 
-                              onSelected:
-                                  (selected) {
+                              child: ChoiceChip(
 
-                                if (selected) {
+                                label:
+                                    Text(filter),
 
-                                  setState(() {
+                                selected:
+                                    isSelected,
 
-                                    selectedFilter =
-                                        filter;
-                                  });
-                                }
-                              },
+                                selectedColor:
+                                    Theme.of(context)
+                                        .colorScheme
+                                        .primary,
+
+                                backgroundColor:
+                                    Theme.of(context)
+                                        .colorScheme
+                                        .surface,
+
+                                labelStyle:
+                                    TextStyle(
+
+                                  color:
+                                      isSelected
+                                          ? Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                ),
+
+                                onSelected:
+                                    (selected) {
+
+                                  if (selected) {
+
+                                    setState(() {
+
+                                      selectedFilter =
+                                          filter;
+                                    });
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
+                          if (exchangeNames.isNotEmpty) ...[
+                            const SizedBox(width: 12),
+                            DropdownButton<String>(
+                              value: selectedExchangeName,
+                              hint: const Text('Exchange'),
+                              items: exchangeNames
+                                  .map((n) => DropdownMenuItem(value: n, child: Text(n)))
+                                  .toList(),
+                              onChanged: (v) => setState(() => selectedExchangeName = v),
                             ),
-                          );
-                        }).toList(),
+                            if (selectedExchangeName != null && selectedExchangeName!.isNotEmpty)
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                tooltip: 'Clear exchange filter',
+                                onPressed: () => setState(() => selectedExchangeName = null),
+                              ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
@@ -781,90 +912,24 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                   item.data()
                                       as Map<String, dynamic>;
 
-                              final status =
-                                  itemData['status']
-                                          as String? ??
-                                      'New Inquiry';
-
-                              final isClosed =
-                                  itemData[
-                                          'isClosed'] ==
-                                      true;
-
-                              final isBooked =
-                                  itemData[
-                                          'isBooked'] ==
-                                      true;
-
                               final isCompleted =
-                                  isClosed ||
-                                      isBooked ||
-                                      status
-                                              .toLowerCase() ==
-                                          'booked' ||
-                                      status
-                                              .toLowerCase() ==
-                                          'closed';
-
-                              bool hasOverdueReminder =
-                                  false;
-
-                              String overdueReminderText =
-                                  '';
+                                  _isCompletedInquiry(
+                                itemData,
+                              );
 
                               final nextFollowUp =
                                   itemData[
                                       'nextFollowUp'];
 
-                              if (nextFollowUp
-                                  is Timestamp) {
+                              final overdueReminderText =
+                                  _followUpReminderText(
+                                itemData,
+                              );
 
-                                final followUpDate =
-                                    nextFollowUp
-                                        .toDate();
-
-                                final followUpDay =
-                                    DateTime(
-                                  followUpDate.year,
-                                  followUpDate.month,
-                                  followUpDate.day,
-                                );
-
-                                final today =
-                                    DateTime.now();
-
-                                final todayDay =
-                                    DateTime(
-                                  today.year,
-                                  today.month,
-                                  today.day,
-                                );
-
-                                if (!isCompleted &&
-                                    status ==
-                                        'New Inquiry') {
-
-                                  if (followUpDay
-                                      .isBefore(
-                                          todayDay)) {
-
-                                    hasOverdueReminder =
-                                        true;
-
-                                    overdueReminderText =
-                                        'Reminder: follow-up pending since ${followUpDay.toString().split(' ')[0]}';
-
-                                  } else if (followUpDay ==
-                                      todayDay) {
-
-                                    hasOverdueReminder =
-                                        true;
-
-                                    overdueReminderText =
-                                        'Reminder: follow-up due today';
-                                  }
-                                }
-                              }
+                              final hasOverdueReminder =
+                                  overdueReminderText !=
+                                          null &&
+                                      !isCompleted;
 
                               return Card(
 
@@ -995,9 +1060,13 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                           "📅 Follow up: ${nextFollowUp.toDate().toString().split(' ')[0]}",
 
                                           style:
-                                              const TextStyle(
+                                              TextStyle(
                                             fontWeight:
                                                 FontWeight.bold,
+                                            color:
+                                                hasOverdueReminder
+                                                    ? Colors.red
+                                                    : null,
                                           ),
                                         ),
 
@@ -1012,7 +1081,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
                                           child: Text(
 
-                                            overdueReminderText,
+                                            overdueReminderText.toString(),
 
                                             style:
                                                 const TextStyle(
