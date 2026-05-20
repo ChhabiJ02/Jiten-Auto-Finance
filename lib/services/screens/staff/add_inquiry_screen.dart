@@ -206,6 +206,26 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     }
   }
 
+  Future<void> _fetchVariants(VehicleQuotation q, String model) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Variant')
+        .where('ParentModel', isEqualTo: model)
+        .get();
+    if (mounted) {
+      setState(() {
+        q.variants = snapshot.docs
+            .map((doc) => {
+                  'name': doc['Name'].toString(),
+                  'price': doc['Price']?.toString() ?? '',
+                  'id': doc.id,
+                })
+            .toList();
+        q.selectedVariant = null;
+        q.variantController.clear();
+      });
+    }
+  }
+
   Future<void> _loadModelDetailsForQuotation(
     VehicleQuotation q,
     String model,
@@ -318,7 +338,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         return {
           'brand': aq.brandController.text.trim(),
           'model': aq.modelController.text.trim(),
-          'variant': '',
+          'variant': aq.variantController.text.trim(),
           'onRoadPrice': aq.onRoadPriceController.text.trim(),
           'offerPrice': aq.offerPriceController.text.trim(),
           'description': aq.descriptionController.text.trim(),
@@ -334,7 +354,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         'phone': phone,
         'brand': q.brandController.text.trim(),
         'model': q.modelController.text.trim(),
-        'variant': '',
+        'variant': q.variantController.text.trim(),
         'vehicleId': q.selectedVehicleId,
         'vehiclePhotoUrl': q.selectedVariantPhotoUrl,
         'vehiclePhotoUrls': q.selectedVariantPhotoUrls,
@@ -385,7 +405,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
   }
 
   // ── PDF header widget (shared across all pages) ────────────
-  pw.Widget _pdfHeader(String staffName) {
+  pw.Widget _pdfHeader(String staffName, String staffPhone) {
     return pw.Container(
       width: double.infinity,
       decoration: const pw.BoxDecoration(color: PdfColor.fromInt(0xFF7B1F3F)),
@@ -412,14 +432,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             ),
           ),
           pw.SizedBox(height: 4),
-          if (staffName.isNotEmpty)
-            pw.Center(
-              child: pw.Text(
-                'Staff: $staffName',
-                style: const pw.TextStyle(color: PdfColors.white, fontSize: 12),
-              ),
-            ),
-          if (staffName.isNotEmpty) pw.SizedBox(height: 8),
           pw.Center(
             child: pw.Container(
               padding: const pw.EdgeInsets.symmetric(
@@ -466,6 +478,26 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                   'Branch :- 2',
                   'Between Ichchhapor Bus Station-2 & 3, Ichchhapor.  M. 98259 24999',
                 ),
+                if (staffName.isNotEmpty || staffPhone.isNotEmpty) ...[
+                  pw.SizedBox(height: 10),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.end,
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          if (staffName.isNotEmpty)
+                            _pdfDetailRow('Staff', staffName),
+                          if (staffPhone.isNotEmpty) ...[
+                            pw.SizedBox(height: 4),
+                            _pdfDetailRow('Mob', staffPhone),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -537,9 +569,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
   // ── Single quotation page content ─────────────────────────
   pw.Widget _buildPdfQuotationContent({
-    required String customerName,
-    required String customerPhone,
-    required String date,
     required String brand,
     required String model,
     required String variant,
@@ -560,60 +589,15 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             pw.Align(
               alignment: pw.Alignment.centerRight,
               child: pw.Text(
-                'Option $pageNumber of $totalPages',
+                'Option $pageNumber',
                 style: pw.TextStyle(
                   color: PdfColor.fromInt(0xFF7B1F3F),
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
             ),
-          if (totalPages > 1) pw.SizedBox(height: 8),
-
-          // ── Customer details ───────────────────────────
-          pw.Container(
-            width: double.infinity,
-            padding: const pw.EdgeInsets.all(16),
-            decoration: pw.BoxDecoration(
-              color: PdfColors.white,
-              border: pw.Border.all(
-                color: PdfColor.fromInt(0xFF7B1F3F),
-                width: 1.5,
-              ),
-            ),
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Customer Details',
-                  style: pw.TextStyle(
-                    fontSize: 14,
-                    fontWeight: pw.FontWeight.bold,
-                    color: PdfColor.fromInt(0xFF7B1F3F),
-                  ),
-                ),
-                pw.SizedBox(height: 10),
-                // ✅ No Expanded/Flexible in this Row — plain spaceBetween
-                pw.Row(
-                  mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        _pdfDetailRow('Name', customerName),
-                        pw.SizedBox(height: 4),
-                        _pdfDetailRow('Mob', customerPhone),
-                      ],
-                    ),
-                    _pdfDetailRow('Date', date),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          pw.SizedBox(height: 14),
+          if (totalPages > 1) pw.SizedBox(height: 12),
 
           // ── Vehicle details ────────────────────────────
           pw.Row(
@@ -752,6 +736,53 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
     );
   }
 
+  pw.Widget _pdfCustomerDetails({
+    required String customerName,
+    required String customerPhone,
+    required String date,
+  }) {
+    return pw.Container(
+      width: double.infinity,
+      padding: const pw.EdgeInsets.all(16),
+      decoration: pw.BoxDecoration(
+        color: PdfColors.white,
+        border: pw.Border.all(
+          color: PdfColor.fromInt(0xFF7B1F3F),
+          width: 1.5,
+        ),
+      ),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        children: [
+          pw.Text(
+            'Customer Details',
+            style: pw.TextStyle(
+              fontSize: 14,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColor.fromInt(0xFF7B1F3F),
+            ),
+          ),
+          pw.SizedBox(height: 10),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  _pdfDetailRow('Name', customerName),
+                  pw.SizedBox(height: 4),
+                  _pdfDetailRow('Mob', customerPhone),
+                ],
+              ),
+              _pdfDetailRow('Date', date),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── FIX: pw.Flexible instead of pw.Expanded ───────────────
   pw.Widget _pdfDetailRow(String label, String value) {
     return pw.Row(
@@ -834,6 +865,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
 
       final user = FirebaseAuth.instance.currentUser;
       String staffName = user?.displayName ?? '';
+      String staffPhone = user?.phoneNumber ?? '';
 
       if (user != null) {
         try {
@@ -843,8 +875,12 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
               .get();
           if (userDoc.exists) {
             final data = userDoc.data() as Map<String, dynamic>;
-            if ((data['name'] ?? '').toString().isNotEmpty) {
-              staffName = data['name'].toString();
+            if ((data['name'] ?? '').toString().trim().isNotEmpty) {
+              staffName = data['name'].toString().trim();
+            }
+            final phoneValue = data['phone'] ?? data['phoneNumber'];
+            if (phoneValue != null && phoneValue.toString().trim().isNotEmpty) {
+              staffPhone = phoneValue.toString().trim();
             }
           }
         } catch (_) {}
@@ -854,6 +890,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       final pdf = pw.Document();
       final totalPages = quotations.length;
 
+      final optionBlocks = <pw.Widget>[];
       for (int i = 0; i < quotations.length; i++) {
         final vq = quotations[i];
 
@@ -881,38 +918,43 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
         final variant = vq.variantController.text.trim();
         final onRoadPrice = vq.onRoadPriceController.text.trim();
         final offerPrice = vq.offerPriceController.text.trim();
-        final isFirstPage = i == 0;
-        final isLastPage = i == totalPages - 1;
 
-        pdf.addPage(
-          pw.Page(
-            pageFormat: PdfPageFormat.a4,
-            margin: const pw.EdgeInsets.all(0),
-            build: (context) {
-              return pw.Column(
-                mainAxisSize: pw.MainAxisSize.max,
-                children: [
-                  if (isFirstPage) _pdfHeader(staffName),
-                  _buildPdfQuotationContent(
-                    customerName: name,
-                    customerPhone: phone,
-                    date: date,
-                    brand: brand,
-                    model: model,
-                    variant: variant,
-                    onRoadPrice: onRoadPrice,
-                    offerPrice: offerPrice,
-                    vehicleImages: vehicleImages,
-                    pageNumber: i + 1,
-                    totalPages: totalPages,
-                  ),
-                  if (isLastPage) _pdfFooter(),
-                ],
-              );
-            },
+        optionBlocks.add(
+          _buildPdfQuotationContent(
+            brand: brand,
+            model: model,
+            variant: variant,
+            onRoadPrice: onRoadPrice,
+            offerPrice: offerPrice,
+            vehicleImages: vehicleImages,
+            pageNumber: i + 1,
+            totalPages: totalPages,
           ),
         );
+
+        if (i != quotations.length - 1) {
+          optionBlocks.add(pw.SizedBox(height: 16));
+        }
       }
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(0),
+          build: (context) => [
+            _pdfHeader(staffName, staffPhone),
+            _pdfCustomerDetails(
+              customerName: name,
+              customerPhone: phone,
+              date: date,
+            ),
+            pw.SizedBox(height: 12),
+            ...optionBlocks,
+            pw.SizedBox(height: 12),
+            _pdfFooter(),
+          ],
+        ),
+      );
 
       final bytes = await pdf.save();
       final cacheDir = await getTemporaryDirectory();
@@ -1066,6 +1108,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                     q.selectedVehicleId = null;
                   });
                   if (value != null) {
+                    _fetchVariants(q, value);
                     _loadModelDetailsForQuotation(q, value);
                   }
                 },
@@ -1073,6 +1116,34 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
             'Model',
             Icons.precision_manufacturing,
             disabled: q.selectedBrand == null,
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        DropdownButtonFormField<String>(
+          key: ValueKey('variant_${index}_${q.selectedModel}'),
+          value: q.selectedVariant,
+          isExpanded: true,
+          hint: const Text("Select Variant (optional)"),
+          disabledHint: const Text("Select a model first"),
+          items: q.variants
+              .map((v) => DropdownMenuItem(
+                    value: v['name'].toString(),
+                    child: Text(v['name'].toString()),
+                  ))
+              .toList(),
+          onChanged: q.selectedModel == null || q.variants.isEmpty
+              ? null
+              : (value) {
+                  setState(() {
+                    q.selectedVariant = value;
+                    q.variantController.text = value ?? '';
+                  });
+                },
+          decoration: _dec(
+            'Variant',
+            Icons.style,
+            disabled: q.selectedModel == null,
           ),
         ),
         const SizedBox(height: 16),
