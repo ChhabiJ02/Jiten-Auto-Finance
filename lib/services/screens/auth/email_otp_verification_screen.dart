@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:showroom_app/services/auth_service.dart';
 
@@ -21,36 +20,37 @@ class EmailOtpVerificationScreen extends StatefulWidget {
 
 class _EmailOtpVerificationScreenState
     extends State<EmailOtpVerificationScreen> {
-  final TextEditingController otpController = TextEditingController();
   final AuthService _authService = AuthService();
 
   bool loading = false;
+  bool emailSent = false;
 
   @override
   void initState() {
     super.initState();
-    _sendOtp();
+    _sendVerificationEmail();
   }
 
-  Future<void> _sendOtp() async {
+  Future<void> _sendVerificationEmail() async {
     setState(() {
       loading = true;
     });
 
     try {
-      await _authService.sendUserEmailOtp(
-        email: widget.email,
-        uid: widget.uid,
-      );
+      await _authService.sendEmailVerification();
+      if (!mounted) return;
+      setState(() {
+        emailSent = true;
+      });
       _showMessage(
-        'Verification code created. Check your email if delivery is configured.',
+        'Verification email sent. Check your inbox and spam folder.',
         isError: false,
       );
     } catch (e) {
       _showMessage(
-        e is FirebaseAuthException
-            ? AuthService.getFriendlyAuthErrorMessage(e)
-            : 'Failed to send verification code.',
+        e is Exception
+            ? e.toString()
+            : 'Failed to send verification email.',
       );
     } finally {
       if (mounted) {
@@ -61,49 +61,45 @@ class _EmailOtpVerificationScreenState
     }
   }
 
-  Future<void> _verifyOtp() async {
-    final otp = otpController.text.trim();
-    if (otp.length != 6) {
-      _showMessage('Enter a valid 6-digit OTP.');
-      return;
-    }
-
+  Future<void> _checkVerificationStatus() async {
     setState(() {
       loading = true;
     });
 
     try {
-      await _authService.verifyUserEmailOtp(
-        uid: widget.uid,
-        email: widget.email,
-        otp: otp,
-      );
-
-      final role = (widget.role ?? await _authService.getUserRole(widget.uid))
-          .toLowerCase();
+      final verified = await _authService.checkEmailVerified();
 
       if (!mounted) return;
 
-      _showMessage('Email verified successfully.', isError: false);
+      if (verified) {
+        _showMessage('Email verified successfully.', isError: false);
 
-      if (role == 'staff' || role == 'workshop') {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/staffDashboard',
-          (route) => false,
-        );
+        final role = (widget.role ?? await _authService.getUserRole(widget.uid))
+            .toLowerCase();
+
+        if (role == 'staff' || role == 'workshop') {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/staffDashboard',
+            (route) => false,
+          );
+        } else {
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/customerDashboard',
+            (route) => false,
+          );
+        }
       } else {
-        Navigator.pushNamedAndRemoveUntil(
-          context,
-          '/customerDashboard',
-          (route) => false,
+        _showMessage(
+          'Email not verified yet. Please click the link in your email.',
         );
       }
     } catch (e) {
       _showMessage(
-        e is FirebaseAuthException
-            ? AuthService.getFriendlyAuthErrorMessage(e)
-            : 'OTP verification failed.',
+        e is Exception
+            ? e.toString()
+            : 'Failed to verify email status.',
       );
     } finally {
       if (mounted) {
@@ -131,12 +127,6 @@ class _EmailOtpVerificationScreenState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    otpController.dispose();
-    super.dispose();
   }
 
   @override
@@ -183,46 +173,41 @@ class _EmailOtpVerificationScreenState
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Enter the 6-digit verification code for ${widget.email}.',
+                        'A verification link has been sent to ${widget.email}.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.black54),
                       ),
-                      const SizedBox(height: 28),
-                      TextField(
-                        controller: otpController,
-                        keyboardType: TextInputType.number,
-                        maxLength: 6,
-                        decoration: const InputDecoration(
-                          labelText: 'Enter OTP',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: OutlineInputBorder(),
-                        ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Click the link in your inbox, then press Confirm below.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 28),
                       SizedBox(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
-                          onPressed: loading ? null : _verifyOtp,
+                          onPressed: loading ? null : _checkVerificationStatus,
                           child: loading
                               ? const CircularProgressIndicator(
                                   color: Colors.white,
                                 )
                               : const Text(
-                                  'Verify OTP',
+                                  'Confirm Verification',
                                   style: TextStyle(fontSize: 18),
                                 ),
                         ),
                       ),
                       const SizedBox(height: 14),
                       TextButton(
-                        onPressed: loading ? null : _sendOtp,
-                        child: const Text('Resend OTP'),
+                        onPressed: loading ? null : _sendVerificationEmail,
+                        child: const Text('Resend verification email'),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       TextButton(
                         onPressed: loading ? null : _backToLogin,
-                        child: const Text('Back to Login'),
+                        child: const Text('Back to login'),
                       ),
                     ],
                   ),

@@ -28,6 +28,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController descriptionController;
   late final TextEditingController referenceController;
   late final TextEditingController otherController;
+  late final TextEditingController notesController;
   late final TextEditingController callDurationController;
   late String paymentType;
   late DateTime selectedDate;
@@ -200,6 +201,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       text: data['description'] ?? '',
     );
     referenceController = TextEditingController(text: data['reference'] ?? '');
+    notesController = TextEditingController(text: data['notes'] ?? '');
 
     otherController = TextEditingController(
       text: data['otherDescription'] ?? '',
@@ -275,6 +277,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     priceController.dispose();
     descriptionController.dispose();
     referenceController.dispose();
+    notesController.dispose();
     otherController.dispose();
     callDurationController.dispose();
     callSubscription?.cancel();
@@ -343,6 +346,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final price = priceController.text.trim();
     final description = descriptionController.text.trim();
     final reference = referenceController.text.trim();
+    final notes = notesController.text.trim();
     final otherDescription = otherController.text.trim();
     final oldData = widget.inquiry.data() as Map<String, dynamic>;
 
@@ -406,6 +410,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       changes.add('Status changed from "$oldStatus" to "$effectiveStatus"');
     }
 
+    final oldNotes = (oldData['notes'] ?? '').toString().trim();
+    if (oldNotes != notes) {
+      changes.add('Notes updated');
+    }
+
     if (changes.isNotEmpty) {
       editHistory.add({
         'staff': user.email ?? 'Staff',
@@ -430,6 +439,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             'description': description,
             'paymentType': paymentType,
             'otherDescription': otherDescription,
+            'notes': notes,
             'reference': reference,
             'nextFollowUp': Timestamp.fromDate(selectedDate),
             'followUpHistory': followUpHistory,
@@ -639,6 +649,18 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                     TextField(
                       controller: referenceController,
                       decoration: const InputDecoration(labelText: 'Reference'),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      minLines: 1,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(

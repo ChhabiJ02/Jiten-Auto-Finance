@@ -295,6 +295,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
               const SizedBox(height: 16),
 
+              /*
               // VEHICLE CARD
               GestureDetector(
 
@@ -377,6 +378,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   ),
                 ),
               ),
+              */
 
               const SizedBox(height: 24),
 

@@ -345,7 +345,7 @@ class _SplashScreenState extends State<SplashScreen>
               const Padding(
                 padding: EdgeInsets.only(bottom: 14),
                 child: Text(
-                  "Copyright © Rex Soltuion'S",
+                  "Featured: Rex Solution'S",
                   style: TextStyle(
                     color: Color(0xFFE8B4C4),
                     fontSize: 12,

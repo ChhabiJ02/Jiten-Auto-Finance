@@ -800,8 +800,13 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                             title: Row(
                               children: [
                                 Expanded(
-                                  child: Text(data['name'] ?? ''),
+                                  child: Text(
+                                    data['name'] ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                                const SizedBox(width: 8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
@@ -812,7 +817,7 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                                     _getStatusText(status, isClosed, isBooked),
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: FontWeight.bold,
                                     ),
                                   ),

@@ -32,6 +32,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
     'Cash',
     'Booked',
     'Closed',
+    'Exchange',
   ];
 
   bool _matchesCurrentUserLead(
@@ -255,7 +256,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
         actions: [
           IconButton(
-            icon: const Icon(Icons.miscellaneous_services_outlined),
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: 'Notifications',
             onPressed: () {
               Navigator.push(
                 context,
@@ -457,10 +459,9 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       if (selectedFilter ==
                           'New Inquiry') {
 
-                        return _isCreatedToday(
-                                  itemData,
-                                ) &&
-                            !isCompleted;
+                        return !isCompleted &&
+                            status.toLowerCase() ==
+                                'new inquiry';
                       }
 
                       // FINANCE
@@ -502,12 +503,18 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                 'closed';
                       }
 
+                      // EXCHANGE
+                      if (selectedFilter ==
+                          'Exchange') {
+                        return itemData['exchangeVehicle'] == true;
+                      }
+
                       // FOLLOW UPS
                       if (selectedFilter ==
                           'Follow Ups') {
-                        return _hasDueFollowUp(
-                          itemData,
-                        );
+                        return status.toLowerCase() ==
+                                'follow ups' ||
+                            _hasDueFollowUp(itemData);
                       }
 
                       return status ==
@@ -837,23 +844,6 @@ class _StaffDashboardState extends State<StaffDashboard> {
                               ),
                             );
                           }).toList(),
-                          if (exchangeNames.isNotEmpty) ...[
-                            const SizedBox(width: 12),
-                            DropdownButton<String>(
-                              value: selectedExchangeName,
-                              hint: const Text('Exchange'),
-                              items: exchangeNames
-                                  .map((n) => DropdownMenuItem(value: n, child: Text(n)))
-                                  .toList(),
-                              onChanged: (v) => setState(() => selectedExchangeName = v),
-                            ),
-                            if (selectedExchangeName != null && selectedExchangeName!.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.close),
-                                tooltip: 'Clear exchange filter',
-                                onPressed: () => setState(() => selectedExchangeName = null),
-                              ),
-                          ],
                         ],
                       ),
                     ),

@@ -31,7 +31,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Future<void> registerAndSendOtp() async {
+  Future<void> registerAndSendVerificationEmail() async {
     final name = nameController.text.trim();
     final phone = phoneController.text.trim();
     final email = emailController.text.trim();
@@ -115,7 +115,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               fontSize: 22, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
                       Text(
-                        "Register with your email address and verify with OTP.",
+                        "Register with your email address and verify using the email link.",
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.black54),
                       ),
@@ -153,7 +153,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: loading ? null : registerAndSendOtp,
+                          onPressed: loading ? null : registerAndSendVerificationEmail,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(

@@ -289,10 +289,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
       showMessage("Price must be at least 5 digits.");
       return false;
     }
-    if (selectedSource == null) {
-      showMessage("Please select a source.");
-      return false;
-    }
     if (selectedSource == 'Reference' &&
         referenceNameController.text.trim().isEmpty) {
       showMessage("Please enter reference person's name.");
@@ -1251,7 +1247,7 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             icon: const Icon(Icons.add),
-                            label: const Text('+ Add Manual'),
+                            label: const Text(' Add Vehicle'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: theme.colorScheme.primary,
                               side: BorderSide(
@@ -1263,24 +1259,6 @@ class _AddInquiryScreenState extends State<AddInquiryScreen> {
                               ),
                             ),
                             onPressed: _addQuotation,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.search),
-                            label: const Text('+ Add from Catalog'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: theme.colorScheme.primary,
-                              side: BorderSide(
-                                color: theme.colorScheme.primary,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                            onPressed: _addVehicleFromCatalog,
                           ),
                         ),
                       ],
