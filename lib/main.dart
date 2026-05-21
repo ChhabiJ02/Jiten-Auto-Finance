@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -19,12 +20,20 @@ void main() async {
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(statusBarColor: Colors.transparent),
   );
-  CloudinaryService.initialize(
-    cloudName: 'dzgudsmu8',
-    uploadPreset: 'showroom_upload',
-    apiKey: '551463428811977',
-    apiSecret: '6V9O6AzisHCDLFeQeRqwTeJJUrQ',
-  );
+  try {
+    CloudinaryService.initialize(
+      cloudName: 'dzgudsmu8',
+      uploadPreset: 'showroom_upload',
+      apiKey: '551463428811977',
+      apiSecret: '6V9O6AzisHCDLFeQeRqwTeJJUrQ',
+    );
+  } catch (e, st) {
+    // Log initialization errors (helps diagnose web startup issues)
+    // Do not rethrow so the app can still attempt to start.
+    // Some Cloudinary operations rely on packages not available on web.
+    print('CloudinaryService.initialize error: $e');
+    print(st);
+  }
   runApp(const MyApp());
 }
 
@@ -141,9 +150,32 @@ class _SplashScreenState extends State<SplashScreen>
     final startedAt = DateTime.now();
 
     try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+      // Avoid duplicate initialization (mobile/web can initialize elsewhere)
+      final hasDefaultApp = Firebase.apps.any((a) => a.name == '[DEFAULT]');
+      if (!hasDefaultApp) {
+        try {
+          await Firebase.initializeApp(
+            options: DefaultFirebaseOptions.currentPlatform,
+          );
+        } catch (e) {
+          // If another part of the app initialized Firebase at the same time,
+          // ignore duplicate-app errors and continue.
+          try {
+            if (e is FirebaseException && e.code == 'duplicate-app') {
+              print('Ignored duplicate Firebase app init');
+            } else {
+              rethrow;
+            }
+          } catch (_) {
+            // In case `e` is not a FirebaseException or we cannot access .code,
+            // simply continue to avoid blocking startup when duplicate occurs.
+            print('Non-fatal Firebase init error ignored: $e');
+          }
+        }
+      } else {
+        // already initialized — safe to continue
+        print('Firebase already initialized, skipping initializeApp');
+      }
 
       final elapsed = DateTime.now().difference(startedAt);
 
@@ -210,11 +242,15 @@ class _SplashScreenState extends State<SplashScreen>
       } else {
         Navigator.pushReplacementNamed(context, '/customerDashboard');
       }
-    } catch (e) {
+    } catch (e, st) {
       if (!mounted) return;
 
+      // Print details to console for debugging (visible in browser console)
+      print('Startup error: $e');
+      print(st);
+
       setState(() {
-        _startupError = 'Unable to start the app. Please try again.';
+        _startupError = 'Unable to start the app. Please try again.\nError: $e';
       });
     }
   }
