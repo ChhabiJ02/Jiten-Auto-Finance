@@ -567,31 +567,51 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                       }),
                     ),
                     const SizedBox(width: 8),
-                    IconButton(
-                      tooltip: 'Pick from date',
-                      icon: const Icon(Icons.date_range),
-                      onPressed: () async {
-                        final d = await showDatePicker(
-                          context: context,
-                          initialDate: fromDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (d != null) setState(() => fromDate = d);
-                      },
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Pick from date',
+                          icon: const Icon(Icons.date_range),
+                          onPressed: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: fromDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (d != null) setState(() => fromDate = d);
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'Start',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      tooltip: 'Pick to date',
-                      icon: const Icon(Icons.date_range_outlined),
-                      onPressed: () async {
-                        final d = await showDatePicker(
-                          context: context,
-                          initialDate: toDate ?? DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (d != null) setState(() => toDate = d);
-                      },
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Pick to date',
+                          icon: const Icon(Icons.date_range_outlined),
+                          onPressed: () async {
+                            final d = await showDatePicker(
+                              context: context,
+                              initialDate: toDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (d != null) setState(() => toDate = d);
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        const Text(
+                          'End',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
                     ),
                   ],
                 ),

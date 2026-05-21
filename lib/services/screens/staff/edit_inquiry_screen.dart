@@ -34,6 +34,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController exchangeOfferPriceController;
   late final TextEditingController otherController;
   late final TextEditingController notesController;
+  late final TextEditingController followUpCommentController;
   late final TextEditingController callDurationController;
   late String paymentType;
   late String eagerness;
@@ -41,6 +42,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late String source;
   String? selectedAssignedStaffId;
   List<Map<String, dynamic>> staffList = [];
+  List<Map<String, dynamic>> additionalQuotations = [];
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
 
@@ -138,8 +140,11 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     followUpHistory.add({
       'date': Timestamp.fromDate(newFollowUpDate),
       'createdAt': Timestamp.now(),
+      if (followUpCommentController.text.trim().isNotEmpty)
+        'comment': followUpCommentController.text.trim(),
     });
     selectedDate = newFollowUpDate;
+    followUpCommentController.clear();
     return true;
   }
 
@@ -268,6 +273,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     exchangeExpectedPriceController = TextEditingController(text: data['exchangeExpectedPrice'] ?? '');
     exchangeOfferPriceController = TextEditingController(text: data['exchangeOfferPrice'] ?? '');
     notesController = TextEditingController(text: data['notes'] ?? '');
+    followUpCommentController = TextEditingController();
 
     otherController = TextEditingController(
       text: data['otherDescription'] ?? '',
@@ -299,6 +305,14 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     selectedModel = data['model'];
     selectedVariant = data['variant'];
     selectedVariantPhotoUrl = data['vehiclePhotoUrl'];
+
+    additionalQuotations = [];
+    final additionalData = data['additionalQuotations'];
+    if (additionalData is List) {
+      additionalQuotations = additionalData
+          .whereType<Map<String, dynamic>>()
+          .toList();
+    }
 
     fetchBrands();
     _loadStaffList();
@@ -370,6 +384,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     exchangeExpectedPriceController.dispose();
     exchangeOfferPriceController.dispose();
     notesController.dispose();
+    followUpCommentController.dispose();
     otherController.dispose();
     callDurationController.dispose();
     callSubscription?.cancel();
@@ -595,7 +610,8 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             'followUpHistory': followUpHistory,
             'callHistory': callHistory,
             'vehiclePhotoUrl': selectedVariantPhotoUrl,
-            'editHistory': editHistory,
+            if (additionalQuotations.isNotEmpty)
+              'additionalQuotations': additionalQuotations,
             'isClosed': isClosed,
             'isBooked': isBooked,
             'status': effectiveStatus,
@@ -819,6 +835,83 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
+                    ],
+
+                    if (additionalQuotations.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Additional Vehicles',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      ...additionalQuotations
+                          .asMap()
+                          .entries
+                          .map((entry) {
+                        final index = entry.key;
+                        final item = entry.value;
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Vehicle ${index + 2}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if ((item['vehiclePhotoUrl'] ?? '')
+                                  .toString()
+                                  .isNotEmpty) ...[
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.network(
+                                    item['vehiclePhotoUrl'].toString(),
+                                    height: 160,
+                                    width: double.infinity,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      height: 160,
+                                      color: Colors.grey.shade200,
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                          'Unable to load vehicle photo'),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                              ],
+                              Text('Brand: ${item['brand'] ?? ''}'),
+                              Text('Model: ${item['model'] ?? ''}'),
+                              Text('Variant: ${item['variant'] ?? ''}'),
+                              Text('Price: ${item['onRoadPrice'] ?? ''}'),
+                              if ((item['offerPrice'] ?? '').toString().isNotEmpty)
+                                Text('Offer Price: ${item['offerPrice']}'),
+                              if ((item['description'] ?? '')
+                                  .toString()
+                                  .isNotEmpty)
+                                Text('Description: ${item['description']}'),
+                              if ((item['otherDescription'] ?? '')
+                                  .toString()
+                                  .isNotEmpty)
+                                Text(
+                                  'Other: ${item['otherDescription']}',
+                                ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                      const SizedBox(height: 12),
                     ],
 
                     TextField(
@@ -1205,6 +1298,17 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                           child: const Text('Change'),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: followUpCommentController,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Comment',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                      ),
                     ),
                     const SizedBox(height: 12),
                   ],
