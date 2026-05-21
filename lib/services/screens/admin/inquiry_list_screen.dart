@@ -1,6 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter_phone_direct_caller/flutter_phone_direct_caller.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../staff/edit_inquiry_screen.dart';
 import '../staff/add_inquiry_screen.dart';
@@ -235,6 +238,12 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
     }
     if (!cleanPhone.startsWith('+') && cleanPhone.length >= 10) {
       cleanPhone = '+$cleanPhone';
+    }
+
+    if (!kIsWeb) {
+      await Permission.phone.request();
+      await FlutterPhoneDirectCaller.callNumber(cleanPhone);
+      return;
     }
 
     final url = Uri.parse('tel:$cleanPhone');
