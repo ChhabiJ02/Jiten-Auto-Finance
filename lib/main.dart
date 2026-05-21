@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'firebase_options.dart';
 import 'services/cloudinary_service.dart';
 import 'widgets/user_session_wrapper.dart';
 import 'services/screens/auth/email_otp_verification_screen.dart';
@@ -140,7 +141,9 @@ class _SplashScreenState extends State<SplashScreen>
     final startedAt = DateTime.now();
 
     try {
-      await Firebase.initializeApp();
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
 
       final elapsed = DateTime.now().difference(startedAt);
 

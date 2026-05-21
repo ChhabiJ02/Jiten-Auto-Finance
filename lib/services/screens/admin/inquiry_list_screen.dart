@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../staff/edit_inquiry_screen.dart';
 import '../staff/add_inquiry_screen.dart';
@@ -215,9 +216,34 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
   }
 
   Future<void> _makeCall(String phoneNumber) async {
-    final url = Uri.parse('tel:$phoneNumber');
+    final rawPhone = phoneNumber.toString().trim();
+    if (rawPhone.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Phone number is missing.')),
+        );
+      }
+      return;
+    }
+
+    String cleanPhone = rawPhone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.startsWith('00')) {
+      cleanPhone = cleanPhone.replaceFirst('00', '+');
+    }
+    if (cleanPhone.length == 10 && !cleanPhone.startsWith('+')) {
+      cleanPhone = '+91$cleanPhone';
+    }
+    if (!cleanPhone.startsWith('+') && cleanPhone.length >= 10) {
+      cleanPhone = '+$cleanPhone';
+    }
+
+    final url = Uri.parse('tel:$cleanPhone');
     if (await canLaunchUrl(url)) {
-      await launchUrl(url);
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to open phone dialer.')),
+      );
     }
   }
 
@@ -854,6 +880,26 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
                                     ],
                                   ),
                                 ),
+                                if ((data['variant'] ?? '').toString().trim().isNotEmpty)
+                                  Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      children: [
+                                        const TextSpan(text: 'Variant: '),
+                                        TextSpan(text: data['variant']?.toString() ?? ''),
+                                      ],
+                                    ),
+                                  ),
+                                if (data['createdAt'] != null)
+                                  Text.rich(
+                                    TextSpan(
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                      children: [
+                                        const TextSpan(text: 'Generated: '),
+                                        TextSpan(text: _formatCreatedAt(data['createdAt'])),
+                                      ],
+                                    ),
+                                  ),
                                 Text.rich(
                                   TextSpan(
                                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -967,6 +1013,25 @@ class _InquiryListScreenState extends State<InquiryListScreen> {
       print('Error getting call history: $e');
     }
     return [];
+  }
+
+  String _formatCreatedAt(dynamic value) {
+    DateTime? createdAt;
+    if (value is Timestamp) {
+      createdAt = value.toDate();
+    } else if (value is DateTime) {
+      createdAt = value;
+    } else if (value is String) {
+      try {
+        createdAt = DateTime.parse(value);
+      } catch (_) {
+        createdAt = null;
+      }
+    }
+    if (createdAt == null) {
+      return 'N/A';
+    }
+    return DateFormat('dd MMM yyyy, HH:mm').format(createdAt);
   }
 
   Color _getStatusColor(String status, bool isClosed, bool isBooked) {

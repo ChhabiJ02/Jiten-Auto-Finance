@@ -1,0 +1,165 @@
+﻿Analyzing showroom_app...                                       
+
+   info - Don't use 'BuildContext's across async gaps - lib\main.dart:189:11 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\main.dart:204:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\main.dart:206:40 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\main.dart:208:40 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\main.dart:259:55 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\main.dart:304:53 - deprecated_member_use
+   info - The file name 'AUTH_SERVICE_EXAMPLES.dart' isn't a lower_case_with_underscores identifier - lib\services\AUTH_SERVICE_EXAMPLES.dart:1:1 - file_names
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:30:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:31:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:32:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:37:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:52:5 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:58:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:61:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:64:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:89:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:94:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:96:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:104:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:109:42 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:112:42 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:119:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:120:28 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:137:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:138:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:141:7 - avoid_print
+   info - Constructors for public widgets should have a named 'key' parameter - lib\services\AUTH_SERVICE_EXAMPLES.dart:150:7 - use_key_in_widget_constructors
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:167:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:173:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:174:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:194:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:195:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:196:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:197:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:198:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:199:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:201:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:213:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:214:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:215:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:217:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:233:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:240:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:241:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:247:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:263:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:266:38 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:268:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:307:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:308:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:311:38 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:314:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\AUTH_SERVICE_EXAMPLES.dart:315:28 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:341:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:346:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:349:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:352:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:355:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:359:7 - avoid_print
+   info - Parameter 'key' could be a super parameter - lib\services\AUTH_SERVICE_EXAMPLES.dart:369:9 - use_super_parameters
+   info - Parameter 'key' could be a super parameter - lib\services\AUTH_SERVICE_EXAMPLES.dart:378:9 - use_super_parameters
+   info - Don't invoke 'print' in production code - lib\services\AUTH_SERVICE_EXAMPLES.dart:391:3 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:37:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:56:11 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:62:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:65:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:69:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:85:9 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:95:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:103:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\cloudinary_service.dart:126:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\role_service.dart:27:7 - avoid_print
+warning - Unused import: 'vehicle_catalog_screen.dart' - lib\services\screens\admin\admin_dashboard.dart:6:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\admin\admin_dashboard.dart:236:45 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\admin\admin_dashboard.dart:398:43 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\admin\admin_dashboard.dart:429:60 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\admin\admin_dashboard.dart:576:33 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\admin\admin_dashboard.dart:592:28 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\admin_profile_screen.dart:175:28 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\screens\admin\inquiry_list_screen.dart:160:7 - avoid_print
+   info - Don't invoke 'print' in production code - lib\services\screens\admin\inquiry_list_screen.dart:194:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\inquiry_list_screen.dart:287:30 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\inquiry_list_screen.dart:291:30 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\inquiry_list_screen.dart:296:28 - use_build_context_synchronously
+   info - Don't invoke 'print' in production code - lib\services\screens\admin\inquiry_list_screen.dart:1112:7 - avoid_print
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\variant_screen.dart:167:54 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\variant_screen.dart:172:54 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\variant_screen.dart:229:39 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\admin\variant_screen.dart:230:46 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\admin_otp_verification_screen.dart:123:28 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\email_otp_verification_screen.dart:82:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\email_otp_verification_screen.dart:88:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\login_screen.dart:192:11 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\login_screen.dart:262:13 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\auth\login_screen.dart:270:13 - use_build_context_synchronously
+   info - Statements in an if should be enclosed in a block - lib\services\screens\customer\book_service_screen.dart:104:9 - curly_braces_in_flow_control_structures
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\customer\book_service_screen.dart:163:15 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\customer\book_service_screen.dart:189:15 - deprecated_member_use
+warning - Unused import: 'new_vehicle_booking_screen.dart' - lib\services\screens\customer\customer_home_screen.dart:5:8 - unused_import
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:67:58 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:164:46 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:206:51 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:345:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:370:53 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:433:41 - deprecated_member_use
+   info - Statements in an if should be enclosed in a block - lib\services\screens\customer\customer_home_screen.dart:656:25 - curly_braces_in_flow_control_structures
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:828:22 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\customer_home_screen.dart:848:24 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\customer\customer_profile_screen.dart:164:28 - use_build_context_synchronously
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\my_inquiries_screen.dart:229:32 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\customer\new_vehicle_booking_screen.dart:319:15 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\customer\new_vehicle_booking_screen.dart:349:15 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\services\screens\customer\new_vehicle_booking_screen.dart:394:37 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\services\screens\customer\new_vehicle_booking_screen.dart:394:41 - unnecessary_underscores
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\customer\vehicle_detail_screen.dart:199:28 - deprecated_member_use
+warning - The declaration '_addVehicleFromCatalog' isn't referenced - lib\services\screens\staff\add_inquiry_screen.dart:124:16 - unused_element
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\add_inquiry_screen.dart:1080:52 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\add_inquiry_screen.dart:1097:52 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1111:11 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1135:11 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1171:11 - deprecated_member_use
+   info - Unnecessary use of multiple underscores - lib\services\screens\staff\add_inquiry_screen.dart:1205:33 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\services\screens\staff\add_inquiry_screen.dart:1205:37 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\services\screens\staff\add_inquiry_screen.dart:1242:39 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\services\screens\staff\add_inquiry_screen.dart:1242:43 - unnecessary_underscores
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\add_inquiry_screen.dart:1321:30 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1392:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1423:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1441:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1460:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\add_inquiry_screen.dart:1481:25 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\add_inquiry_screen.dart:1504:32 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\add_inquiry_screen.dart:1508:34 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\edit_inquiry_screen.dart:634:36 - deprecated_member_use
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\edit_inquiry_screen.dart:636:55 - deprecated_member_use
+   info - Use the null-aware marker '?' rather than a null check via an 'if' - lib\services\screens\staff\edit_inquiry_screen.dart:656:11 - use_null_aware_elements
+warning - The '!' will have no effect because the receiver can't be null - lib\services\screens\staff\edit_inquiry_screen.dart:752:30 - unnecessary_non_null_assertion
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:763:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:822:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:874:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:891:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:920:23 - deprecated_member_use
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre - lib\services\screens\staff\edit_inquiry_screen.dart:996:25 - deprecated_member_use
+  error - The argument type 'List<DropdownMenuItem<Object>>' can't be assigned to the parameter type 'List<DropdownMenuItem<String>>?'.  - lib\services\screens\staff\edit_inquiry_screen.dart:1002:32 - argument_type_not_assignable
+warning - The value of the field '_authService' isn't used - lib\services\screens\staff\service_requests_screen.dart:14:9 - unused_field
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\services\screens\staff\service_requests_screen.dart:249:68 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\services\screens\staff\service_requests_screen.dart:270:68 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\services\screens\staff\service_requests_screen.dart:342:66 - use_build_context_synchronously
+   info - Unnecessary use of string interpolation - lib\services\screens\staff\staff_dashboard.dart:274:17 - unnecessary_string_interpolations
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check - lib\services\screens\staff\staff_dashboard.dart:381:23 - use_build_context_synchronously
+   info - Unnecessary use of 'toList' in a spread - lib\services\screens\staff\staff_dashboard.dart:868:30 - unnecessary_to_list_in_spreads
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss - lib\services\screens\staff\staff_dashboard.dart:960:50 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\staff\staff_profile_screen.dart:123:30 - use_build_context_synchronously
+   info - Don't use 'BuildContext's across async gaps - lib\services\screens\staff\staff_profile_screen.dart:171:28 - use_build_context_synchronously
+
+flutter : 154 issues found. (ran in 9.0s)
+At line:1 char:50
++ ... \Jiten Auto\showroom_app"; flutter analyze > analysis_errors.txt 2>&1
++                                ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (154 issues found. (ran in 9.0s):S 
+   tring) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

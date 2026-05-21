@@ -26,11 +26,21 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
   late final TextEditingController variantController;
   late final TextEditingController priceController;
   late final TextEditingController descriptionController;
-  late final TextEditingController referenceController;
+  late final TextEditingController referenceNameController;
+  late final TextEditingController referencePhoneController;
+  late final TextEditingController exchangeBrandModelController;
+  late final TextEditingController exchangeRegController;
+  late final TextEditingController exchangeExpectedPriceController;
+  late final TextEditingController exchangeOfferPriceController;
   late final TextEditingController otherController;
   late final TextEditingController notesController;
   late final TextEditingController callDurationController;
   late String paymentType;
+  late String eagerness;
+  late bool exchangeVehicle;
+  late String source;
+  String? selectedAssignedStaffId;
+  List<Map<String, dynamic>> staffList = [];
   late DateTime selectedDate;
   late DateTime newFollowUpDate;
 
@@ -42,6 +52,15 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     'New Inquiry',
     'Follow Ups',
     'Finance',
+  ];
+  static const List<String> _sourceOptions = [
+    'Google',
+    'Facebook / Instagram',
+    'Sticker',
+    'Just Dial',
+    'Walking',
+    'Reference',
+    'Website',
   ];
   List<Map<String, dynamic>> followUpHistory = [];
   List<Map<String, dynamic>> callHistory = [];
@@ -163,6 +182,26 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     });
   }
 
+  Future<void> fetchVariants(String model) async {
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Variant')
+        .where('ParentModel', isEqualTo: model)
+        .get();
+
+    setState(() {
+
+      variants = snapshot.docs.map((e) {
+
+        return {
+          'name': e['Name'].toString(),
+        };
+
+      }).toList();
+
+    });
+  }
+
   Future<void> _loadSelectedModelDetails(String brand, String model) async {
     final details = await fetchVehicleModelLookupData(
       firestore: FirebaseFirestore.instance,
@@ -185,6 +224,28 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     });
   }
 
+  Future<void> _loadStaffList() async {
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', isEqualTo: 'staff')
+          .where('isDisabled', isEqualTo: false)
+          .get();
+
+      if (!mounted) return;
+
+      setState(() {
+        staffList = snapshot.docs.map((doc) {
+          final data = doc.data();
+          return {
+            'id': doc.id,
+            'name': (data['name'] ?? 'Unknown Staff').toString(),
+          };
+        }).toList();
+      });
+    } catch (_) {}
+  }
+
   @override
   void initState() {
     super.initState();
@@ -200,7 +261,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     descriptionController = TextEditingController(
       text: data['description'] ?? '',
     );
-    referenceController = TextEditingController(text: data['reference'] ?? '');
+    referenceNameController = TextEditingController(text: data['referenceName'] ?? '');
+    referencePhoneController = TextEditingController(text: data['referencePhone'] ?? '');
+    exchangeBrandModelController = TextEditingController(text: data['exchangeBrandModel'] ?? '');
+    exchangeRegController = TextEditingController(text: data['exchangeRegNumber'] ?? '');
+    exchangeExpectedPriceController = TextEditingController(text: data['exchangeExpectedPrice'] ?? '');
+    exchangeOfferPriceController = TextEditingController(text: data['exchangeOfferPrice'] ?? '');
     notesController = TextEditingController(text: data['notes'] ?? '');
 
     otherController = TextEditingController(
@@ -210,30 +276,51 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     callDurationController = TextEditingController();
 
     paymentType = data['paymentType'] ?? 'Loan';
+    eagerness = data['eagerness'] ?? 'Cold';
+
+    final exchangeFlag = data['exchangeVehicle'];
+    if (exchangeFlag is bool) {
+      exchangeVehicle = exchangeFlag;
+    } else if (exchangeFlag is String) {
+      exchangeVehicle = exchangeFlag.toLowerCase() == 'yes' ||
+          exchangeFlag.toLowerCase() == 'true';
+    } else {
+      exchangeVehicle = false;
+    }
+
+    source = data['source'] ?? 'Facebook / Instagram';
+    selectedAssignedStaffId = (data['assignedTo'] ?? data['staffId'])?.toString();
 
     final nextFollowUp = data['nextFollowUp'];
-
     selectedDate = _parseDate(nextFollowUp) ?? DateTime.now();
-
     newFollowUpDate = selectedDate;
 
     selectedBrand = data['brand'];
     selectedModel = data['model'];
     selectedVariant = data['variant'];
-
     selectedVariantPhotoUrl = data['vehiclePhotoUrl'];
 
     fetchBrands();
+    _loadStaffList();
 
     if (selectedBrand != null) {
       fetchModels(selectedBrand!);
     }
 
     if (selectedBrand != null && selectedModel != null) {
-      _loadSelectedModelDetails(selectedBrand!, selectedModel!);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        setState(() {});
-      });
+      fetchVariants(selectedModel!);
+
+      _loadSelectedModelDetails(
+        selectedBrand!,
+        selectedModel!,
+      );
+
+      Future.delayed(
+        const Duration(milliseconds: 500),
+        () {
+          setState(() {});
+        },
+      );
     }
 
     final history = data['followUpHistory'];
@@ -276,7 +363,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     variantController.dispose();
     priceController.dispose();
     descriptionController.dispose();
-    referenceController.dispose();
+    referenceNameController.dispose();
+    referencePhoneController.dispose();
+    exchangeBrandModelController.dispose();
+    exchangeRegController.dispose();
+    exchangeExpectedPriceController.dispose();
+    exchangeOfferPriceController.dispose();
     notesController.dispose();
     otherController.dispose();
     callDurationController.dispose();
@@ -345,7 +437,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final variant = variantController.text.trim();
     final price = priceController.text.trim();
     final description = descriptionController.text.trim();
-    final reference = referenceController.text.trim();
+    final referenceName = referenceNameController.text.trim();
+    final referencePhone = referencePhoneController.text.trim();
+    final exchangeBrandModel = exchangeBrandModelController.text.trim();
+    final exchangeRegNumber = exchangeRegController.text.trim();
+    final exchangeExpectedPrice = exchangeExpectedPriceController.text.trim();
+    final exchangeOfferPrice = exchangeOfferPriceController.text.trim();
     final notes = notesController.text.trim();
     final otherDescription = otherController.text.trim();
     final oldData = widget.inquiry.data() as Map<String, dynamic>;
@@ -362,6 +459,10 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       showMessage('Please enter the vehicle brand.');
       return;
     }
+    if (source == 'Reference' && referenceName.isEmpty) {
+      showMessage('Please enter the reference person name.');
+      return;
+    }
 
     if (!_stagePendingFollowUp()) {
       return;
@@ -373,12 +474,12 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
     final effectiveStatus = isClosed
         ? 'Closed'
         : isBooked
-        ? 'Booked'
-        : paymentType == 'Loan'
-        ? 'Finance'
-        : status == 'Finance'
-        ? 'New Inquiry'
-        : status;
+            ? 'Booked'
+            : paymentType == 'Loan'
+                ? 'Finance'
+                : status == 'Finance'
+                    ? 'New Inquiry'
+                    : status;
 
     final changes = <String>[];
 
@@ -410,9 +511,49 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
       changes.add('Status changed from "$oldStatus" to "$effectiveStatus"');
     }
 
+    final oldReferenceName = (oldData['referenceName'] ?? '').toString().trim();
+    final oldReferencePhone = (oldData['referencePhone'] ?? '').toString().trim();
+    final oldExchangeBrandModel = (oldData['exchangeBrandModel'] ?? '').toString().trim();
+    final oldExchangeRegNumber = (oldData['exchangeRegNumber'] ?? '').toString().trim();
+    final oldExchangeExpectedPrice = (oldData['exchangeExpectedPrice'] ?? '').toString().trim();
+    final oldExchangeOfferPrice = (oldData['exchangeOfferPrice'] ?? '').toString().trim();
     final oldNotes = (oldData['notes'] ?? '').toString().trim();
+    final oldAssignedTo = (oldData['assignedTo'] ?? oldData['staffId'] ?? '').toString().trim();
+
+    if (oldReferenceName != referenceName) {
+      changes.add('Reference person changed');
+    }
+
+    if (oldReferencePhone != referencePhone) {
+      changes.add('Reference phone changed');
+    }
+
+    if (oldExchangeBrandModel != exchangeBrandModel) {
+      changes.add('Exchange brand/model changed');
+    }
+
+    if (oldExchangeRegNumber != exchangeRegNumber) {
+      changes.add('Exchange registration changed');
+    }
+
+    if (oldExchangeExpectedPrice != exchangeExpectedPrice) {
+      changes.add('Exchange expected price changed');
+    }
+
+    if (oldExchangeOfferPrice != exchangeOfferPrice) {
+      changes.add('Exchange offer price changed');
+    }
+
     if (oldNotes != notes) {
       changes.add('Notes updated');
+    }
+
+    final assignedToValue = selectedAssignedStaffId?.trim().isNotEmpty == true
+        ? selectedAssignedStaffId!
+        : oldAssignedTo;
+
+    if (oldAssignedTo != assignedToValue) {
+      changes.add('Assigned staff changed');
     }
 
     if (changes.isNotEmpty) {
@@ -437,10 +578,19 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
             'variant': variant,
             'price': price,
             'description': description,
+            'referenceName': referenceName,
+            'referencePhone': referencePhone,
             'paymentType': paymentType,
+            'source': source,
+            'eagerness': eagerness,
+            'exchangeVehicle': exchangeVehicle,
+            'exchangeBrandModel': exchangeBrandModel,
+            'exchangeRegNumber': exchangeRegNumber,
+            'exchangeExpectedPrice': exchangeExpectedPrice,
+            'exchangeOfferPrice': exchangeOfferPrice,
             'otherDescription': otherDescription,
             'notes': notes,
-            'reference': reference,
+            'assignedTo': assignedToValue,
             'nextFollowUp': Timestamp.fromDate(selectedDate),
             'followUpHistory': followUpHistory,
             'callHistory': callHistory,
@@ -572,8 +722,7 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                         setState(() {
                           selectedBrand = val;
                           selectedModel = null;
-                          selectedVariant = null;
-                          modelController.clear();
+                          
                           variantController.clear();
                           selectedVariantPhotoUrl = null;
                           priceController.clear();
@@ -600,13 +749,13 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       onChanged: (val) async {
                         setState(() {
                           selectedModel = val;
-                          selectedVariant = null;
-                          variantController.clear();
+                          
                           selectedVariantPhotoUrl = null;
                           priceController.clear();
                         });
 
                         modelController.text = val ?? '';
+                        await fetchVariants(val!);
                         await _loadSelectedModelDetails(
                           selectedBrand ?? '',
                           val!,
@@ -618,6 +767,39 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
+
+                    DropdownButtonFormField<String>(
+                      value: selectedVariant,
+                      isExpanded: true,
+                      hint: const Text("Select Variant"),
+
+                      items: variants.map((v) {
+
+                        return DropdownMenuItem(
+                          value: v['name'].toString(),
+                          child: Text(v['name'].toString()),
+                        );
+
+                      }).toList(),
+
+                      onChanged: (val) {
+
+                        setState(() {
+
+                          selectedVariant = val;
+                          variantController.text = val ?? '';
+
+                        });
+
+                      },
+
+                      decoration: const InputDecoration(
+                        labelText: 'Variant',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
 
                     if (selectedVariantPhotoUrl != null &&
                         selectedVariantPhotoUrl!.isNotEmpty) ...[
@@ -641,28 +823,55 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
 
                     TextField(
                       controller: priceController,
-                      readOnly: true,
                       decoration: const InputDecoration(labelText: 'Price'),
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: referenceController,
-                      decoration: const InputDecoration(labelText: 'Reference'),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: notesController,
-                      minLines: 1,
-                      maxLines: null,
-                      keyboardType: TextInputType.multiline,
+                    DropdownButtonFormField<String>(
+                      value: source,
+                      items: [
+                        if (!_sourceOptions.contains(source)) source,
+                        ..._sourceOptions,
+                      ]
+                          .map(
+                            (option) => DropdownMenuItem(
+                              value: option,
+                              child: Text(option),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            source = value;
+                          });
+                        }
+                      },
                       decoration: const InputDecoration(
-                        labelText: 'Notes',
-                        alignLabelWithHint: true,
+                        labelText: 'Source',
                         border: OutlineInputBorder(),
                       ),
                     ),
                     const SizedBox(height: 12),
+                    if (source == 'Reference') ...[
+                      TextField(
+                        controller: referenceNameController,
+                        decoration: const InputDecoration(
+                          labelText: "Reference Person's Name",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: referencePhoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: const InputDecoration(
+                          labelText: "Reference Person's Phone",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     DropdownButtonFormField<String>(
                       value: paymentType,
                       items: const [
@@ -676,6 +885,154 @@ class _EditInquiryScreenState extends State<EditInquiryScreen> {
                       },
                       decoration: const InputDecoration(
                         labelText: 'Payment Option',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: eagerness,
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'Hot',
+                          child: Text('🔥 Hot'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Warm',
+                          child: Text('🌤 Warm'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Cold',
+                          child: Text('❄ Cold'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            eagerness = value;
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Eagerness',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<bool>(
+                      value: exchangeVehicle,
+                      items: const [
+                        DropdownMenuItem(value: false, child: Text('No Exchange')),
+                        DropdownMenuItem(value: true, child: Text('Exchange')),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            exchangeVehicle = value;
+                          });
+                        }
+                      },
+                      decoration: const InputDecoration(
+                        labelText: 'Exchange Vehicle?',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    if (exchangeVehicle) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.black12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Exchange Vehicle Details',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: exchangeBrandModelController,
+                              decoration: const InputDecoration(
+                                labelText: 'Brand / Model',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: exchangeRegController,
+                              decoration: const InputDecoration(
+                                labelText: 'Registration Number',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: exchangeExpectedPriceController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: "Customer's Expected Price",
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: exchangeOfferPriceController,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Our Offer Price',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (staffList.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedAssignedStaffId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Assign Staff (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: staffList
+                            .map<DropdownMenuItem<String>>((staff) => DropdownMenuItem<String>(
+                                  value: staff['id']?.toString(),
+                                  child: Text(staff['name'].toString()),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() => selectedAssignedStaffId = value);
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: notesController,
+                      minLines: 1,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        alignLabelWithHint: true,
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: otherController,
+                      minLines: 1,
+                      maxLines: null,
+                      keyboardType: TextInputType.multiline,
+                      decoration: const InputDecoration(
+                        labelText: 'Other Details',
+                        alignLabelWithHint: true,
                         border: OutlineInputBorder(),
                       ),
                     ),

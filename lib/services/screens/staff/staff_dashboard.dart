@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'add_inquiry_screen.dart';
 import 'edit_inquiry_screen.dart';
 import 'staff_profile_screen.dart';
@@ -175,6 +176,25 @@ class _StaffDashboardState extends State<StaffDashboard> {
     }
 
     return 'Reminder: follow-up due today';
+  }
+
+  String _formatCreatedAt(dynamic value) {
+    DateTime? createdAt;
+    if (value is Timestamp) {
+      createdAt = value.toDate();
+    } else if (value is DateTime) {
+      createdAt = value;
+    } else if (value is String) {
+      try {
+        createdAt = DateTime.parse(value);
+      } catch (_) {
+        createdAt = null;
+      }
+    }
+    if (createdAt == null) {
+      return 'N/A';
+    }
+    return DateFormat('dd MMM yyyy, HH:mm').format(createdAt);
   }
 
   @override
@@ -461,7 +481,8 @@ class _StaffDashboardState extends State<StaffDashboard> {
 
                         return !isCompleted &&
                             status.toLowerCase() ==
-                                'new inquiry';
+                                'new inquiry' &&
+                            _isCreatedToday(itemData);
                       }
 
                       // FINANCE
@@ -512,9 +533,10 @@ class _StaffDashboardState extends State<StaffDashboard> {
                       // FOLLOW UPS
                       if (selectedFilter ==
                           'Follow Ups') {
-                        return status.toLowerCase() ==
-                                'follow ups' ||
-                            _hasDueFollowUp(itemData);
+                        return !isCompleted && (
+                          status.toLowerCase().contains('follow') ||
+                          _hasDueFollowUp(itemData)
+                        );
                       }
 
                       return status ==
@@ -907,10 +929,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                 itemData,
                               );
 
-                              final nextFollowUp =
-                                  itemData[
-                                      'nextFollowUp'];
-
+                              final nextFollowUpDay = _followUpDay(itemData);
                               final overdueReminderText =
                                   _followUpReminderText(
                                 itemData,
@@ -1043,11 +1062,18 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                         ),
                                       ),
 
-                                      if (nextFollowUp
-                                          is Timestamp)
+                                      if (itemData['createdAt'] != null)
+                                        Text(
+                                          "🕒 Generated: ${_formatCreatedAt(itemData['createdAt'])}",
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+
+                                      if (nextFollowUpDay != null)
 
                                         Text(
-                                          "📅 Follow up: ${nextFollowUp.toDate().toString().split(' ')[0]}",
+                                          "📅 Follow up: ${nextFollowUpDay.toString().split(' ')[0]}",
 
                                           style:
                                               TextStyle(
@@ -1056,7 +1082,7 @@ class _StaffDashboardState extends State<StaffDashboard> {
                                             color:
                                                 hasOverdueReminder
                                                     ? Colors.red
-                                                    : null,
+                                                    : Colors.black87,
                                           ),
                                         ),
 
